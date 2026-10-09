@@ -84,7 +84,9 @@ export type SlotView = {
 	Multiplier: number,
 }
 
--- Auto-display: the slot where `newIncome` raises CE/min the most. Locked slots are never touched.
+-- The slot where `newIncome` raises CE/min the most (the Relics menu's Equip button, and the
+-- pacing simulation, which assumes the player keeps their best relics equipped). Locked slots
+-- are never touched.
 -- Returns nil unless the improvement is strictly positive.
 function Economy.bestDisplaySlot(slots: { SlotView }, newIncome: number): (number?, number)
 	local bestSlot, bestGain = nil, 0
@@ -97,6 +99,47 @@ function Economy.bestDisplaySlot(slots: { SlotView }, newIncome: number): (numbe
 		end
 	end
 	return bestSlot, bestGain
+end
+
+export type EquipSlot = { Locked: boolean, Multiplier: number }
+-- Key identifies the relic (its Uid); Shown = currently on a pedestal (kept first on ties).
+export type EquipCandidate = { Key: number, Income: number, Shown: boolean? }
+
+-- Equip Best: the highest-income candidates go on the unlocked slots, the best relic on the
+-- highest pedestal multiplier, which gives the largest total CE/min. Locked slots are skipped
+-- (their relics must not be in `candidates`). Returns [slot] = candidate Key for every unlocked
+-- slot that gets a relic; unlocked slots missing from the result stay empty.
+function Economy.equipBest(slots: { EquipSlot }, candidates: { EquipCandidate }): { [number]: number }
+	local open = {}
+	for index, slot in slots do
+		if not slot.Locked then
+			table.insert(open, index)
+		end
+	end
+	table.sort(open, function(a, b)
+		if slots[a].Multiplier ~= slots[b].Multiplier then
+			return slots[a].Multiplier > slots[b].Multiplier
+		end
+		return a < b
+	end)
+	local sorted = table.clone(candidates)
+	table.sort(sorted, function(a, b)
+		if a.Income ~= b.Income then
+			return a.Income > b.Income
+		end
+		if (a.Shown == true) ~= (b.Shown == true) then
+			return a.Shown == true
+		end
+		return a.Key < b.Key
+	end)
+	local plan = {}
+	for rank, slot in open do
+		local candidate = sorted[rank]
+		if candidate then
+			plan[slot] = candidate.Key
+		end
+	end
+	return plan
 end
 
 return Economy

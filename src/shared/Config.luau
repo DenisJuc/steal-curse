@@ -16,9 +16,64 @@ Config.Scan = {
 
 Config.Feed = {
 	MaxLines = 4,
+	-- Fewer lines on small (phone) screens.
+	CompactMaxLines = 2,
 	LineLifetimeSeconds = 8,
 	-- Feed lines at or above this tier get a highlighted border.
 	HighlightTier = "Epic",
+}
+
+-- Reveal presentation (GDD 3.2). Tiers below MediumTier get a small projection + feed line;
+-- MediumTier.. get an enlarged model, flash and sound; LargeTier.. get the dramatic skippable
+-- reveal. A mutation adds a second stage after the base relic. Reveals never block scanning.
+Config.Reveal = {
+	MediumTier = "Epic",
+	LargeTier = "Celestial",
+	SmallSeconds = 0.5,
+	MediumSeconds = 1.3,
+	MediumMutationSeconds = 0.6,
+	LargeSeconds = 3,
+	LargeMutationSeconds = 1.5,
+	-- Waiting overlays beyond this are coalesced (still in the feed and the Journal).
+	MaxQueued = 3,
+	-- Small projections above the player at once.
+	MaxProjections = 3,
+}
+
+-- Server-wide chat message for very rare finds (GDD 3.1 "optional server message", 12.2).
+Config.Announce = {
+	Enabled = true,
+	MinTier = "Celestial",
+	-- Mutated finds at or above this tier are announced too.
+	MutatedMinTier = "Mythic",
+}
+
+-- AFK (GDD 2.2, 9.4). AFKing in game just keeps scanning; nothing pops up. The AFK stretch is
+-- logged and summarized on the Welcome Back screen the next time the player opens the game, or
+-- when they return after an anti-AFK server hop.
+Config.Afk = {
+	-- No input for this long marks the player AFK (the logged stretch starts here).
+	MarkAfterSeconds = 60,
+	-- Anti-AFK: Roblox disconnects players idle for 20 minutes, so idle players are moved to a
+	-- fresh server before that and keep AFKing. A banner warns HopWarningSeconds before the hop.
+	HopAfterSeconds = 17 * 60,
+	HopWarningSeconds = 15,
+	-- The AFK part of Welcome Back shows only after at least this much AFK time with a find.
+	MinReportSeconds = 60,
+	-- Most entries in the "Unlocked" list (the rest are counted as "and N more").
+	MaxUnlocks = 80,
+	-- /afksim: most scans simulated in one go.
+	SimMaxScans = 600,
+}
+
+-- Client sounds: Id, Volume (0..1 before the player's volume setting), Speed (pitch).
+-- Placeholders from Roblox's built-in sounds until Slice 8 adds the real audio.
+Config.Sounds = {
+	RevealSmall = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.12, Speed = 1.5 },
+	RevealMedium = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.6, Speed = 0.7 },
+	RevealLarge = { Id = "rbxasset://sounds/impact_explosion_03.mp3", Volume = 0.45, Speed = 0.6 },
+	Mutation = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.6, Speed = 1.9 },
+	Click = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.25, Speed = 1.2 },
 }
 
 Config.RemoteLimits = {
@@ -27,6 +82,7 @@ Config.RemoteLimits = {
 	Settings = { Rate = 4, Burst = 8 },
 	Shrine = { Rate = 8, Burst = 16 },
 	Inventory = { Rate = 8, Burst = 16 },
+	Afk = { Rate = 1, Burst = 4 },
 }
 
 -- Inventory (GDD 9.2, 9.3). Displayed relics count toward the capacity.
@@ -100,7 +156,6 @@ Config.Economy = {
 	UpgradeCostGrowth = 2,
 	-- Selling pays this fraction of one minute of the relic's base income (mutation included).
 	SellFraction = 0.01,
-	AutoDisplayDefault = true,
 }
 
 -- Offline earnings (GDD 2.2): no scans offline; displayed relics pay a reduced, capped amount.

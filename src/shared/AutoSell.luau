@@ -1,5 +1,5 @@
 -- Auto-sell rules (GDD 9.2, 9.3). Pure: no Roblox APIs, no requires, so Lune tests it as a
--- decision table. The server runs decide() on every new find that Auto-Display didn't place;
+-- decision table. The server runs decide() on every new find;
 -- the UI runs the same function for its "what will happen" preview.
 --
 -- Precedence (first match wins):

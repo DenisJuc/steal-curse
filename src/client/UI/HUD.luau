@@ -1,7 +1,8 @@
 -- Top-left column: the Spirit Resonator box (scan progress and totals), then Cursed Energy,
--- then the Shrine (pedestal), Luck (cursed lucky flower), Relics (chest) and Codex (book)
--- buttons, one under the other. Reads player attributes only; one UIScale keeps the whole
--- column readable on phones.
+-- then the Shrine (pedestal), Luck (cursed lucky flower), Relics (chest), Codex (book),
+-- Journal (scroll) and Settings (gear) buttons, one under the other. On small (phone) screens
+-- the buttons wrap into rows of three. Reads player attributes only; one UIScale keeps the
+-- whole column readable on phones.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,9 +20,13 @@ export type Callbacks = {
 	OnLuck: () -> (),
 	OnRelics: () -> (),
 	OnCodex: () -> (),
+	OnJournal: () -> (),
+	OnSettings: () -> (),
 }
 
 local ICON_BUTTON_SIZE = 64
+local ICON_GAP = 6
+local COMPACT_PER_ROW = 3
 
 local function iconButton(parent: Instance, name: string, order: number, caption: string): (TextButton, TextLabel)
 	local button = UIKit.create("TextButton", {
@@ -54,7 +59,8 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local column = UIKit.create("Frame", {
 		Name = "LeftColumn",
 		Position = UDim2.fromOffset(12, 12),
-		Size = UDim2.fromOffset(280, 470),
+		Size = UDim2.fromOffset(280, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		Parent = screen,
 	}, {
@@ -140,11 +146,25 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	player:GetAttributeChangedSignal("CE"):Connect(refreshCE)
 	refreshCE()
 
-	local shrineButton = iconButton(column, "ShrineButton", 3, "Shrine")
+	local buttons = UIKit.create("Frame", {
+		Name = "Buttons",
+		LayoutOrder = 3,
+		BackgroundTransparency = 1,
+		Parent = column,
+	})
+	local grid = UIKit.create("UIGridLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		CellSize = UDim2.fromOffset(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE),
+		CellPadding = UDim2.fromOffset(ICON_GAP, ICON_GAP),
+		FillDirection = Enum.FillDirection.Horizontal,
+		Parent = buttons,
+	})
+
+	local shrineButton = iconButton(buttons, "ShrineButton", 3, "Shrine")
 	Icons.pedestal(shrineButton)
 	shrineButton.Activated:Connect(callbacks.OnShrine)
 
-	local luckButton, luckCaption = iconButton(column, "LuckButton", 4, "Luck")
+	local luckButton, luckCaption = iconButton(buttons, "LuckButton", 4, "Luck")
 	Icons.cursedFlower(luckButton)
 	luckButton.Activated:Connect(callbacks.OnLuck)
 	local function refreshLuck()
@@ -153,13 +173,32 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	player:GetAttributeChangedSignal("EffectiveLuck"):Connect(refreshLuck)
 	refreshLuck()
 
-	local relicsButton = iconButton(column, "RelicsButton", 5, "Relics")
+	local relicsButton = iconButton(buttons, "RelicsButton", 5, "Relics")
 	Icons.chest(relicsButton)
 	relicsButton.Activated:Connect(callbacks.OnRelics)
 
-	local codexButton, codexCaption = iconButton(column, "CodexButton", 6, "Codex")
+	local codexButton, codexCaption = iconButton(buttons, "CodexButton", 6, "Codex")
 	Icons.book(codexButton)
 	codexButton.Activated:Connect(callbacks.OnCodex)
+
+	local journalButton = iconButton(buttons, "JournalButton", 7, "Journal")
+	Icons.scroll(journalButton)
+	journalButton.Activated:Connect(callbacks.OnJournal)
+
+	local settingsButton = iconButton(buttons, "SettingsButton", 8, "Settings")
+	Icons.gear(settingsButton)
+	settingsButton.Activated:Connect(callbacks.OnSettings)
+
+	local buttonCount = 6
+	UIKit.watchCompact(function(compact: boolean)
+		local perRow = if compact then COMPACT_PER_ROW else 1
+		local rows = math.ceil(buttonCount / perRow)
+		grid.FillDirectionMaxCells = perRow
+		buttons.Size = UDim2.fromOffset(
+			perRow * ICON_BUTTON_SIZE + (perRow - 1) * ICON_GAP,
+			rows * ICON_BUTTON_SIZE + (rows - 1) * ICON_GAP
+		)
+	end)
 	local function refreshCodex()
 		codexCaption.Text = `Codex {player:GetAttribute("DiscoveredCount") or 0}/{#CodexBook.AllIds}`
 	end

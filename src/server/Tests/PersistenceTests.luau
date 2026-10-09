@@ -137,7 +137,10 @@ local TESTS: { { Name: string, Run: () -> () } } = {
 			local item = DiscoveryPipeline.ApplyEntry(data, { Id = firstRelicOfTier("Epic"), Source = "Scan" }, os.time())
 			data.CE = 1234.56
 			table.insert(data.Pedestals, { Level = 7, Locked = true, Uid = item.Uid })
-			data.Settings.AutoDisplay = false
+			data.Settings.Client.Effects = "Low"
+			data.Settings.Client.InterfaceSize = "Big"
+			data.AfkLog.Active = true
+			data.AfkLog.Discoveries = 42
 			data.Offline.IncomePerMin = 321
 			data.Offline.At = 1700000000
 			local reloaded = endAndReopen(profile, key)
@@ -146,7 +149,8 @@ local TESTS: { { Name: string, Run: () -> () } } = {
 			check(#after.Pedestals == 4, `expected 4 pedestals, got {#after.Pedestals}`)
 			local fourth = after.Pedestals[4]
 			check(fourth.Level == 7 and fourth.Locked == true and fourth.Uid == item.Uid, "pedestal 4 not restored")
-			check(after.Settings.AutoDisplay == false, "Auto-Display setting lost")
+			check(after.Settings.Client.Effects == "Low" and after.Settings.Client.InterfaceSize == "Big", "Settings lost")
+			check(after.AfkLog.Active == true and after.AfkLog.Discoveries == 42, "AFK log lost")
 			check(after.Offline.IncomePerMin == 321 and after.Offline.At == 1700000000, "offline snapshot lost")
 			reloaded:EndSession()
 		end,

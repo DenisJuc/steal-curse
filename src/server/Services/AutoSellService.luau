@@ -1,10 +1,8 @@
--- Auto-sell pipeline stage (GDD 9.2, 9.3). Runs after Auto-Display on the new finds that were
--- not placed on a pedestal. The rule order lives in the pure AutoSell.decide (unit-tested).
+-- Auto-sell pipeline stage (GDD 9.2, 9.3). Runs on the new finds of a batch (and skips any that
+-- are already on a pedestal). The rule order lives in the pure AutoSell.decide (unit-tested).
 -- Then the capacity check: scans pause at the limit (ScanService), so this only catches other
 -- sources (signal captures, debug grants). If the inventory is full, a kept find is sold too,
 -- unless it is a first discovery or rare (Config.Inventory overflow rules), kept over the limit.
--- Displaced pedestal relics are never auto-sold; they just return to the inventory.
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AutoSell = require(ReplicatedStorage.Shared.AutoSell)

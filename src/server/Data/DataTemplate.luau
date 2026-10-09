@@ -4,7 +4,7 @@
 
 local DataTemplate = {}
 
-DataTemplate.Version = 2
+DataTemplate.Version = 3
 
 export type Item = {
 	Uid: number,
@@ -57,10 +57,23 @@ export type Data = {
 	-- Favorite relic + mutation keys (AutoSell.favoriteKey); protects future copies from auto-sell.
 	Favorites: { [string]: boolean },
 	RareHistory: { RareFind },
+	-- The current AFK stretch (kept across anti-AFK server hops and leaving), summarized on the
+	-- Welcome Back screen. Unlocks are read from the Codex/history timestamps >= StartedAt.
+	AfkLog: {
+		Active: boolean,
+		StartedAt: number,
+		ScansAtStart: number,
+		-- AFK time spent in game (not offline time between sessions).
+		Seconds: number,
+		CE: number,
+		Discoveries: number,
+		Sold: number,
+		SoldCE: number,
+		Hops: number,
+	},
 	Settings: {
 		RarityFocus: string,
 		Frequency: string,
-		AutoDisplay: boolean,
 		AutoSell: {
 			Tiers: { [string]: string },
 			SellAllDuplicates: boolean,
@@ -68,6 +81,8 @@ export type Data = {
 			ProtectFirst: boolean,
 			ProtectMutated: boolean,
 		},
+		-- Presentation settings (ClientSettings schema): string or number values.
+		Client: { [string]: string | number },
 	},
 	Skills: {
 		CoreLuck: number,
@@ -99,10 +114,20 @@ DataTemplate.Template = {
 	CodexMilestones = {},
 	Favorites = {},
 	RareHistory = {},
+	AfkLog = {
+		Active = false,
+		StartedAt = 0,
+		ScansAtStart = 0,
+		Seconds = 0,
+		CE = 0,
+		Discoveries = 0,
+		Sold = 0,
+		SoldCE = 0,
+		Hops = 0,
+	},
 	Settings = {
 		RarityFocus = "MaxLuck",
 		Frequency = "All",
-		AutoDisplay = true,
 		-- Must equal AutoSell.defaults() (checked by a Lune test).
 		AutoSell = {
 			Tiers = {
@@ -119,6 +144,16 @@ DataTemplate.Template = {
 			SellEasierThan = 0,
 			ProtectFirst = true,
 			ProtectMutated = true,
+		},
+		-- Must equal ClientSettings.defaults() (checked by a Lune test).
+		Client = {
+			Effects = "Full",
+			Reveals = "Full",
+			Camera = "On",
+			Sound = 100,
+			InterfaceSize = "Medium",
+			AfkReports = "On",
+			Hints = "On",
 		},
 	},
 	Skills = {

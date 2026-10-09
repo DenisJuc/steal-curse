@@ -1,23 +1,26 @@
 -- The single path every relic grant goes through (passive scans, captures, bonus rolls, debug).
 -- Stages (GDD 9.3 order):
 --   store item -> Codex discovery (base relic id) + seen mutation -> rare history
---   -> auto-display -> auto-sell (rules, then capacity) -> Codex milestones
---   -> priority save -> notify owner.
+--   -> auto-sell (rules, then capacity) -> Codex milestones -> AFK log
+--   -> priority save -> notify owner -> server announcement for very rare finds.
+-- New finds are never put on pedestals automatically (the player uses Equip Best).
 -- The Codex is written before auto-sell, so a first find counts even if it is sold right away.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Presentation = require(ReplicatedStorage.Shared.Presentation)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local AutoSellService = require(script.Parent.Services.AutoSellService)
 local CodexService = require(script.Parent.Services.CodexService)
 local DataService = require(script.Parent.Services.DataService)
 local GameEvents = require(script.Parent.Services.GameEvents)
-local PedestalService = require(script.Parent.Services.PedestalService)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local DiscoveryResult = Remotes:WaitForChild("DiscoveryResult") :: RemoteEvent
+local Announce = Remotes:WaitForChild("Announce") :: RemoteEvent
 
 local DiscoveryPipeline = {}
 
@@ -34,7 +37,6 @@ export type Result = {
 	Source: string,
 	First: boolean,
 	NewVariant: boolean,
-	Displayed: boolean,
 	-- Set when the find was auto-sold: CE earned and why.
 	Sold: number?,
 	SoldReason: string?,
@@ -43,6 +45,8 @@ export type Result = {
 local PRIORITY_INDEX = RarityConfig.IndexById[Config.Save.PriorityTier]
 local PRIORITY_MUTATED_INDEX = RarityConfig.IndexById[Config.Save.PriorityMutatedTier]
 local HISTORY_INDEX = RarityConfig.IndexById[Config.Save.RareHistoryTier]
+local ANNOUNCE_INDEX = RarityConfig.IndexById[Config.Announce.MinTier]
+local ANNOUNCE_MUTATED_INDEX = RarityConfig.IndexById[Config.Announce.MutatedMinTier]
 
 local function tierIndex(relicId: string): number
 	local relic = RelicConfig.ById[relicId]
@@ -124,19 +128,24 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 			Source = item.Source,
 			First = first,
 			NewVariant = newVariant,
-			Displayed = false,
 		})
 		GameEvents.Fire("Discovery", player, item, first)
 	end
 
-	local shown = PedestalService.AutoDisplayNew(player, items)
-	local sold = AutoSellService.Apply(player, items, firsts, shown)
+	local sold = AutoSellService.Apply(player, items, firsts, {})
+	local afk = data.AfkLog
 	for _, result in results do
-		result.Displayed = shown[result.Uid] == true
 		local sale = sold[result.Uid]
 		if sale then
 			result.Sold = sale.Earned
 			result.SoldReason = sale.Reason
+		end
+		if afk.Active then
+			afk.Discoveries += 1
+			if sale then
+				afk.Sold += 1
+				afk.SoldCE += sale.Earned
+			end
 		end
 	end
 
@@ -148,7 +157,30 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 		DataService.RequestSave(player)
 	end
 	DiscoveryResult:FireClient(player, results)
+	DiscoveryPipeline.AnnounceBest(player, results)
 	return results
+end
+
+-- One chat line to everyone for the rarest qualifying find of a batch (never more per batch).
+function DiscoveryPipeline.AnnounceBest(player: Player, results: { Result })
+	if not Config.Announce.Enabled then
+		return
+	end
+	local best: Result? = nil
+	local bestScore = -math.huge
+	for _, result in results do
+		local index = tierIndex(result.Id)
+		local mutated = result.Mutation ~= nil
+		local score = Presentation.score(index, mutated)
+		if Presentation.announces(index, mutated, ANNOUNCE_INDEX, ANNOUNCE_MUTATED_INDEX) and score > bestScore then
+			best, bestScore = result, score
+		end
+	end
+	if best then
+		for _, other in Players:GetPlayers() do
+			Announce:FireClient(other, { Name = player.DisplayName, Id = best.Id, Mutation = best.Mutation })
+		end
+	end
 end
 
 function DiscoveryPipeline.Grant(player: Player, relicIds: { string }, source: string): { Result }

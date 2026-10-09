@@ -7,7 +7,7 @@ local function minutes(seconds: number?): string
 	return if seconds then string.format("%6.1f min", seconds / 60) else "  not reached"
 end
 
-print("AFK shrine pacing at base luck, Auto-Display ON, 5 seeds (GDD 6.8 targets: pedestal 4 at 10-15 min,")
+print("AFK shrine pacing at base luck, best relics kept equipped, 5 seeds (GDD 6.8 targets: pedestal 4 at 10-15 min,")
 print("pedestal 5 at 45-60 min, pedestal 6 at 2-3 h; skill tree speed-ups are not in yet)\n")
 for _, scanSeconds in { Config.Scan.BaseIntervalSeconds, 2 } do
 	print(`Scan every {scanSeconds}s`)

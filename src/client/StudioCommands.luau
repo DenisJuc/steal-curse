@@ -1,11 +1,14 @@
 -- Studio-only client helpers:
 --   /help          prints every debug command into the chat window
 --   /forgecomplete acts like an exploiter: sends Complete without a real hold, and prints the server's answer
+--   /afkhop        jump the idle timer to just before the anti-AFK hop (banner, then the hop)
+--   /hints         replay the beginner hints
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TextChatService = game:GetService("TextChatService")
 
 local HuntController = require(script.Parent.Hunt.HuntController)
+local Settings = require(script.Parent.Settings)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local BeginBind = Remotes:WaitForChild("BeginBind") :: RemoteEvent
@@ -37,10 +40,13 @@ local HELP = {
 	"/savestatus - save mode, last save time, relic counts",
 	"/runtests - run the persistence tests (mock store)",
 	"/ce &lt;amount&gt; - add CE; /ce set &lt;amount&gt;",
-	"/offline &lt;seconds&gt; - pay offline earnings as if you were away",
+	"/offline &lt;seconds&gt; - pay offline earnings as if you were away (shows Welcome Back)",
+	"/afksim [minutes] - simulate AFKing that long, then show Welcome Back",
+	"/afkhop - skip to the anti-AFK warning; touch nothing for 15 s to see the hop",
 	"/pedlevel &lt;slot&gt; &lt;level&gt; - set a pedestal level",
-	"/give &lt;relicId&gt; [mutation] [count] - grant exact copies (auto-sell applies)",
+	"/give &lt;relicId&gt; [mutation|none] [count] - grant exact copies (auto-sell applies)",
 	"/codexfill [n] - mark the first n relics as discovered",
+	"/hints - replay the beginner hints",
 }
 
 local function say(text: string)
@@ -85,11 +91,18 @@ local function forgeComplete()
 	end
 end
 
-function StudioCommands.Start()
+function StudioCommands.Start(hooks: { SkipToHopWarning: () -> () })
 	register("/help", function()
 		say(table.concat(HELP, "\n"))
 	end)
 	register("/forgecomplete", forgeComplete)
+	register("/afkhop", function()
+		hooks.SkipToHopWarning()
+		say("[afkhop] Idle timer moved to the anti-AFK warning. Don't touch anything.")
+	end)
+	register("/hints", function()
+		Settings.Set("Hints", "On")
+	end)
 end
 
 return StudioCommands

@@ -1,6 +1,8 @@
--- Shrine management (GDD 6.3-6.5, 9.4): six pedestal rows (buy, upgrade, max, lock, change) and a
--- relic picker to choose what a pedestal displays. Selling lives in the Relics menu. The client only sends intents; the server validates
--- costs and ownership and pushes the new state back on ShrineState.
+-- Shrine menu (GDD 6.3-6.5): the pedestals only. Buy slots, upgrade levels, lock a pedestal and see
+-- what each one earns. "Choose" opens the Relics menu to pick what a pedestal shows; everything
+-- about relics themselves (Equip Best, selling, locks, favorites) lives in the Relics menu.
+-- The client only sends intents; the server validates costs and pushes the new state back on
+-- ShrineState.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,14 +15,14 @@ local UIKit = require(script.Parent.UIKit)
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local ShrineAction = Remotes:WaitForChild("ShrineAction") :: RemoteEvent
 local ShrineState = Remotes:WaitForChild("ShrineState") :: RemoteEvent
-local GetInventory = Remotes:WaitForChild("GetInventory") :: RemoteFunction
 
 local ShrinePanel = {}
 
 local ROW_HEIGHT = 58
 local PANEL_WIDTH = 500
+local LIST_TOP = 50
 
-type Snapshot = { Slots: { any }, AutoDisplay: boolean, IncomePerMin: number, IncomeMultiplier: number }
+type Snapshot = { Slots: { any }, IncomePerMin: number, IncomeMultiplier: number }
 
 local function button(parent: Instance, text: string, width: number, x: number, onClick: () -> ()): TextButton
 	local instance = UIKit.create("TextButton", {
@@ -46,17 +48,17 @@ local function relicColor(relicId: string, mutation: string?): Color3
 	return if relic then UIKit.tierColor(relic.Tier) else UIKit.Colors.Text
 end
 
-function ShrinePanel.Start(screen: ScreenGui, onOpenRelics: () -> ()): { Toggle: () -> (), SetVisible: (boolean) -> () }
+function ShrinePanel.Start(
+	screen: ScreenGui,
+	onChoose: (slot: number) -> ()
+): { Toggle: () -> (), Open: () -> (), SetVisible: (boolean) -> () }
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 	local snapshot: Snapshot? = nil
-	local pickerSlot: number? = nil
-	local pickerOpen = false
 	-- Buttons whose color depends on affordability: { button, cost }.
 	local costButtons: { { Button: TextButton, Cost: number } } = {}
 
-	local panel, content =
-		UIKit.modal(screen, "ShrineMenu", "SHRINE PEDESTALS", colors.Gold, Vector2.new(PANEL_WIDTH, 600))
+	local panel, content = UIKit.modal(screen, "ShrineMenu", "SHRINE", colors.Gold, Vector2.new(PANEL_WIDTH, 600))
 
 	local incomeLabel = UIKit.label({
 		TextSize = 15,
@@ -64,62 +66,20 @@ function ShrinePanel.Start(screen: ScreenGui, onOpenRelics: () -> ()): { Toggle:
 		Size = UDim2.new(1, 0, 0, 20),
 		Parent = content,
 	})
-
-	local toolbar = UIKit.create("Frame", {
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, 26),
-		Size = UDim2.new(1, 0, 0, 34),
+	UIKit.label({
+		Text = "Choose what each pedestal shows, or use Equip Best in Relics. Locked pedestals never change.",
+		TextSize = 12,
+		TextColor3 = colors.SubText,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Position = UDim2.fromOffset(0, 24),
+		Size = UDim2.new(1, 0, 0, 18),
 		Parent = content,
 	})
-	local autoButton = UIKit.create("TextButton", {
-		Font = UIKit.Font,
-		TextSize = 14,
-		TextColor3 = colors.Text,
-		BackgroundColor3 = colors.Card,
-		Size = UDim2.new(0.5, -3, 1, 0),
-		Parent = toolbar,
-	}, { UIKit.corner(8) })
-	local relicsButton = UIKit.create("TextButton", {
-		Text = "Relics & Selling",
-		Font = UIKit.Font,
-		TextSize = 14,
-		TextColor3 = colors.Text,
-		BackgroundColor3 = colors.Card,
-		Position = UDim2.new(0.5, 3, 0, 0),
-		Size = UDim2.new(0.5, -3, 1, 0),
-		Parent = toolbar,
-	}, { UIKit.corner(8) })
 
 	local slotsFrame = UIKit.scrollList(content, 6)
 	slotsFrame.Name = "Slots"
-	slotsFrame.Position = UDim2.fromOffset(0, 68)
-	slotsFrame.Size = UDim2.new(1, 0, 1, -68)
-
-	local picker = UIKit.create("Frame", {
-		Name = "Picker",
-		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, 68),
-		Size = UDim2.new(1, 0, 1, -68),
-		Visible = false,
-		Parent = content,
-	})
-	local pickerTitle = UIKit.label({
-		TextSize = 15,
-		TextWrapped = true,
-		Size = UDim2.new(1, -170, 0, 34),
-		Parent = picker,
-	})
-	local pickerStatus = UIKit.label({
-		TextSize = 13,
-		TextColor3 = colors.SubText,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		Position = UDim2.fromOffset(0, 38),
-		Size = UDim2.new(1, 0, 0, 18),
-		Parent = picker,
-	})
-	local list = UIKit.scrollList(picker, 4)
-	list.Position = UDim2.fromOffset(0, 60)
-	list.Size = UDim2.new(1, 0, 1, -60)
+	slotsFrame.Position = UDim2.fromOffset(0, LIST_TOP)
+	slotsFrame.Size = UDim2.new(1, 0, 1, -LIST_TOP)
 
 	local function refreshAffordability()
 		local ce = player:GetAttribute("CE") or 0
@@ -136,102 +96,6 @@ function ShrinePanel.Start(screen: ScreenGui, onOpenRelics: () -> ()): { Toggle:
 		incomeLabel.Text = `CE {Format.ce(ce)}   |   +{Format.number(perMin)} CE/min`
 	end
 
-	local function renderGroups(groups: { any })
-		for _, child in list:GetChildren() do
-			if child:IsA("Frame") then
-				child:Destroy()
-			end
-		end
-		if #groups == 0 then
-			pickerStatus.Text = "No relics yet. Your resonator finds one every few seconds."
-		end
-		for index, group in groups do
-			local spare = group.Count - group.Displayed
-			local row = UIKit.create("Frame", {
-				LayoutOrder = index,
-				Size = UDim2.new(1, -10, 0, 48),
-				BackgroundColor3 = colors.Card,
-				Parent = list,
-			}, { UIKit.corner(8) })
-			local hasActions = spare > 0 and pickerSlot ~= nil
-			local textWidth = if hasActions then -84 else -12
-			UIKit.label({
-				Text = Odds.displayName(group.Id, group.Mutation),
-				TextSize = 14,
-				TextColor3 = relicColor(group.Id, group.Mutation),
-				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(8, 4),
-				Size = UDim2.new(1, textWidth, 0, 20),
-				Parent = row,
-			})
-			UIKit.label({
-				Text = `x{group.Count}{if group.Displayed > 0 then ` ({group.Displayed} shown)` else ""}  |  +{Format.number(
-					group.IncomePerMin
-				)}/min`,
-				TextSize = 12,
-				TextColor3 = colors.SubText,
-				Position = UDim2.fromOffset(8, 24),
-				Size = UDim2.new(1, textWidth, 0, 16),
-				Parent = row,
-			})
-			if not hasActions then
-				continue
-			end
-			local slot = pickerSlot
-			button(row, "Display", 72, -6, function()
-				ShrineAction:FireServer("DisplayGroup", slot, group.Id, group.Mutation)
-				pickerOpen = false
-				picker.Visible = false
-				slotsFrame.Visible = true
-			end)
-		end
-	end
-
-	local function loadGroups()
-		task.spawn(function()
-			local ok, state = pcall(function()
-				return GetInventory:InvokeServer()
-			end)
-			if ok and type(state) == "table" and pickerOpen then
-				renderGroups(state.Groups)
-			end
-		end)
-	end
-
-	local function openPicker(slot: number)
-		pickerSlot = slot
-		pickerOpen = true
-		pickerTitle.Text = `Choose a relic for pedestal {slot}`
-		pickerStatus.Text = "Favorites first, then best income. Sell relics from the Relics menu."
-		for _, child in picker:GetChildren() do
-			if child:IsA("TextButton") then
-				child:Destroy()
-			end
-		end
-		local back = button(picker, "Back", 60, 0, function()
-			pickerOpen = false
-			picker.Visible = false
-			slotsFrame.Visible = true
-		end)
-		back.AnchorPoint = Vector2.new(1, 0)
-		back.Position = UDim2.fromScale(1, 0)
-		back.BackgroundColor3 = colors.Card
-		local clear = button(picker, "Empty slot", 90, -66, function()
-			ShrineAction:FireServer("Clear", slot)
-			pickerOpen = false
-			picker.Visible = false
-			slotsFrame.Visible = true
-		end)
-		clear.AnchorPoint = Vector2.new(1, 0)
-		clear.Position = UDim2.new(1, -66, 0, 0)
-		clear.BackgroundColor3 = colors.Card
-		slotsFrame.Visible = false
-		picker.Visible = true
-		renderGroups({})
-		pickerStatus.Text = "Loading..."
-		loadGroups()
-	end
-
 	local function renderSlots()
 		costButtons = {}
 		for _, child in slotsFrame:GetChildren() do
@@ -242,9 +106,6 @@ function ShrinePanel.Start(screen: ScreenGui, onOpenRelics: () -> ()): { Toggle:
 		if not snapshot then
 			return
 		end
-		autoButton.Text = `Auto-Display: {if snapshot.AutoDisplay then "ON" else "OFF"}`
-		autoButton.BackgroundColor3 = if snapshot.AutoDisplay then colors.Accent else colors.Card
-
 		for _, slot in snapshot.Slots do
 			local row = UIKit.create("Frame", {
 				LayoutOrder = slot.Slot,
@@ -302,8 +163,8 @@ function ShrinePanel.Start(screen: ScreenGui, onOpenRelics: () -> ()): { Toggle:
 			subtitle.Text = `+{Format.number(slot.IncomePerMin)}/min  |  Lv {slot.Level} (x{Format.number(slot.Multiplier)})`
 
 			local slotNumber = slot.Slot
-			button(row, "Change", 62, -8, function()
-				openPicker(slotNumber)
+			button(row, "Choose", 62, -8, function()
+				onChoose(slotNumber)
 			end)
 			if slot.UpgradeCost then
 				local maxButton = button(row, "Max", 44, -74, function()
@@ -328,22 +189,12 @@ function ShrinePanel.Start(screen: ScreenGui, onOpenRelics: () -> ()): { Toggle:
 		refreshAffordability()
 	end
 
-	autoButton.Activated:Connect(function()
-		if snapshot then
-			ShrineAction:FireServer("AutoDisplay", not snapshot.AutoDisplay)
-		end
-	end)
-	relicsButton.Activated:Connect(onOpenRelics)
-
 	ShrineState.OnClientEvent:Connect(function(state: Snapshot)
 		if type(state) ~= "table" or type(state.Slots) ~= "table" then
 			return
 		end
 		snapshot = state
 		renderSlots()
-		if pickerOpen and panel.Visible then
-			loadGroups()
-		end
 	end)
 	player:GetAttributeChangedSignal("CE"):Connect(function()
 		refreshIncome()
@@ -355,12 +206,9 @@ function ShrinePanel.Start(screen: ScreenGui, onOpenRelics: () -> ()): { Toggle:
 	return {
 		Toggle = function()
 			panel.Visible = not panel.Visible
-			if panel.Visible then
-				pickerOpen = false
-				picker.Visible = false
-				slotsFrame.Visible = true
-				renderSlots()
-			end
+		end,
+		Open = function()
+			panel.Visible = true
 		end,
 		SetVisible = function(visible: boolean)
 			if not visible then

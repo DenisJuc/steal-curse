@@ -27,6 +27,16 @@ Migrations.Steps = {
 			end
 		end
 	end,
+	-- 2 -> 3: Auto-Display was replaced by the Equip Best button; the numeric interface size became
+	-- Small/Medium/Big. Drop the old fields (Reconcile adds the new ones).
+	[3] = function(data: any)
+		if type(data.Settings) == "table" then
+			data.Settings.AutoDisplay = nil
+			if type(data.Settings.Client) == "table" then
+				data.Settings.Client.UIScale = nil
+			end
+		end
+	end,
 } :: { [number]: (any) -> () }
 
 export type Outcome = "Current" | "Migrated" | "Newer"

@@ -18,9 +18,11 @@
 --   /savestatus        save mode, last save time and counts
 --   /runtests          run the persistence tests on the ProfileStore mock
 --   /ce <amount>       add CE (negative removes); /ce set <amount>
---   /offline <seconds> pretend you were away that long and pay offline earnings now
+--   /offline <seconds> pretend you were away that long, pay offline earnings and show Welcome Back
+--   /afksim [minutes]  simulate an AFK stretch with anti-AFK hops (scans + shrine CE), then show
+--                      Welcome Back as if you just came back (default 30)
 --   /pedlevel <slot> <level>   set a pedestal level directly
---   /give <relicId> [mutation] [count]   grant exact copies through the full pipeline (auto-sell included)
+--   /give <relicId> [mutation|none] [count]   grant exact copies through the full pipeline (auto-sell included)
 --   /codexfill [n]     mark the first n relics (rarity order, default all) as discovered, without items
 
 local Players = game:GetService("Players")
@@ -36,6 +38,7 @@ local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local Stats = require(ReplicatedStorage.Shared.Stats)
+local AfkService = require(script.Parent.Services.AfkService)
 local BindService = require(script.Parent.Services.BindService)
 local CodexService = require(script.Parent.Services.CodexService)
 local DataService = require(script.Parent.Services.DataService)
@@ -347,7 +350,30 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 					then "nothing is displayed"
 					else `under {Config.Offline.MinSeconds}s pays nothing`
 				reply(player, `No offline earnings ({why}).`)
+				return
 			end
+			AfkService.Welcome(player, EconomyService.TakeOfflinePayout(player), false)
+		end,
+
+		afksim = function(player, args)
+			local data = DataService.Get(player)
+			local minutes = tonumber(args[1] or "30")
+			if not data or not minutes or minutes <= 0 then
+				reply(player, "Usage: /afksim [minutes], e.g. /afksim 60")
+				return
+			end
+			AfkService.Start(player)
+			local log = data.AfkLog
+			local seconds = math.floor(minutes * 60)
+			local scans = math.min(math.floor(seconds / Config.Scan.BaseIntervalSeconds), Config.Afk.SimMaxScans)
+			local ran = ScanService.ForceScans(player, scans, "Scan")
+			local income = EconomyService.GetIncomePerMin(player) * minutes
+			EconomyService.Add(player, income)
+			log.CE += income
+			log.Seconds += seconds
+			log.Hops += math.max(1, math.floor(seconds / Config.Afk.HopAfterSeconds))
+			reply(player, `Simulated {minutes} min AFK: {ran} scans, +{Format.ce(income)} CE. Showing Welcome Back.`)
+			AfkService.Welcome(player, nil, true)
 		end,
 
 		pedlevel = function(player, args)
@@ -362,12 +388,15 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 		give = function(player, args)
 			local relicId = findRelic(args[1] or "")
 			if not relicId then
-				reply(player, "Usage: /give <relicId> [mutation] [count], e.g. /give CrackedPrayerBead golden 5")
+				reply(player, "Usage: /give <relicId> [mutation|none] [count], e.g. /give CrackedPrayerBead golden 5")
 				return
 			end
 			local mutation = nil
 			local countArg = args[2]
-			if args[2] and not tonumber(args[2]) and args[2] ~= "" then
+			local noMutation = args[2] and (string.lower(args[2]) == "none" or string.lower(args[2]) == "nil")
+			if noMutation then
+				countArg = args[3]
+			elseif args[2] and not tonumber(args[2]) and args[2] ~= "" then
 				mutation = findMutation(args[2])
 				if not mutation then
 					reply(player, `Unknown mutation "{args[2]}".`)

@@ -1,6 +1,7 @@
 -- Shrine pedestals (GDD 6.3, 6.4): buy slots 4-6 with CE, per-slot levels 1-10, manual display,
--- slot locks and Auto-Display. A displayed relic stays in the inventory; the pedestal only points
--- at it by Uid, so swapping never loses an item.
+-- slot locks and Equip Best. New finds are never placed automatically: pedestals only change
+-- when the player picks a relic or presses Equip Best. A displayed relic stays in the inventory;
+-- the pedestal only points at it by Uid, so swapping never loses an item.
 --
 -- Client intents arrive on ShrineAction (action name + arguments); every argument is validated and
 -- every handler is synchronous, so rapid clicks are processed one at a time against current CE.
@@ -145,7 +146,6 @@ function PedestalService.Snapshot(player: Player): { [string]: any }?
 	end
 	return {
 		Slots = slots,
-		AutoDisplay = data.Settings.AutoDisplay,
 		IncomePerMin = EconomyService.GetIncomePerMin(player),
 		IncomeMultiplier = MultiplierService.Get(player, "Income"),
 	}
@@ -168,82 +168,42 @@ local function setDisplay(player: Player, slot: number, item: any?)
 	displayed[player][slot] = item
 end
 
--- Auto-Display (GDD 6.4, 9.3): put each item where it raises CE/min the most. A displaced relic
--- goes back to the inventory and is itself re-checked against the remaining slots. Locked slots
--- are never touched. Returns true if anything moved.
-local function autoPlace(player: Player, items: { any }): boolean
+-- Equip Best (GDD 6.4): fills every unlocked pedestal with the best relics the player holds,
+-- best relic on the highest-level pedestal. Locked pedestals and their relics are never touched.
+-- Returns the CE/min gained.
+function PedestalService.EquipBest(player: Player): number
 	local data = DataService.Get(player)
 	local cache = displayed[player]
 	if not data or not cache then
-		return false
+		return 0
 	end
-	local changed = false
-	for _, newItem in items do
-		local candidate = newItem
-		local filled = {}
-		for _ = 1, #data.Pedestals do
-			local views = {}
-			for slot, pedestal in data.Pedestals do
-				local current = cache[slot]
-				views[slot] = {
-					Locked = pedestal.Locked or filled[slot] == true,
-					Income = if current then relicIncome(current) else 0,
-					Multiplier = multiplier(pedestal),
-				}
-			end
-			local slot = Economy.bestDisplaySlot(views, relicIncome(candidate))
-			if not slot then
-				break
-			end
-			local displaced = cache[slot]
-			setDisplay(player, slot, candidate)
-			filled[slot] = true
-			changed = true
-			if not displaced then
-				break
-			end
-			candidate = displaced
+	local before = EconomyService.GetIncomePerMin(player)
+	local views, lockedUids = {}, {}
+	for slot, pedestal in data.Pedestals do
+		views[slot] = { Locked = pedestal.Locked, Multiplier = multiplier(pedestal) }
+		if pedestal.Locked and cache[slot] then
+			lockedUids[cache[slot].Uid] = true
 		end
 	end
-	return changed
-end
-
--- Pipeline stage: considers freshly granted items. Returns the set of their Uids now displayed.
-function PedestalService.AutoDisplayNew(player: Player, items: { any }): { [number]: boolean }
-	local data = DataService.Get(player)
-	local shown = {}
-	if not data or not data.Settings.AutoDisplay then
-		return shown
-	end
-	if autoPlace(player, items) then
-		PedestalService.Refresh(player)
-	end
-	for _, item in displayed[player] or {} do
-		shown[item.Uid] = true
-	end
-	return shown
-end
-
--- Best undisplayed inventory items first (used when a slot is bought or Auto-Display is turned on).
-local function autoFillFromInventory(player: Player)
-	local data = DataService.Get(player)
-	if not data or not data.Settings.AutoDisplay then
-		return
-	end
-	local candidates = {}
+	local candidates, byUid = {}, {}
 	for _, item in data.Inventory do
-		if not PedestalService.IsDisplayed(player, item.Uid) then
-			table.insert(candidates, item)
+		if not lockedUids[item.Uid] then
+			byUid[item.Uid] = item
+			table.insert(candidates, {
+				Key = item.Uid,
+				Income = relicIncome(item),
+				Shown = PedestalService.IsDisplayed(player, item.Uid),
+			})
 		end
 	end
-	table.sort(candidates, function(a, b)
-		return relicIncome(a) > relicIncome(b)
-	end)
-	local top = {}
-	for index = 1, math.min(#candidates, #data.Pedestals) do
-		top[index] = candidates[index]
+	local plan = Economy.equipBest(views, candidates)
+	for slot, pedestal in data.Pedestals do
+		if not pedestal.Locked then
+			local uid = plan[slot]
+			setDisplay(player, slot, if uid then byUid[uid] else nil)
+		end
 	end
-	autoPlace(player, top)
+	return EconomyService.GetIncomePerMin(player) - before
 end
 
 local function validSlot(data: any, slot: any): number?
@@ -251,6 +211,22 @@ local function validSlot(data: any, slot: any): number?
 		return nil
 	end
 	return slot
+end
+
+local function validGroup(relicId: any, mutationId: any): boolean
+	if type(relicId) ~= "string" or not RelicConfig.ById[relicId] then
+		return false
+	end
+	return mutationId == nil or (type(mutationId) == "string" and MutationConfig.ById[mutationId] ~= nil)
+end
+
+local function spareCopy(player: Player, data: any, relicId: string, mutationId: string?): any?
+	for _, item in data.Inventory do
+		if item.Id == relicId and item.Mutation == mutationId and not PedestalService.IsDisplayed(player, item.Uid) then
+			return item
+		end
+	end
+	return nil
 end
 
 local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
@@ -266,7 +242,6 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 			return
 		end
 		table.insert(data.Pedestals, { Level = 1, Locked = false })
-		autoFillFromInventory(player)
 		DataService.RequestSave(player)
 	end,
 
@@ -295,19 +270,65 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 
 	DisplayGroup = function(player, data, slotArg, relicId, mutationId)
 		local slot = validSlot(data, slotArg)
-		if not slot or type(relicId) ~= "string" or not RelicConfig.ById[relicId] then
+		if not slot or not validGroup(relicId, mutationId) then
 			return
 		end
-		if mutationId ~= nil and (type(mutationId) ~= "string" or not MutationConfig.ById[mutationId]) then
+		local item = spareCopy(player, data, relicId, mutationId)
+		if item then
+			setDisplay(player, slot, item)
+		else
+			fail(player, "You have no spare copy of that relic.")
+		end
+	end,
+
+	-- From the Relics menu: one spare copy goes on the unlocked pedestal where it adds the most CE/min.
+	EquipGroup = function(player, data, relicId, mutationId)
+		if not validGroup(relicId, mutationId) then
 			return
 		end
-		for _, item in data.Inventory do
-			if item.Id == relicId and item.Mutation == mutationId and not PedestalService.IsDisplayed(player, item.Uid) then
-				setDisplay(player, slot, item)
-				return
+		local item = spareCopy(player, data, relicId, mutationId)
+		if not item then
+			fail(player, "Every copy of that relic is already on a pedestal.")
+			return
+		end
+		local cache = displayed[player]
+		local views = {}
+		for slot, pedestal in data.Pedestals do
+			local current = cache[slot]
+			views[slot] = {
+				Locked = pedestal.Locked,
+				Income = if current then relicIncome(current) else 0,
+				Multiplier = multiplier(pedestal),
+			}
+		end
+		local slot, gain = Economy.bestDisplaySlot(views, relicIncome(item))
+		if not slot then
+			fail(player, "Your unlocked pedestals already hold better relics. Use Choose in the Shrine to place it anyway.")
+			return
+		end
+		setDisplay(player, slot, item)
+		Notify:FireClient(player, `Placed on pedestal {slot}: +{Format.number(gain)} CE/min`)
+	end,
+
+	UnequipGroup = function(player, data, relicId, mutationId)
+		if not validGroup(relicId, mutationId) then
+			return
+		end
+		local cache = displayed[player]
+		local lockedLeft = 0
+		for slot, pedestal in data.Pedestals do
+			local item = cache[slot]
+			if item and item.Id == relicId and item.Mutation == mutationId then
+				if pedestal.Locked then
+					lockedLeft += 1
+				else
+					setDisplay(player, slot, nil)
+				end
 			end
 		end
-		fail(player, "You have no spare copy of that relic.")
+		if lockedLeft > 0 then
+			fail(player, `{lockedLeft} cop{if lockedLeft == 1 then "y is" else "ies are"} on a locked pedestal. Unlock it in the Shrine first.`)
+		end
 	end,
 
 	Clear = function(player, data, slotArg)
@@ -324,13 +345,12 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 		end
 	end,
 
-	AutoDisplay = function(player, data, enabled)
-		if type(enabled) ~= "boolean" then
-			return
-		end
-		data.Settings.AutoDisplay = enabled
-		if enabled then
-			autoFillFromInventory(player)
+	EquipBest = function(player, _data)
+		local gained = PedestalService.EquipBest(player)
+		if gained > 1e-9 then
+			Notify:FireClient(player, `Equipped your best relics: +{Format.number(gained)} CE/min`)
+		else
+			Notify:FireClient(player, "Your best relics are already equipped.")
 		end
 	end,
 }

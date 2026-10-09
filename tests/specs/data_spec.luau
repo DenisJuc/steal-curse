@@ -50,7 +50,6 @@ return {
 			expect.equal(template.DataVersion, DataTemplate.Version, "template version")
 			expect.equal(template.Settings.RarityFocus, Config.Focus.Default, "focus default")
 			expect.equal(template.Settings.Frequency, Config.Frequency.Default, "frequency default")
-			expect.equal(template.Settings.AutoDisplay, Config.Economy.AutoDisplayDefault, "auto-display default")
 			expect.equal(#template.Pedestals, Config.Plots.StartingPedestals, "free starting pedestals")
 			expect.equal(template.CE, 0, "starting CE")
 			isSaveSafe(template, "Data")
@@ -112,6 +111,26 @@ return {
 			expect.equal(data.CodexMutations.CrackedPrayerBead, nil, "plain relic has no mutation record")
 			expect.equal(#data.Inventory, 3, "inventory kept")
 			expect.equal(data.Settings.AutoSell.ProtectFirst, true, "auto-sell settings reconciled")
+		end,
+	},
+	{
+		Name = "v2 data drops Auto-Display and the old numeric interface size, keeping everything else",
+		Run = function()
+			local data = {
+				DataVersion = 2,
+				CE = 50,
+				Inventory = { { Uid = 1, Id = "CrackedPrayerBead", At = 10, Source = "Scan" } },
+				Settings = { AutoDisplay = true, RarityFocus = "Epic", Client = { UIScale = 120, Effects = "Low" } },
+			}
+			expect.equal(Migrations.run(data, DataTemplate.Version), "Migrated", "outcome")
+			reconcile(data, DataTemplate.Template)
+			expect.equal(data.Settings.AutoDisplay, nil, "auto-display removed")
+			expect.equal(data.Settings.Client.UIScale, nil, "old interface size removed")
+			expect.equal(data.Settings.Client.InterfaceSize, "Medium", "new interface size added")
+			expect.equal(data.Settings.Client.Effects, "Low", "other settings kept")
+			expect.equal(data.Settings.RarityFocus, "Epic", "focus kept")
+			expect.equal(data.AfkLog.Active, false, "AFK log added")
+			expect.equal(#data.Inventory, 1, "inventory kept")
 		end,
 	},
 	{

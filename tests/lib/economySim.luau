@@ -1,5 +1,6 @@
 -- Second-by-second AFK shrine simulation at base luck, using the real roll math, income bands,
--- Auto-Display rule and prices. A pacing check for GDD 6.8, not a balance verdict: skill tree
+-- prices, and a player who keeps their best relics equipped (as if pressing Equip Best after
+-- every better find). A pacing check for GDD 6.8, not a balance verdict: skill tree
 -- upgrades (scan speed, Core Luck) arrive later and will speed this up.
 -- Spending policy: buy the next pedestal when affordable; otherwise buy the cheapest pedestal
 -- level only if it costs at most UpgradeBudgetShare of the next pedestal price.

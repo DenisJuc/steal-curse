@@ -22,13 +22,13 @@ type Result = {
 	Source: string,
 	First: boolean?,
 	NewVariant: boolean?,
-	Displayed: boolean?,
 	Sold: number?,
 	SoldReason: string?,
 }
 
 local LINE_HEIGHT = 44
 local order = 0
+local maxLines = Config.Feed.MaxLines
 
 local function tierIndex(relicId: string): number
 	local relic = RelicConfig.ById[relicId]
@@ -103,7 +103,7 @@ local function makeLine(list: Frame, title: string, subtitle: string, color: Col
 	table.sort(lines, function(a, b)
 		return a.LayoutOrder < b.LayoutOrder
 	end)
-	for index = Config.Feed.MaxLines + 1, #lines do
+	for index = maxLines + 1, #lines do
 		lines[index]:Destroy()
 	end
 	fadeLater(line)
@@ -124,9 +124,7 @@ local function showRelic(list: Frame, result: Result)
 	end
 	local color = if result.Mutation then UIKit.mutationColor(result.Mutation) else UIKit.tierColor(relic.Tier)
 	local subtitle = Odds.describe(relic.Id, result.Mutation)
-	if result.Displayed then
-		subtitle ..= "  |  on pedestal"
-	elseif result.Sold then
+	if result.Sold then
 		local reason = AutoSell.ReasonText[result.SoldReason or ""] or "auto-sell"
 		subtitle ..= `  |  sold +{Format.number(result.Sold)} CE ({reason})`
 	end
@@ -154,12 +152,16 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 		}),
 	})
 	UIKit.scaler(list)
+	UIKit.watchCompact(function(compact: boolean)
+		maxLines = if compact then Config.Feed.CompactMaxLines else Config.Feed.MaxLines
+		list.Size = UDim2.fromOffset(340, (LINE_HEIGHT + 6) * maxLines)
+	end)
 
 	DiscoveryResult.OnClientEvent:Connect(function(results: { Result })
 		if type(results) ~= "table" then
 			return
 		end
-		if #results <= Config.Feed.MaxLines then
+		if #results <= maxLines then
 			for _, result in results do
 				showRelic(list, result)
 			end
@@ -170,7 +172,7 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 		table.sort(sorted, function(a, b)
 			return rarityKey(a) < rarityKey(b)
 		end)
-		local shown = Config.Feed.MaxLines - 1
+		local shown = maxLines - 1
 		local soldCount, soldCE = 0, 0
 		for _, result in results do
 			if result.Sold then

@@ -53,6 +53,24 @@
         },
         "ClaimCodex": {
           "$className": "RemoteFunction"
+        },
+        "SetClientSetting": {
+          "$className": "RemoteEvent"
+        },
+        "Announce": {
+          "$className": "RemoteEvent"
+        },
+        "GetJournal": {
+          "$className": "RemoteFunction"
+        },
+        "SetAfk": {
+          "$className": "RemoteEvent"
+        },
+        "AfkHop": {
+          "$className": "RemoteEvent"
+        },
+        "WelcomeBack": {
+          "$className": "RemoteEvent"
         }
       }
     },

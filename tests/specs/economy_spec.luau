@@ -1,5 +1,5 @@
 -- Shrine economy formulas (GDD 6): pedestal costs and multipliers, income, selling, offline pay,
--- and the Auto-Display decision.
+-- and the Equip Best assignment.
 
 local Config = require("../../src/shared/Config")
 local Economy = require("../../src/shared/Economy")
@@ -111,7 +111,39 @@ return {
 		end,
 	},
 	{
-		Name = "Auto-Display only makes strictly positive swaps and never touches locked slots",
+		Name = "Equip Best puts the best relics on the highest pedestals and skips locked ones",
+		Run = function()
+			local slots = {
+				{ Locked = false, Multiplier = 1 },
+				{ Locked = true, Multiplier = 2 },
+				{ Locked = false, Multiplier = 1.5 },
+				{ Locked = false, Multiplier = 1 },
+			}
+			local candidates = {
+				{ Key = 1, Income = 10 },
+				{ Key = 2, Income = 600 },
+				{ Key = 3, Income = 75 },
+				{ Key = 4, Income = 200 },
+			}
+			local plan = Economy.equipBest(slots, candidates)
+			expect.equal(plan[2], nil, "locked slot untouched")
+			expect.equal(plan[3], 2, "best relic on the highest unlocked multiplier")
+			expect.equal(plan[1], 4, "second best on the next slot (lower index wins ties)")
+			expect.equal(plan[4], 3, "third best on the last slot")
+
+			local few = Economy.equipBest(slots, { { Key = 9, Income = 5 } })
+			expect.equal(few[3], 9, "a single relic goes on the best slot")
+			expect.equal(few[1], nil, "other unlocked slots stay empty")
+
+			local tie = Economy.equipBest({ { Locked = false, Multiplier = 1 } }, {
+				{ Key = 1, Income = 10 },
+				{ Key = 2, Income = 10, Shown = true },
+			})
+			expect.equal(tie[1], 2, "on equal income the already-equipped copy stays")
+		end,
+	},
+	{
+		Name = "pacing helper only makes strictly positive swaps and never touches locked slots",
 		Run = function()
 			local slots = {
 				{ Locked = false, Income = 75, Multiplier = 1 },

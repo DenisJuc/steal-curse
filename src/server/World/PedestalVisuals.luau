@@ -1,7 +1,7 @@
 -- Server-side look of a plot's six pedestals, so visitors see the same shrine as the owner.
 -- Owned: solid stand, glow brightens with level, placeholder relic shape + info billboard.
 -- Next buyable slot: ghost stand with its price. Later slots: hidden ghost.
--- Placeholder shapes by object type until Slice 8 imports real models.
+-- Placeholder shapes by object type (RelicShapes) until Slice 8 imports real models.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -10,6 +10,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RelicShapes = require(ReplicatedStorage.Shared.RelicShapes)
 local BuildUtil = require(script.Parent.BuildUtil)
 
 local PedestalVisuals = {}
@@ -28,19 +29,6 @@ export type SlotState = {
 
 local NEON_FROM_TIER = RarityConfig.IndexById.Epic
 
-local function shapeFor(objectType: string, at: CFrame): { [string]: any }
-	if objectType == "Weapon" then
-		return { Size = Vector3.new(0.5, 4.2, 0.5), CFrame = at * CFrame.new(0, 0.6, 0) * CFrame.Angles(0, 0, math.rad(20)) }
-	elseif objectType == "Book" then
-		return { Size = Vector3.new(2.2, 0.6, 1.7), CFrame = at * CFrame.Angles(math.rad(-15), 0, 0) }
-	elseif objectType == "Mask" then
-		return { Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.4, 2.4, 2.4), CFrame = at * CFrame.new(0, 0.4, 0) }
-	elseif objectType == "Crystal" then
-		return { Size = Vector3.new(1.3, 2.6, 1.3), CFrame = at * CFrame.new(0, 0.4, 0) * CFrame.Angles(0, math.rad(45), 0) }
-	end
-	return { Shape = Enum.PartType.Ball, Size = Vector3.new(1.9, 1.9, 1.9), CFrame = at }
-end
-
 local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mutationId: string?)
 	local relic = RelicConfig.ById[relicId]
 	if not relic then
@@ -48,7 +36,7 @@ local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mut
 	end
 	local tier = RarityConfig.Get(relic.Tier)
 	local color = if tier then Color3.fromHex(tier.Color) else Color3.new(1, 1, 1)
-	local props = shapeFor(relic.ObjectType, CFrame.new(top.Position + Vector3.new(0, 2.4, 0)))
+	local props = RelicShapes.props(relic.ObjectType, CFrame.new(top.Position + Vector3.new(0, 2.4, 0)))
 	props.Name = "RelicDisplay"
 	props.Color = color
 	props.Material = if (RarityConfig.IndexById[relic.Tier] or 1) >= NEON_FROM_TIER

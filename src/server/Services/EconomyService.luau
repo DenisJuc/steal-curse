@@ -6,21 +6,24 @@
 --
 -- Offline (GDD 2.2): every tick stores the current CE/min and time in data.Offline. On the next
 -- join that snapshot pays Rate x CE/min x min(away time, cap) once. Scanning never runs offline.
+-- The payout is kept for AfkService's Welcome Back screen (GDD 9.4). SessionIncome counts the
+-- shrine CE produced online this session (Journal), and an active AFK log gets the CE too.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Economy = require(ReplicatedStorage.Shared.Economy)
-local Format = require(ReplicatedStorage.Shared.Format)
 local DataService = require(script.Parent.DataService)
 local MultiplierService = require(script.Parent.MultiplierService)
 
-local Notify = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Notify") :: RemoteEvent
-
 local EconomyService = {}
 
+export type OfflinePayout = { Amount: number, Seconds: number, PaidSeconds: number }
+
 local lastTick: { [Player]: number } = {}
+local sessionIncome: { [Player]: number } = {}
+local offlinePayouts: { [Player]: OfflinePayout } = {}
 local contributionsOf: (Player) -> { number } = function(_player: Player)
 	return {}
 end
@@ -74,8 +77,14 @@ local function tick(player: Player, seconds: number)
 	data.LifetimeCE += earned
 	data.Offline.IncomePerMin = perMin
 	data.Offline.At = os.time()
+	sessionIncome[player] = (sessionIncome[player] or 0) + earned
+	if data.AfkLog.Active then
+		data.AfkLog.CE += earned
+		data.AfkLog.Seconds += seconds
+	end
 	player:SetAttribute("CE", data.CE)
 	player:SetAttribute("IncomePerMin", perMin)
+	player:SetAttribute("SessionIncome", sessionIncome[player])
 end
 
 -- Pays the stored snapshot once. Returns the CE paid (0 if too short or nothing displayed).
@@ -89,16 +98,22 @@ function EconomyService.PayOffline(player: Player): number
 	local amount = Economy.offlineEarnings(Config.Offline, data.Offline.IncomePerMin, elapsed)
 	data.Offline.At = now
 	if amount > 0 then
+		offlinePayouts[player] = {
+			Amount = amount,
+			Seconds = elapsed,
+			PaidSeconds = math.min(elapsed, Config.Offline.CapSeconds),
+		}
 		EconomyService.Add(player, amount)
-		local paidFor = Format.duration(math.min(elapsed, Config.Offline.CapSeconds))
-		Notify:FireClient(
-			player,
-			`While you were away ({Format.duration(elapsed)}): +{Format.ce(amount)} CE from your shrine ({paidFor} paid)`,
-			"Offline"
-		)
 		DataService.RequestSave(player)
 	end
 	return amount
+end
+
+-- The last offline payout not shown yet (read once by the Welcome Back screen).
+function EconomyService.TakeOfflinePayout(player: Player): OfflinePayout?
+	local payout = offlinePayouts[player]
+	offlinePayouts[player] = nil
+	return payout
 end
 
 function EconomyService.Init()
@@ -111,6 +126,8 @@ function EconomyService.Init()
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		lastTick[player] = nil
+		sessionIncome[player] = nil
+		offlinePayouts[player] = nil
 	end)
 
 	task.spawn(function()

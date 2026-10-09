@@ -1,8 +1,10 @@
 -- Client entry point: builds the UI and hunt controls. The client only shows information and sends intents.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local ClientSettings = require(ReplicatedStorage.Shared.ClientSettings)
 local HUD = require(script.Parent.UI.HUD)
 local AutoSellPanel = require(script.Parent.UI.AutoSellPanel)
 local Banner = require(script.Parent.UI.Banner)
@@ -10,9 +12,19 @@ local CodexPanel = require(script.Parent.UI.CodexPanel)
 local DiscoveryFeed = require(script.Parent.UI.DiscoveryFeed)
 local FocusPanel = require(script.Parent.UI.FocusPanel)
 local InventoryPanel = require(script.Parent.UI.InventoryPanel)
+local JournalPanel = require(script.Parent.UI.JournalPanel)
+local Onboarding = require(script.Parent.UI.Onboarding)
+local SettingsPanel = require(script.Parent.UI.SettingsPanel)
 local ShrinePanel = require(script.Parent.UI.ShrinePanel)
 local Toasts = require(script.Parent.UI.Toasts)
+local UIKit = require(script.Parent.UI.UIKit)
+local WelcomeBack = require(script.Parent.UI.WelcomeBack)
+local Announcements = require(script.Parent.Announcements)
+local AfkController = require(script.Parent.Controllers.AfkController)
+local GamepadController = require(script.Parent.Controllers.GamepadController)
+local RevealController = require(script.Parent.Controllers.RevealController)
 local HuntController = require(script.Parent.Hunt.HuntController)
+local Settings = require(script.Parent.Settings)
 local StudioCommands = require(script.Parent.StudioCommands)
 
 local screen = Instance.new("ScreenGui")
@@ -20,6 +32,10 @@ screen.Name = "RelicCollectorUI"
 screen.ResetOnSpawn = false
 screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screen.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+Settings.Watch("InterfaceSize", function(value)
+	UIKit.SetUserScale(ClientSettings.InterfaceScale[value :: string] or 1)
+end)
 
 -- Every menu opens in the screen center; only one is open at a time.
 type Menu = { SetVisible: (boolean) -> () }
@@ -33,17 +49,27 @@ local function closeAllExcept(keep: Menu?)
 end
 
 local autoSellPanel = AutoSellPanel.Start(screen)
-local inventoryPanel = InventoryPanel.Start(screen, function()
-	closeAllExcept(autoSellPanel)
-	autoSellPanel.Open()
-end)
-local shrinePanel = ShrinePanel.Start(screen, function()
+local shrinePanel
+local inventoryPanel = InventoryPanel.Start(screen, {
+	OnOpenAutoSell = function()
+		closeAllExcept(autoSellPanel)
+		autoSellPanel.Open()
+	end,
+	OnPickDone = function()
+		closeAllExcept(shrinePanel)
+		shrinePanel.Open()
+	end,
+})
+shrinePanel = ShrinePanel.Start(screen, function(slot: number)
 	closeAllExcept(inventoryPanel)
-	inventoryPanel.Toggle()
+	inventoryPanel.Pick(slot)
 end)
 local focusPanel = FocusPanel.Start(screen)
 local codexPanel = CodexPanel.Start(screen)
-menus = { shrinePanel, focusPanel, inventoryPanel, autoSellPanel, codexPanel }
+local journalPanel = JournalPanel.Start(screen)
+local settingsPanel = SettingsPanel.Start(screen)
+local welcomeBack = WelcomeBack.Start(screen)
+menus = { shrinePanel, focusPanel, inventoryPanel, autoSellPanel, codexPanel, journalPanel, settingsPanel, welcomeBack }
 
 local function toggleOnly(menu: Menu & { Toggle: () -> () })
 	return function()
@@ -57,10 +83,14 @@ local hud = HUD.Start(screen, {
 	OnLuck = toggleOnly(focusPanel),
 	OnRelics = toggleOnly(inventoryPanel),
 	OnCodex = toggleOnly(codexPanel),
+	OnJournal = toggleOnly(journalPanel),
+	OnSettings = toggleOnly(settingsPanel),
 })
 DiscoveryFeed.Start(screen)
+RevealController.Start(screen)
 Toasts.Start(screen)
 Banner.Start(screen)
+Announcements.Start()
 HuntController.Start(screen, {
 	-- Spirit Sight hides management UI; scanning itself never stops.
 	SetManagementVisible = function(visible: boolean)
@@ -70,7 +100,12 @@ HuntController.Start(screen, {
 		end
 	end,
 })
+GamepadController.Start(screen, function()
+	return screen:FindFirstChild("Buttons", true)
+end)
+Onboarding.Start(screen)
+local afk = AfkController.Start()
 
 if RunService:IsStudio() then
-	StudioCommands.Start()
+	StudioCommands.Start({ SkipToHopWarning = afk.SkipToHopWarning })
 end

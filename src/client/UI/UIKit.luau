@@ -144,6 +144,7 @@ function UIKit.modal(screen: ScreenGui, name: string, title: string, accent: Col
 		UIKit.stroke(accent, 2, 0.3),
 		UIKit.padding(10),
 	})
+	window:SetAttribute("Modal", true)
 	UIKit.label({
 		Name = "Title",
 		Text = title,
@@ -193,21 +194,59 @@ function UIKit.scrollList(parent: Instance, padding: number): ScrollingFrame
 	})
 end
 
--- Keeps a panel readable on phones and not oversized on big monitors. Scales around the panel's AnchorPoint.
-function UIKit.scaler(panel: GuiObject): UIScale
-	local scale = UIKit.create("UIScale", { Parent = panel })
+local function getCamera(): Camera
 	local camera = workspace.CurrentCamera
 	while not camera do
 		task.wait()
 		camera = workspace.CurrentCamera
 	end
+	return camera
+end
+
+-- Player's "Interface size" setting (1 = 100%), applied on top of the screen-size scale.
+local userScale = 1
+local scaleUpdaters: { () -> () } = {}
+
+-- Keeps a panel readable on phones and not oversized on big monitors. Scales around the panel's AnchorPoint.
+function UIKit.scaler(panel: GuiObject): UIScale
+	local scale = UIKit.create("UIScale", { Parent = panel })
+	local camera = getCamera()
 	local function update()
 		local viewport = camera.ViewportSize
-		scale.Scale = math.clamp(math.min(viewport.X / 1280, viewport.Y / 720), 0.65, 1.15)
+		scale.Scale = math.clamp(math.min(viewport.X / 1280, viewport.Y / 720), 0.65, 1.15) * userScale
 	end
 	camera:GetPropertyChangedSignal("ViewportSize"):Connect(update)
+	table.insert(scaleUpdaters, update)
 	update()
 	return scale
+end
+
+function UIKit.SetUserScale(scale: number)
+	userScale = math.clamp(scale, 0.5, 1.5)
+	for _, update in scaleUpdaters do
+		update()
+	end
+end
+
+-- Compact layout for small screens (phones in landscape are about 390 px tall).
+local COMPACT_HEIGHT = 520
+
+function UIKit.isCompact(): boolean
+	return getCamera().ViewportSize.Y < COMPACT_HEIGHT
+end
+
+-- Runs now and whenever the screen switches between compact and normal.
+function UIKit.watchCompact(callback: (boolean) -> ())
+	local camera = getCamera()
+	local last = UIKit.isCompact()
+	camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+		local now = UIKit.isCompact()
+		if now ~= last then
+			last = now
+			callback(now)
+		end
+	end)
+	callback(last)
 end
 
 return UIKit

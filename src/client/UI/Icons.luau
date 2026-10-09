@@ -106,4 +106,53 @@ function Icons.book(parent: Instance): Frame
 	return icon
 end
 
+-- Journal: an unrolled parchment scroll with ink lines.
+function Icons.scroll(parent: Instance): Frame
+	local icon = box(parent)
+	local paper = Color3.fromRGB(236, 220, 180)
+	local roll = Color3.fromRGB(190, 160, 110)
+	local ink = Color3.fromRGB(90, 60, 110)
+	rect(icon, 10, 8, 28, 32, paper, 2)
+	rect(icon, 6, 4, 36, 8, roll, 4)
+	rect(icon, 6, 38, 36, 8, roll, 4)
+	rect(icon, 15, 17, 18, 3, ink, 1)
+	rect(icon, 15, 23, 14, 3, ink, 1)
+	rect(icon, 15, 29, 17, 3, ink, 1)
+	return icon
+end
+
+-- Settings: a gear (eight teeth around a ring).
+function Icons.gear(parent: Instance): Frame
+	local icon = box(parent)
+	local metal = Color3.fromRGB(190, 185, 210)
+	for index = 0, 3 do
+		UIKit.create("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(24, 24),
+			Size = UDim2.fromOffset(40, 9),
+			Rotation = index * 45,
+			BackgroundColor3 = metal,
+			BorderSizePixel = 0,
+			Parent = icon,
+		}, { UIKit.corner(2) })
+	end
+	local ring = UIKit.create("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(24, 24),
+		Size = UDim2.fromOffset(28, 28),
+		BackgroundColor3 = metal,
+		BorderSizePixel = 0,
+		Parent = icon,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	UIKit.create("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(12, 12),
+		BackgroundColor3 = UIKit.Colors.Panel,
+		BorderSizePixel = 0,
+		Parent = ring,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	return icon
+end
+
 return Icons
