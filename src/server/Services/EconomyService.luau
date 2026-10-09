@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Economy = require(ReplicatedStorage.Shared.Economy)
+local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local DataService = require(script.Parent.DataService)
 local MultiplierService = require(script.Parent.MultiplierService)
 
@@ -95,13 +96,16 @@ function EconomyService.PayOffline(player: Player): number
 	end
 	local now = os.time()
 	local elapsed = now - data.Offline.At
-	local amount = Economy.offlineEarnings(Config.Offline, data.Offline.IncomePerMin, elapsed)
+	-- Spirit Reservoir extends the cap (GDD 6.6).
+	local settings = table.clone(Config.Offline)
+	settings.CapSeconds = SkillConfig.offlineCapSeconds(data.Skills.SpiritReservoir or 0)
+	local amount = Economy.offlineEarnings(settings, data.Offline.IncomePerMin, elapsed)
 	data.Offline.At = now
 	if amount > 0 then
 		offlinePayouts[player] = {
 			Amount = amount,
 			Seconds = elapsed,
-			PaidSeconds = math.min(elapsed, Config.Offline.CapSeconds),
+			PaidSeconds = math.min(elapsed, settings.CapSeconds),
 		}
 		EconomyService.Add(player, amount)
 		DataService.RequestSave(player)

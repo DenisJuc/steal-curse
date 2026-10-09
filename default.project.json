@@ -71,6 +71,12 @@
         },
         "WelcomeBack": {
           "$className": "RemoteEvent"
+        },
+        "SkillAction": {
+          "$className": "RemoteFunction"
+        },
+        "ShowcaseAction": {
+          "$className": "RemoteFunction"
         }
       }
     },

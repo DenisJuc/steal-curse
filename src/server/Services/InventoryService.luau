@@ -2,7 +2,7 @@
 -- grouped by relic + mutation, which stays small however many copies are held.
 --   Favorite (per relic + mutation): pinned to the top, and auto-sell never sells new copies.
 --   Lock (per copy; the UI locks a whole group): the copies can't be sold at all.
--- Remotes: GetInventory (snapshot) and InventoryAction (Favorite, Lock, Sell, SetAutoSell),
+-- Remotes: GetInventory (snapshot) and InventoryAction (Favorite, Lock, Sell, SetAutoSell, Carry),
 -- which returns the fresh snapshot so the menu redraws from server truth.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,6 +13,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local AutoSellService = require(script.Parent.AutoSellService)
+local CosmeticEquipService = require(script.Parent.CosmeticEquipService)
 local DataService = require(script.Parent.DataService)
 local PedestalService = require(script.Parent.PedestalService)
 local RemoteGuard = require(script.Parent.RemoteGuard)
@@ -96,6 +97,7 @@ function InventoryService.State(player: Player)
 		Count = #data.Inventory,
 		Capacity = Config.Inventory.Capacity,
 		AutoSell = AutoSellService.Rules(player),
+		Carry = { Key = data.Cosmetic.Key, Mode = data.Cosmetic.Mode },
 	}
 end
 
@@ -140,6 +142,7 @@ local ACTIONS: { [string]: (Player, any, ...any) -> string? } = {
 			return nil
 		end
 		local sold, earned = SellService.Sell(player, relicId, mutationId, count)
+		CosmeticEquipService.Validate(player)
 		if sold == 0 then
 			return "Nothing to sell (displayed and locked copies are kept)."
 		end
@@ -151,6 +154,11 @@ local ACTIONS: { [string]: (Player, any, ...any) -> string? } = {
 	SetAutoSell = function(player, _data, rules)
 		AutoSellService.SetRules(player, rules)
 		return "Auto-sell rules saved."
+	end,
+
+	-- mode: "Float", "Hand" or "None" (display only, GDD 9.1).
+	Carry = function(player, _data, relicId, mutationId, mode)
+		return CosmeticEquipService.Set(player, relicId, mutationId, mode)
 	end,
 }
 

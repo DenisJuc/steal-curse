@@ -10,6 +10,7 @@ local UserInputService = game:GetService("UserInputService")
 local CaptureFamilies = require(ReplicatedStorage.Shared.CaptureFamilies)
 local Config = require(ReplicatedStorage.Shared.Config)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local RevealController = require(script.Parent.Parent.Controllers.RevealController)
 local BindEffects = require(script.Parent.Parent.Effects.BindEffects)
 local CaptureAnimation = require(script.Parent.Parent.Effects.CaptureAnimation)
@@ -166,12 +167,18 @@ local function setSight(on: boolean)
 	end
 end
 
+-- Spirit Sight skill rank shortens the pulse cooldown (GDD 6.6).
+local function pulseCooldown(): number
+	local rank = player:GetAttribute("Skill_SpiritSight")
+	return SkillConfig.pulseCooldown(if type(rank) == "number" then rank else 0)
+end
+
 local function pulse()
 	if not SpiritSight.IsEnabled() then
 		return
 	end
 	local rootPart = getRoot()
-	if not rootPart or os.clock() - lastPulse < Config.SpiritSight.PulseCooldownSeconds then
+	if not rootPart or os.clock() - lastPulse < pulseCooldown() then
 		return
 	end
 	lastPulse = os.clock()
@@ -279,7 +286,7 @@ local function step(dt: number)
 		else "full"
 	local district = DISTRICT_NAMES[player:GetAttribute("SignalDistrict") :: string] or "?"
 	hud.SetSignalInfo(`{district}: signals {count}/{max}  |  {regen}`)
-	hud.SetPulseCooldown(Config.SpiritSight.PulseCooldownSeconds - (os.clock() - lastPulse))
+	hud.SetPulseCooldown(pulseCooldown() - (os.clock() - lastPulse))
 	hud.SetBindAvailable(state ~= "Idle" or nearestInRange() ~= nil)
 
 	if state == "Pending" and os.clock() - pendingSince > 2 then

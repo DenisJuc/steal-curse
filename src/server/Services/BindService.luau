@@ -11,6 +11,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Formulas = require(ReplicatedStorage.Shared.Formulas)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local DataService = require(script.Parent.DataService)
 local RemoteGuard = require(script.Parent.RemoteGuard)
 local RollService = require(script.Parent.RollService)
@@ -88,8 +89,19 @@ local function cancel(player: Player, reason: string)
 	reply(player, { Ok = false, Reason = reason })
 end
 
+local function skillRank(player: Player, nodeId: string): number
+	local data = DataService.Get(player)
+	return if data then data.Skills[nodeId] or 0 else 0
+end
+
 function BindService.GetHoldSeconds(player: Player): number
-	return holdOverride[player] or Config.Bind.HoldSeconds
+	return holdOverride[player] or SkillConfig.holdSeconds(skillRank(player, "BindingEfficiency"))
+end
+
+-- Bonus discoveries for one capture (GDD 4.4), raised by Resonant Harvest.
+function BindService.BonusCount(player: Player): number
+	local base = Formulas.bonusRolls(ScanService.GetInterval(player), Config.Signals.RegenSeconds, Config.Hunt)
+	return math.ceil(base * SkillConfig.harvestMultiplier(skillRank(player, "ResonantHarvest")) - 1e-9)
 end
 
 local function onBegin(player: Player, signalId: any)
@@ -180,8 +192,7 @@ local function onComplete(player: Player, signalId: any)
 	binds[player] = nil
 	setBindAttributes(player, nil, nil)
 
-	local bonusCount =
-		Formulas.bonusRolls(ScanService.GetInterval(player), Config.Signals.RegenSeconds, Config.Hunt)
+	local bonusCount = BindService.BonusCount(player)
 	local rolls = RollService.RollMany(player, 1 + bonusCount)
 	local captured = rolls[1]
 	local entries = { { Id = captured.Id, Mutation = captured.Mutation, Source = "Capture" } }

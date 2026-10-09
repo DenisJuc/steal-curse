@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 
 local PedestalVisuals = require(script.Parent.Parent.World.PedestalVisuals)
+local ShowcaseVisuals = require(script.Parent.Parent.World.ShowcaseVisuals)
 local GameEvents = require(script.Parent.GameEvents)
 
 local PlotService = {}
@@ -62,6 +63,7 @@ local function release(player: Player)
 			plots[index]:SetAttribute("OwnerUserId", nil)
 			setSignText(plots[index], "Unclaimed Shrine")
 			PedestalVisuals.Reset(plots[index])
+			ShowcaseVisuals.Apply(plots[index], nil)
 		end
 	end
 end

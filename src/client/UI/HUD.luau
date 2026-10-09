@@ -1,6 +1,6 @@
 -- Top-left column: the Spirit Resonator box (scan progress and totals), then Cursed Energy,
--- then the Shrine (pedestal), Luck (cursed lucky flower), Relics (chest), Codex (book),
--- Journal (scroll) and Settings (gear) buttons, one under the other. On small (phone) screens
+-- then the Shrine (pedestal), Luck (cursed lucky flower), Relics (chest), Skills (rune tree),
+-- Codex (book), Journal (scroll) and Settings (gear) buttons, one under the other. On small (phone) screens
 -- the buttons wrap into rows of three. Reads player attributes only; one UIScale keeps the
 -- whole column readable on phones.
 
@@ -19,6 +19,7 @@ export type Callbacks = {
 	OnShrine: () -> (),
 	OnLuck: () -> (),
 	OnRelics: () -> (),
+	OnSkills: () -> (),
 	OnCodex: () -> (),
 	OnJournal: () -> (),
 	OnSettings: () -> (),
@@ -177,19 +178,23 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	Icons.chest(relicsButton)
 	relicsButton.Activated:Connect(callbacks.OnRelics)
 
-	local codexButton, codexCaption = iconButton(buttons, "CodexButton", 6, "Codex")
+	local skillsButton = iconButton(buttons, "SkillsButton", 6, "Skills")
+	Icons.runeTree(skillsButton)
+	skillsButton.Activated:Connect(callbacks.OnSkills)
+
+	local codexButton, codexCaption = iconButton(buttons, "CodexButton", 7, "Codex")
 	Icons.book(codexButton)
 	codexButton.Activated:Connect(callbacks.OnCodex)
 
-	local journalButton = iconButton(buttons, "JournalButton", 7, "Journal")
+	local journalButton = iconButton(buttons, "JournalButton", 8, "Journal")
 	Icons.scroll(journalButton)
 	journalButton.Activated:Connect(callbacks.OnJournal)
 
-	local settingsButton = iconButton(buttons, "SettingsButton", 8, "Settings")
+	local settingsButton = iconButton(buttons, "SettingsButton", 9, "Settings")
 	Icons.gear(settingsButton)
 	settingsButton.Activated:Connect(callbacks.OnSettings)
 
-	local buttonCount = 6
+	local buttonCount = 7
 	UIKit.watchCompact(function(compact: boolean)
 		local perRow = if compact then COMPACT_PER_ROW else 1
 		local rows = math.ceil(buttonCount / perRow)

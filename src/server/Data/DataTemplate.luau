@@ -84,10 +84,19 @@ export type Data = {
 		-- Presentation settings (ClientSettings schema): string or number values.
 		Client: { [string]: string | number },
 	},
-	Skills: {
-		CoreLuck: number,
-		FrequencyFocus: number,
-		MutationResonance: number,
+	-- Skill tree ranks by SkillConfig node id (all bought with CE).
+	Skills: { [string]: number },
+	-- Showcases.State: Active = "" when none; Owned[id] = level 1-4.
+	Showcases: {
+		Active: string,
+		Owned: { [string]: number },
+		AccessoriesOff: { [string]: boolean },
+	},
+	-- The one relic carried for show (GDD 9.1): Key = "<relicId>|<mutation>" ("" = none),
+	-- Mode = "Float" or "Hand". Display only; it stays in the inventory and on pedestals.
+	Cosmetic: {
+		Key: string,
+		Mode: string,
 	},
 }
 
@@ -156,10 +165,27 @@ DataTemplate.Template = {
 			Hints = "On",
 		},
 	},
+	-- Must list every SkillConfig node (checked by a Lune test).
 	Skills = {
 		CoreLuck = 0,
+		ScanSpeed = 0,
 		FrequencyFocus = 0,
 		MutationResonance = 0,
+		EnergyConduction = 0,
+		SpiritMerchant = 0,
+		SpiritReservoir = 0,
+		SpiritSight = 0,
+		BindingEfficiency = 0,
+		ResonantHarvest = 0,
+	},
+	Showcases = {
+		Active = "",
+		Owned = {},
+		AccessoriesOff = {},
+	},
+	Cosmetic = {
+		Key = "",
+		Mode = "Float",
 	},
 } :: Data
 

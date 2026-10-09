@@ -93,6 +93,7 @@ function CodexService.Evaluate(player: Player)
 	mirror(player, data)
 	if changed then
 		DataService.RequestSave(player)
+		GameEvents.Fire("CodexChanged", player)
 	end
 end
 

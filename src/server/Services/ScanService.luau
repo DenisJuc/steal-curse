@@ -7,6 +7,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local DataService = require(script.Parent.DataService)
 local RollService = require(script.Parent.RollService)
 local DiscoveryPipeline = require(script.Parent.Parent.DiscoveryPipeline)
@@ -39,7 +40,8 @@ function ScanService.GetInterval(player: Player): number
 	if state and state.IntervalOverride then
 		return state.IntervalOverride
 	end
-	return Config.Scan.BaseIntervalSeconds
+	local data = DataService.Get(player)
+	return SkillConfig.scanInterval(if data then data.Skills.ScanSpeed or 0 else 0)
 end
 
 local function schedule(player: Player, state: State, from: number)
@@ -138,7 +140,7 @@ function ScanService.SetIntervalOverride(player: Player, seconds: number?)
 	schedule(player, state, workspace:GetServerTimeNow())
 end
 
--- Restart the timer from now (used after wiping data).
+-- Restart the timer from now (after wiping data or a Scan Speed rank change).
 function ScanService.Restart(player: Player)
 	local state = states[player]
 	if state then

@@ -2,9 +2,11 @@
 -- Every orb looks identical on purpose: nothing here may hint at a relic's rarity.
 
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 
 local SpiritSight = {}
 
@@ -110,6 +112,8 @@ end
 -- Bobs every orb that is not being bound and hides orbs beyond reveal range.
 function SpiritSight.Update(dt: number, viewer: Vector3?)
 	clock += dt
+	local rank = Players.LocalPlayer:GetAttribute("Skill_SpiritSight")
+	local revealRange = SkillConfig.sightRange(if type(rank) == "number" then rank else 0)
 	for _, orb in orbs do
 		local part = orb.Part
 		if part:GetAttribute("Binding") then
@@ -117,7 +121,7 @@ function SpiritSight.Update(dt: number, viewer: Vector3?)
 		end
 		local offset = math.sin(clock * 2 + orb.Phase) * 0.4
 		part.CFrame = CFrame.new(orb.Base + Vector3.new(0, offset, 0))
-		local visible = viewer ~= nil and (orb.Base - viewer).Magnitude <= Config.SpiritSight.RevealRange
+		local visible = viewer ~= nil and (orb.Base - viewer).Magnitude <= revealRange
 		part.Transparency = if visible then 0.15 else 1
 		local light = part:FindFirstChildOfClass("PointLight")
 		if light then

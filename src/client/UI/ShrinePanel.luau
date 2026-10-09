@@ -1,5 +1,6 @@
--- Shrine menu (GDD 6.3-6.5): the pedestals only. Buy slots, upgrade levels, lock a pedestal and see
--- what each one earns. "Choose" opens the Relics menu to pick what a pedestal shows; everything
+-- Shrine menu (GDD 6.3-6.5): the pedestals. Buy slots, upgrade levels, lock a pedestal and see
+-- what each one earns; "Showcases" in the header opens the Showcase menu (GDD 6.7).
+-- "Choose" opens the Relics menu to pick what a pedestal shows; everything
 -- about relics themselves (Equip Best, selling, locks, favorites) lives in the Relics menu.
 -- The client only sends intents; the server validates costs and pushes the new state back on
 -- ShrineState.
@@ -50,7 +51,8 @@ end
 
 function ShrinePanel.Start(
 	screen: ScreenGui,
-	onChoose: (slot: number) -> ()
+	onChoose: (slot: number) -> (),
+	onShowcases: () -> ()
 ): { Toggle: () -> (), Open: () -> (), SetVisible: (boolean) -> () }
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
@@ -63,9 +65,18 @@ function ShrinePanel.Start(
 	local incomeLabel = UIKit.label({
 		TextSize = 15,
 		TextColor3 = colors.Gold,
-		Size = UDim2.new(1, 0, 0, 20),
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Size = UDim2.new(1, -130, 0, 20),
 		Parent = content,
 	})
+	UIKit.button({
+		Name = "Showcases",
+		Text = "Showcases >",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -10, 0, -2),
+		Size = UDim2.fromOffset(118, 24),
+		Parent = content,
+	}, onShowcases)
 	UIKit.label({
 		Text = "Choose what each pedestal shows, or use Equip Best in Relics. Locked pedestals never change.",
 		TextSize = 12,

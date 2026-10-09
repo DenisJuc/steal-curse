@@ -15,7 +15,9 @@ local InventoryPanel = require(script.Parent.UI.InventoryPanel)
 local JournalPanel = require(script.Parent.UI.JournalPanel)
 local Onboarding = require(script.Parent.UI.Onboarding)
 local SettingsPanel = require(script.Parent.UI.SettingsPanel)
+local ShowcasePanel = require(script.Parent.UI.ShowcasePanel)
 local ShrinePanel = require(script.Parent.UI.ShrinePanel)
+local SkillTreePanel = require(script.Parent.UI.SkillTreePanel)
 local Toasts = require(script.Parent.UI.Toasts)
 local UIKit = require(script.Parent.UI.UIKit)
 local WelcomeBack = require(script.Parent.UI.WelcomeBack)
@@ -24,6 +26,7 @@ local AfkController = require(script.Parent.Controllers.AfkController)
 local GamepadController = require(script.Parent.Controllers.GamepadController)
 local KioskController = require(script.Parent.Controllers.KioskController)
 local OtherBinds = require(script.Parent.Effects.OtherBinds)
+local ShowcaseLOD = require(script.Parent.Effects.ShowcaseLOD)
 local RevealController = require(script.Parent.Controllers.RevealController)
 local HuntController = require(script.Parent.Hunt.HuntController)
 local Settings = require(script.Parent.Settings)
@@ -62,16 +65,35 @@ local inventoryPanel = InventoryPanel.Start(screen, {
 		shrinePanel.Open()
 	end,
 })
+local showcasePanel = ShowcasePanel.Start(screen, function()
+	closeAllExcept(shrinePanel)
+	shrinePanel.Open()
+end)
 shrinePanel = ShrinePanel.Start(screen, function(slot: number)
 	closeAllExcept(inventoryPanel)
 	inventoryPanel.Pick(slot)
+end, function()
+	closeAllExcept(showcasePanel)
+	showcasePanel.Open()
 end)
 local focusPanel = FocusPanel.Start(screen)
+local skillPanel = SkillTreePanel.Start(screen)
 local codexPanel = CodexPanel.Start(screen)
 local journalPanel = JournalPanel.Start(screen)
 local settingsPanel = SettingsPanel.Start(screen)
 local welcomeBack = WelcomeBack.Start(screen)
-menus = { shrinePanel, focusPanel, inventoryPanel, autoSellPanel, codexPanel, journalPanel, settingsPanel, welcomeBack }
+menus = {
+	shrinePanel,
+	showcasePanel,
+	focusPanel,
+	inventoryPanel,
+	autoSellPanel,
+	skillPanel,
+	codexPanel,
+	journalPanel,
+	settingsPanel,
+	welcomeBack,
+}
 
 local function toggleOnly(menu: Menu & { Toggle: () -> () })
 	return function()
@@ -84,6 +106,7 @@ local openers = {
 	Shrine = toggleOnly(shrinePanel),
 	Luck = toggleOnly(focusPanel),
 	Relics = toggleOnly(inventoryPanel),
+	Skills = toggleOnly(skillPanel),
 	Codex = toggleOnly(codexPanel),
 	Journal = toggleOnly(journalPanel),
 	Settings = toggleOnly(settingsPanel),
@@ -92,6 +115,7 @@ local hud = HUD.Start(screen, {
 	OnShrine = openers.Shrine,
 	OnLuck = openers.Luck,
 	OnRelics = openers.Relics,
+	OnSkills = openers.Skills,
 	OnCodex = openers.Codex,
 	OnJournal = openers.Journal,
 	OnSettings = openers.Settings,
@@ -115,6 +139,7 @@ GamepadController.Start(screen, function()
 	return screen:FindFirstChild("Buttons", true)
 end)
 OtherBinds.Start()
+ShowcaseLOD.Start()
 Onboarding.Start(screen)
 local afk = AfkController.Start()
 

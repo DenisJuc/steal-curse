@@ -121,6 +121,45 @@ function Icons.scroll(parent: Instance): Frame
 	return icon
 end
 
+-- Skills: a small rune tree, three glowing nodes branching from one root.
+function Icons.runeTree(parent: Instance): Frame
+	local icon = box(parent)
+	local branch = Color3.fromRGB(120, 90, 160)
+	local glow = Color3.fromRGB(150, 230, 255)
+	local function line(x: number, y: number, length: number, rotation: number)
+		UIKit.create("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(x, y),
+			Size = UDim2.fromOffset(4, length),
+			Rotation = rotation,
+			BackgroundColor3 = branch,
+			BorderSizePixel = 0,
+			Parent = icon,
+		}, { UIKit.corner(2) })
+	end
+	line(24, 30, 26, 0)
+	line(17, 23, 18, -50)
+	line(31, 23, 18, 50)
+	local function node(x: number, y: number, size: number, color: Color3)
+		UIKit.create("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(x, y),
+			Size = UDim2.fromOffset(size, size),
+			BackgroundColor3 = color,
+			BorderSizePixel = 0,
+			Parent = icon,
+		}, {
+			UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			UIKit.stroke(Color3.fromRGB(40, 30, 60), 2, 0),
+		})
+	end
+	node(24, 9, 13, glow)
+	node(9, 17, 11, UIKit.Colors.Gold)
+	node(39, 17, 11, UIKit.Colors.Accent)
+	node(24, 43, 10, branch)
+	return icon
+end
+
 -- Settings: a gear (eight teeth around a ring).
 function Icons.gear(parent: Instance): Frame
 	local icon = box(parent)

@@ -91,7 +91,7 @@ Config.RemoteLimits = {
 -- When full, a new find that the rules would keep is sold instead, unless it is protected
 -- below; protected finds go over the limit ("protected overflow") and are never discarded.
 Config.Inventory = {
-	-- Base capacity; skill tree upgrades will add to it (Slice 7).
+	-- Held relic limit (GDD 9.2). No skill raises it; selling and auto-sell keep room free.
 	Capacity = 100,
 	-- Always kept when full: first discoveries, finds at or above this tier...
 	OverflowKeepTier = "Legendary",

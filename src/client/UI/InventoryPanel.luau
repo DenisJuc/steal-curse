@@ -1,6 +1,7 @@
 -- Relics menu (GDD 9.2, 12.1): the one place for relics. Held relics grouped by relic + mutation,
 -- with base and current 1-in-X odds (RollMath via Odds). Tap a relic to select it; the action bar
--- equips/unequips it (pedestal), sells, locks or favorites it. Equip Best and Auto-Sell Rules sit in
+-- equips/unequips it (pedestal), sells, locks, favorites or carries it (for show: floating, then in
+-- hand, then put away; display only). Equip Best and Auto-Sell Rules sit in
 -- the header. The Shrine's "Choose" opens this menu in pick mode: tapping a relic places it on
 -- that pedestal. Every button sends an intent; the server answers with the fresh state.
 
@@ -26,6 +27,7 @@ export type State = {
 	Count: number,
 	Capacity: number,
 	AutoSell: any,
+	Carry: { Key: string, Mode: string }?,
 }
 
 export type Hooks = {
@@ -194,9 +196,10 @@ function InventoryPanel.Start(
 	end
 
 	local function barButton(order: number, onClick: (group: any) -> ()): TextButton
-		return UIKit.button({
+		local instance = UIKit.button({
 			LayoutOrder = order,
-			Size = UDim2.new(0.2, -5, 1, 0),
+			TextScaled = true,
+			Size = UDim2.new(1 / 6, -5, 1, 0),
 			Parent = bar,
 		}, function()
 			local group = selectedGroup()
@@ -204,6 +207,8 @@ function InventoryPanel.Start(
 				onClick(group)
 			end
 		end)
+		UIKit.create("UITextSizeConstraint", { MaxTextSize = 14, Parent = instance })
+		return instance
 	end
 	local equipButton = barButton(1, function(group)
 		ShrineAction:FireServer(if group.Displayed > 0 then "UnequipGroup" else "EquipGroup", group.Id, group.Mutation)
@@ -219,6 +224,18 @@ function InventoryPanel.Start(
 	end)
 	local favButton = barButton(5, function(group)
 		send("Favorite", group.Id, group.Mutation, not group.Favorite)
+	end)
+	-- Carry for show (display only): not carried -> floating -> in hand -> put away.
+	local function carryMode(group: any): string?
+		if state and state.Carry and state.Carry.Key == groupKey(group) then
+			return state.Carry.Mode
+		end
+		return nil
+	end
+	local carryButton = barButton(6, function(group)
+		local mode = carryMode(group)
+		local nextMode = if mode == nil then "Float" elseif mode == "Float" then "Hand" else "None"
+		send("Carry", group.Id, group.Mutation, nextMode)
 	end)
 
 	local function styleBarButton(instance: TextButton, text: string, enabled: boolean, color: Color3?)
@@ -239,8 +256,12 @@ function InventoryPanel.Start(
 			styleBarButton(sellAllButton, "Sell all", false)
 			styleBarButton(lockButton, "Lock", false)
 			styleBarButton(favButton, "Favorite", false)
+			styleBarButton(carryButton, "Carry", false)
 			return
 		end
+		local carried = carryMode(group)
+		local carryText = if carried == nil then "Carry" elseif carried == "Float" then "Hold" else "Put away"
+		styleBarButton(carryButton, carryText, true, if carried then colors.Gold else colors.Panel)
 		local equipped = group.Displayed > 0
 		local allLocked = group.Locked >= group.Count
 		styleBarButton(equipButton, if equipped then "Unequip" else "Equip", true, if equipped then colors.Gold else nil)
@@ -325,6 +346,10 @@ function InventoryPanel.Start(
 			end
 			if group.Locked > 0 then
 				table.insert(tags, "LOCKED")
+			end
+			local carried = carryMode(group)
+			if carried then
+				table.insert(tags, if carried == "Hand" then "IN HAND" else "CARRIED")
 			end
 			UIKit.label({
 				Text = table.concat(tags, "  "),

@@ -13,9 +13,11 @@
 --   /simroll [count]   simulate rolls with your current context and compare with the math (Output)
 --   /setluck <x>       extra debug luck multiplier; /setluck reset
 --   /luckrank <n>      set Core Luck rank 0..100
+--   /skill <node> <n>  set any skill rank, e.g. /skill mutationresonance 3
+--   /grantshowcase <id|all>          unlock a Showcase (level 1), e.g. /grantshowcase crimsonthrone
+--   /showcaselevel <id> <level>      set an owned Showcase's level 1..4
 --   /focus <tier|max>  set Rarity Focus
 --   /freq <family|all> set Signal Frequency
---   /mutrank <n>       set Mutation Resonance rank 0..5
 --   /savestatus        save mode, last save time and counts
 --   /runtests          run the persistence tests on the ProfileStore mock
 --   /ce <amount>       add CE (negative removes); /ce set <amount>
@@ -38,6 +40,8 @@ local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
+local ShowcaseConfig = require(ReplicatedStorage.Shared.ShowcaseConfig)
+local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local Stats = require(ReplicatedStorage.Shared.Stats)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local AfkService = require(script.Parent.Services.AfkService)
@@ -50,7 +54,9 @@ local PedestalService = require(script.Parent.Services.PedestalService)
 local RollService = require(script.Parent.Services.RollService)
 local ScanService = require(script.Parent.Services.ScanService)
 local SettingsService = require(script.Parent.Services.SettingsService)
+local ShowcaseService = require(script.Parent.Services.ShowcaseService)
 local SignalService = require(script.Parent.Services.SignalService)
+local SkillService = require(script.Parent.Services.SkillService)
 local DiscoveryPipeline = require(script.Parent.DiscoveryPipeline)
 local PersistenceTests = require(script.Parent.Tests.PersistenceTests)
 
@@ -107,6 +113,34 @@ local function findMutation(text: string): string?
 		end
 	end
 	return nil
+end
+
+local function findSkill(text: string)
+	local lowered = string.lower(text)
+	for _, node in SkillConfig.Nodes do
+		if string.lower(node.Id) == lowered then
+			return node
+		end
+	end
+	return nil
+end
+
+local function findShowcase(text: string): string?
+	local lowered = string.lower(text)
+	for _, showcase in ShowcaseConfig.Showcases do
+		if string.lower(showcase.Id) == lowered then
+			return showcase.Id
+		end
+	end
+	return nil
+end
+
+local function showcaseIds(): string
+	local ids = {}
+	for _, showcase in ShowcaseConfig.Showcases do
+		table.insert(ids, string.lower(showcase.Id))
+	end
+	return table.concat(ids, "|")
 end
 
 local function findFamily(text: string): string?
@@ -267,14 +301,47 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 
 		luckrank = function(player, args)
 			local rank = tonumber(args[1])
-			local data = DataService.Get(player)
-			if not rank or not data then
+			local set = rank and SkillService.SetRank(player, "CoreLuck", rank)
+			if not set then
 				reply(player, "Usage: /luckrank <0-100>")
 				return
 			end
-			data.Skills.CoreLuck = math.clamp(math.floor(rank), 0, Config.Luck.CoreLuckMaxRank)
-			MultiplierService.Refresh(player)
-			reply(player, `Core Luck rank {data.Skills.CoreLuck}. {describeLuck(player)}`)
+			reply(player, `Core Luck rank {set}. {describeLuck(player)}`)
+		end,
+
+		skill = function(player, args)
+			local node = findSkill(args[1] or "")
+			local rank = tonumber(args[2])
+			local set = node and rank and SkillService.SetRank(player, node.Id, rank)
+			if not node or not set then
+				local ids = {}
+				for _, each in SkillConfig.Nodes do
+					table.insert(ids, string.lower(each.Id))
+				end
+				reply(player, `Usage: /skill <{table.concat(ids, "|")}> <rank>`)
+				return
+			end
+			reply(player, `{node.Name} rank {set}/{node.MaxRank}. {describeLuck(player)}`)
+		end,
+
+		grantshowcase = function(player, args)
+			local wanted = string.lower(args[1] or "")
+			local id = if wanted == "all" then "all" else findShowcase(wanted)
+			if not id or not ShowcaseService.Grant(player, id) then
+				reply(player, `Usage: /grantshowcase <{showcaseIds()}|all>`)
+				return
+			end
+			reply(player, `Granted {if id == "all" then "every Showcase" else id}. {describeLuck(player)}`)
+		end,
+
+		showcaselevel = function(player, args)
+			local id = findShowcase(args[1] or "")
+			local level = tonumber(args[2])
+			if not id or not level or not ShowcaseService.SetLevel(player, id, level) then
+				reply(player, `Usage: /showcaselevel <{showcaseIds()}> <1-{ShowcaseConfig.MaxLevel}> (owned only)`)
+				return
+			end
+			reply(player, `{id} is now level {math.clamp(math.floor(level), 1, ShowcaseConfig.MaxLevel)}. {describeLuck(player)}`)
 		end,
 
 		focus = function(player, args)
@@ -295,19 +362,6 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				return
 			end
 			reply(player, `Signal Frequency: {frequency}.`)
-		end,
-
-		mutrank = function(player, args)
-			local rank = tonumber(args[1])
-			local data = DataService.Get(player)
-			if not rank or not data then
-				reply(player, `Usage: /mutrank <0-{MutationConfig.MaxRank}>`)
-				return
-			end
-			data.Skills.MutationResonance = math.clamp(math.floor(rank), 0, MutationConfig.MaxRank)
-			RollService.RefreshAttributes(player)
-			local chance = MutationConfig.ChanceAt(data.Skills.MutationResonance)
-			reply(player, `Mutation Resonance rank {data.Skills.MutationResonance}: {chance * 100}% mutation chance.`)
 		end,
 
 		savestatus = function(player)
@@ -376,7 +430,7 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			AfkService.Start(player)
 			local log = data.AfkLog
 			local seconds = math.floor(minutes * 60)
-			local scans = math.min(math.floor(seconds / Config.Scan.BaseIntervalSeconds), Config.Afk.SimMaxScans)
+			local scans = math.min(math.floor(seconds / ScanService.GetInterval(player)), Config.Afk.SimMaxScans)
 			local ran = ScanService.ForceScans(player, scans, "Scan")
 			local income = EconomyService.GetIncomePerMin(player) * minutes
 			EconomyService.Add(player, income)
