@@ -24,10 +24,51 @@ Config.Feed = {
 Config.RemoteLimits = {
 	Default = { Rate = 10, Burst = 20 },
 	Bind = { Rate = 8, Burst = 12 },
+	Settings = { Rate = 4, Burst = 8 },
 }
 
 Config.Debug = {
 	MaxRollsPerCommand = 1000,
+	MaxSimulatedRolls = 1000000,
+}
+
+-- Persistence (ProfileStore). Never one DataStore write per scan: ProfileStore autosaves every 5 min and
+-- on leave/shutdown; rare finds additionally request the next allowed save slot.
+Config.Save = {
+	-- Changing this name starts everyone with fresh data.
+	StoreName = "PlayerData_v1",
+	MinSecondsBetweenSaves = 7,
+	-- A find at or above this tier requests an immediate (throttled) save.
+	PriorityTier = "Mythic",
+	-- A mutated find at or above this tier also requests one.
+	PriorityMutatedTier = "Legendary",
+	-- Finds at or above this tier (or priority mutated finds) go into the rare-find history.
+	RareHistoryTier = "Epic",
+	RareHistoryMax = 50,
+}
+
+-- Rarity Focus (GDD 5.2): choosing a tier caps luck so that tier realistically appears again.
+-- At the cap, the chance of rolling the focused tier OR HIGHER equals TierOrHigherChance.
+Config.Focus = {
+	Default = "MaxLuck",
+	TierOrHigherChance = 0.5,
+}
+
+-- Signal Frequency (GDD 3.3): weights the chosen family inside whichever tier was rolled.
+-- MultiplierByRank is indexed by Frequency Focus skill rank 0..5 (GDD 6.6: up to ~3x).
+Config.Frequency = {
+	Default = "All",
+	MultiplierByRank = { [0] = 1.5, [1] = 1.8, [2] = 2.1, [3] = 2.4, [4] = 2.7, [5] = 3.0 },
+}
+
+-- Endgame luck stack reference values (GDD 5.2 / 5.3), used by balance reports and tests.
+Config.Luck = {
+	CoreLuckMaxRank = 100,
+	CodexMaxBonus = 0.5,
+	ShowcaseMaxBonus = 0.10,
+	MaxConsumable = 2,
+	MaxEvent = 1.5,
+	FastestScanSeconds = 1,
 }
 
 -- Personal hunt signals (GDD 4.2). Only the owner ever receives their positions.

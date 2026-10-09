@@ -1,6 +1,6 @@
 # Supernatural Relic Collector (Roblox)
 
-An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 1 - Minimal Discover, Hunt, Capture prototype**.
+An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 2 - Persistence and probability core**.
 
 Design sources (outside this repo): `Supernatural_Relic_Collector_GDD_FINAL.md`, `CURSOR_RELIC_GAME_BLUEPRINT.md`, `ROBLOX_GAME_PLAYBOOK.md`.
 
@@ -49,7 +49,7 @@ If `default.project.json` changes (for example when new remotes are added), stop
 - Phone layout check: **Test** tab > **Device** (Device Emulator), pick a phone.
 - Watch for errors: **View** tab > **Output**. Red text means an error.
 
-Data is **in memory only** in Slice 0: everything resets when you stop Play. Saving arrives in Slice 2 (and needs the place published, see below).
+Data is saved with **ProfileStore**. In an unpublished place (or without API access) ProfileStore uses a **mock** store: saving works during the session but everything resets when you stop Play. For real saving across sessions, publish the place and enable API access (section 10). `/savestatus` tells you which mode you are in.
 
 ## 5. Hunt controls
 
@@ -76,6 +76,15 @@ Type these in the chat box during Play. They do not exist outside Studio.
 | `/bindtime <seconds>` | Changes your hold time, e.g. `/bindtime 1`; `/bindtime reset` restores 6 s |
 | `/huntstats` | Shows captures, cancels and average time between captures this session |
 | `/forgecomplete` | Pretends to be a cheater sending "capture complete" without holding; the server must reject it |
+| `/forceroll <tier or relicId> [mutation]` | Gives an exact relic, e.g. `/forceroll cosmic abyssal` |
+| `/simroll [count]` | Simulates rolls with your current luck/focus/frequency/mutation rank and compares them with the math (results in Output; nothing is granted). Max 1,000,000 |
+| `/setluck <x>` | Extra debug luck multiplier, e.g. `/setluck 1e10`; `/setluck reset` |
+| `/luckrank <0-100>` | Sets your Core Luck rank (rank 100 = 10 billion x) |
+| `/focus <tier or max>` | Sets Rarity Focus, e.g. `/focus legendary` |
+| `/freq <family or all>` | Sets Signal Frequency, e.g. `/freq demonic` |
+| `/mutrank <0-5>` | Sets your Mutation Resonance rank |
+| `/savestatus` | Save mode (real or mock), time since the last save, relic and Codex counts |
+| `/runtests` | Runs the persistence tests on ProfileStore's mock store (never touches real data) |
 
 ## 7. Automated checks (run before every commit)
 
@@ -87,26 +96,37 @@ rojo build -o build/RelicCollector.rbxl
 
 All three must finish with no errors and no warnings.
 
+Rare-find waiting times under max boosts (mean, median, 90th percentile) can be printed with:
+
+```
+lune run tests/rareWaitReport
+```
+
 ## 8. Project layout
 
 ```
 default.project.json   Rojo mapping of src/ into the Roblox game tree; declares all remotes
 src/shared/            ReplicatedStorage.Shared - config and pure math used by server, client and tests
-  Config.luau            tunable numbers (scan interval, plots, feed, remote limits)
+  Config.luau            tunable numbers (scan, plots, feed, remote limits, saving, focus, frequency, luck)
   RarityConfig.luau      the 8 rarity tiers and their base cumulative odds
-  RelicConfig.luau       relic definitions (10 original placeholders in Slice 0)
-  RollMath.luau          probability math: tier masses, per-relic odds, roll sampler
-  Formulas.luau          gameplay formulas (hunt bonus rolls)
+  RelicConfig.luau       relic definitions (10 original placeholders)
+  MutationConfig.luau    the 5 mutations, unlock ranks, weights and chance per rank
+  RollMath.luau          ALL probability math: tiers, focus cap, frequency, mutations, joint odds, sampler
+  RollRules.luau         RollMath rules assembled from config (shared by server rolls and UI odds)
+  Stats.luau             chi-square and waiting-time helpers
+  Formulas.luau          gameplay formulas (Core Luck, hunt bonus rolls)
   Format.luau            number / odds formatting (1.5K, 1 in 1.32Qd)
 src/server/            ServerScriptService.Server
   Main.server.luau       builds the map, then starts services in order
   DiscoveryPipeline.luau the single path every relic grant goes through
   DebugCommands.luau     Studio-only chat commands
-  Services/              one module per system (Data, Plot, Roll, Scan, Signal, Bind, RemoteGuard, GameEvents)
+  Data/                  saved data template + migrations (pure, tested by Lune)
+  Services/              one module per system (Data, Multiplier, Roll, Settings, Plot, Scan, Signal, Bind, RemoteGuard, GameEvents)
+  Tests/                 Studio persistence tests (/runtests)
   World/                 code-built map (BuildUtil, MapBuilder, PlotBuilder, HuntAreaBuilder)
 src/client/            StarterPlayerScripts.Client
   Main.client.luau       builds the UI and hunt controls
-  UI/                    UIKit, HUD, DiscoveryFeed, Toasts, HuntHUD
+  UI/                    UIKit, HUD, FocusPanel, Odds, DiscoveryFeed, Toasts, HuntHUD
   Hunt/HuntController    Spirit Sight / pulse / hold-to-bind input and state
   Effects/               SpiritSight (orbs, trails, tint), BindEffects (chains, camera, seal flash)
   StudioCommands.luau    Studio-only /help and /forgecomplete
@@ -117,10 +137,15 @@ tests/                 Lune headless tests (lune run tests/run)
 
 - **Server authority.** The server rolls every relic and owns all data. The client only displays results.
 - **Passive scanner.** `ScanService` runs one loop for all players. Every 4 seconds (Config.Scan.BaseIntervalSeconds) each player gets exactly one relic. It never pauses for menus or effects. After a server hitch it grants at most 3 overdue scans.
-- **Rolls.** `RollMath` uses the GDD tier odds (Uncommon+ 1 in 4 ... Cosmic 1 in 1.32 quadrillion). It climbs tier by tier, then picks a relic inside the tier by its weight. Each relic's displayed "1 in X" is computed from the same math.
-- **Discovery pipeline.** Every grant goes through `DiscoveryPipeline.Grant`, which stores the relic and tells the owner's client. Later slices add Codex, auto-display, auto-sell and saving here.
+- **Rolls.** `RollMath` uses the GDD tier odds (Uncommon+ 1 in 4 ... Cosmic 1 in 1.32 quadrillion). It climbs tier by tier, then picks a relic inside the tier by its weight, then rolls at most one mutation. The server and the UI build the same roll context with `RollMath.contextFor`, so every displayed "1 in X" is the real chance.
+- **Luck.** `MultiplierService` multiplies every luck source (Core Luck rank now; Codex, Showcases, consumables and events later). Core Luck = 10^(rank/10), so rank 100 = 10 billion x.
+- **Rarity Focus.** Picking a tier caps the luck used for rolls so that tier (or higher) comes up 50% of the time. Your bought luck is never removed; "Max Luck" uses all of it. Focus only lowers luck when your luck is above the cap.
+- **Signal Frequency.** Picking a family (Demonic, Spiritual, Arcane, Astral) multiplies that family's weight inside whatever tier was rolled (1.5x at Frequency Focus rank 0, up to 3x at rank 5). It never changes tier chances.
+- **Mutations.** Mutation Resonance rank 0 = none. Each rank unlocks one more (Golden, Corrupted, Bloodmoon, Divine, Abyssal) and raises the total chance (10% ... 50%). Weights 30/22/18/15/15 split that chance among unlocked mutations. A mutated relic counts as the same Codex entry as the normal one.
+- **Discovery pipeline.** Every grant goes through `DiscoveryPipeline.GrantBatch`: store the relic, record a first Codex discovery (by base relic id), add Epic+ finds (and mutated Legendary+) to the rare history (last 50), request a priority save for rare finds, then tell the owner's client.
+- **Saving.** ProfileStore autosaves every 5 minutes and saves when you leave and when the server shuts down. A first discovery, any Mythic+ or any mutated Legendary+ requests an extra save, merged to at most one save every 7 seconds. Limit: if a Roblox server crashes hard, finds made after the last completed save can be lost; priority saves keep that window to about 7 seconds for rare finds.
 - **Plots.** 8 shrine plots surround the hub. Each player gets the first free plot, their name appears on the gate sign, and they spawn there. **Set Max Players to 8 or fewer** when publishing.
-- **UI.** The top-left panel shows the scan progress bar, interval, total scans, relics held and signals sealed (read from player attributes). The right-side feed shows each discovery with its tier color and base odds.
+- **UI.** The top-left panel shows the scan progress bar, interval, total scans, relics held, signals sealed and a luck/focus button that opens the Rarity Focus & Odds panel (read from player attributes). The right-side feed shows each discovery with its tier (or mutation) color and base odds; "NEW!" marks first discoveries.
 - **Haunted Grove.** A greybox hunting ground between plots 1 and 2, reached by its own path from the hub. Trees, rocks and ruined walls block line of sight. 15 hidden spawn points (tagged `SignalSpawn`) are where signals can appear.
 - **Personal signals.** `SignalService` gives each player 3 signals at start, adds 1 every 2 minutes up to 5, and sends positions only to that player. Other players never see or receive them. All signals look identical, and no rarity exists until a capture succeeds.
 - **Spirit Sight.** A client view mode: it hides the resonator panel, tints the screen, shows your signal orbs within 90 studs, and a pulse draws trails to all of them. Passive scanning keeps running.

@@ -1,26 +1,19 @@
 -- Right-side feed of recent discoveries. Lines fade out on their own and never block anything.
--- Base odds come from RollMath, the same math the server rolls with.
+-- Base odds come from RollMath (via Odds), the same math the server rolls with.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local Format = require(ReplicatedStorage.Shared.Format)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RollMath = require(ReplicatedStorage.Shared.RollMath)
+local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
 
 local DiscoveryResult = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DiscoveryResult") :: RemoteEvent
 
 local DiscoveryFeed = {}
 
-type Result = { Uid: number, Id: string, Source: string }
-
-local baseOdds: { [string]: string } = {}
-for _, relic in RelicConfig.Relics do
-	local probability = RollMath.itemProbability(RarityConfig.Tiers, RelicConfig.Relics, relic.Id, 1)
-	baseOdds[relic.Id] = Format.odds(probability)
-end
+type Result = { Uid: number, Id: string, Mutation: string?, Source: string, First: boolean? }
 
 local LINE_HEIGHT = 44
 local order = 0
@@ -109,11 +102,19 @@ local function showRelic(list: Frame, result: Result)
 	if not relic then
 		return
 	end
-	local tier = RarityConfig.Get(relic.Tier)
 	local highlightIndex = RarityConfig.IndexById[Config.Feed.HighlightTier] or math.huge
-	local highlight = tierIndex(relic.Id) >= highlightIndex
-	local tierName = if tier then tier.Name else relic.Tier
-	makeLine(list, relic.Name, `{tierName}  |  {baseOdds[relic.Id]}`, UIKit.tierColor(relic.Tier), highlight)
+	local highlight = tierIndex(relic.Id) >= highlightIndex or result.Mutation ~= nil
+	local title = Odds.displayName(relic.Id, result.Mutation)
+	if result.First then
+		title = "NEW! " .. title
+	end
+	local color = if result.Mutation then UIKit.mutationColor(result.Mutation) else UIKit.tierColor(relic.Tier)
+	makeLine(list, title, Odds.describe(relic.Id, result.Mutation), color, highlight)
+end
+
+-- Sort key: tier first, mutated above plain within a tier.
+local function rarityKey(result: Result): number
+	return tierIndex(result.Id) * 2 + (if result.Mutation then 1 else 0)
 end
 
 function DiscoveryFeed.Start(screen: ScreenGui)
@@ -145,7 +146,7 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 		-- Big batches: show the rarest few plus one summary line instead of flooding the feed.
 		local sorted = table.clone(results)
 		table.sort(sorted, function(a, b)
-			return tierIndex(a.Id) < tierIndex(b.Id)
+			return rarityKey(a) < rarityKey(b)
 		end)
 		local shown = Config.Feed.MaxLines - 1
 		makeLine(list, `+{#results - shown} more discoveries`, "Batch summary", UIKit.Colors.SubText, false)

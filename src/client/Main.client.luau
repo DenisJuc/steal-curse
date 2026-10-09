@@ -5,6 +5,7 @@ local RunService = game:GetService("RunService")
 
 local HUD = require(script.Parent.UI.HUD)
 local DiscoveryFeed = require(script.Parent.UI.DiscoveryFeed)
+local FocusPanel = require(script.Parent.UI.FocusPanel)
 local Toasts = require(script.Parent.UI.Toasts)
 local HuntController = require(script.Parent.Hunt.HuntController)
 local StudioCommands = require(script.Parent.StudioCommands)
@@ -15,11 +16,16 @@ screen.ResetOnSpawn = false
 screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screen.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
-local hud = HUD.Start(screen)
+local focusPanel = FocusPanel.Start(screen)
+local hud = HUD.Start(screen, focusPanel.Toggle)
 DiscoveryFeed.Start(screen)
 Toasts.Start(screen)
 HuntController.Start(screen, {
-	SetManagementVisible = hud.SetVisible,
+	-- Spirit Sight hides management UI; scanning itself never stops.
+	SetManagementVisible = function(visible: boolean)
+		hud.SetVisible(visible)
+		focusPanel.SetVisible(visible)
+	end,
 })
 
 if RunService:IsStudio() then

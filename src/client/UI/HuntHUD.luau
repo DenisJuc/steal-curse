@@ -4,10 +4,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
-local Format = require(ReplicatedStorage.Shared.Format)
-local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RollMath = require(ReplicatedStorage.Shared.RollMath)
+local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
 
 local HuntHUD = {}
@@ -26,7 +24,7 @@ export type Hud = {
 	SetProgress: (progress: number?) -> (),
 	SetSignalInfo: (text: string) -> (),
 	ShowHint: (text: string, seconds: number?) -> (),
-	ShowCapture: (capturedId: string, bonusCount: number, bestBonusId: string?) -> (),
+	ShowCapture: (capturedId: string, mutation: string?, bonusCount: number, bestBonusId: string?) -> (),
 }
 
 local function keyHint(key: string): string
@@ -264,18 +262,16 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		end
 	end
 
-	function hud.ShowCapture(capturedId: string, bonusCount: number, bestBonusId: string?)
+	function hud.ShowCapture(capturedId: string, mutation: string?, bonusCount: number, bestBonusId: string?)
 		local relic = RelicConfig.ById[capturedId]
 		if not relic then
 			return
 		end
-		local tier = RarityConfig.Get(relic.Tier)
-		local color = UIKit.tierColor(relic.Tier)
-		local probability = RollMath.itemProbability(RarityConfig.Tiers, RelicConfig.Relics, relic.Id, 1)
-		cardName.Text = relic.Name
+		local color = if mutation then UIKit.mutationColor(mutation) else UIKit.tierColor(relic.Tier)
+		cardName.Text = Odds.displayName(relic.Id, mutation)
 		cardName.TextColor3 = color
 		cardStroke.Color = color
-		cardOdds.Text = `{if tier then tier.Name else relic.Tier}  |  {Format.odds(probability)}`
+		cardOdds.Text = Odds.describe(relic.Id, mutation)
 		cardOdds.TextColor3 = color
 		local best = bestBonusId and RelicConfig.ById[bestBonusId]
 		cardBonus.Text = `+{bonusCount} bonus discoveries` .. (if best then `  |  best: {best.Name}` else "")

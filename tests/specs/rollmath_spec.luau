@@ -4,6 +4,7 @@ local RarityConfig = require("../../src/shared/RarityConfig")
 local RelicConfig = require("../../src/shared/RelicConfig")
 local RollMath = require("../../src/shared/RollMath")
 local expect = require("../lib/expect")
+local rules = require("../lib/rules")
 
 local tiers = RarityConfig.Tiers
 local relics = RelicConfig.Relics
@@ -14,6 +15,10 @@ local function constant(value: number): () -> number
 	return function()
 		return value
 	end
+end
+
+local function at(luck: number): RollMath.Context
+	return RollMath.contextFor(rules, { FullLuck = luck })
 end
 
 return {
@@ -45,13 +50,13 @@ return {
 			for _, luck in LUCK_GRID do
 				local sum = 0
 				for _, relic in relics do
-					sum += RollMath.itemProbability(tiers, relics, relic.Id, luck)
+					sum += RollMath.itemProbability(at(luck), relic.Id)
 				end
 				expect.near(sum, 1, 1e-12, `relic sum at luck {luck}`)
 			end
 			local seen = {}
 			for _, relic in relics do
-				local probability = RollMath.itemProbability(tiers, relics, relic.Id, 1)
+				local probability = RollMath.itemProbability(at(1), relic.Id)
 				expect.truthy(probability > 0, `{relic.Id} has positive base chance`)
 				expect.truthy(not seen[probability], `{relic.Id} base odds are unique`)
 				seen[probability] = true
@@ -71,17 +76,24 @@ return {
 				return draws[i]
 			end)
 			expect.equal(index, 2, "stops at Uncommon")
+			-- Exactly at the ratio does not step (strict <).
+			i = 0
+			draws = { 0.25 }
+			expect.equal(RollMath.rollTierIndex(tiers, 1, function()
+				i += 1
+				return draws[i]
+			end), 1, "u = 1/4 stays Common")
 		end,
 	},
 	{
 		Name = "Monte Carlo at 1x matches tier masses (200k rolls)",
 		Run = function()
 			math.randomseed(12345)
-			local byTier = RollMath.groupByTier(relics)
+			local ctx = at(1)
 			local counts = {}
 			local rolls = 200000
 			for _ = 1, rolls do
-				local relic = RollMath.roll(tiers, byTier, 1, math.random)
+				local relic = RollMath.roll(ctx, math.random)
 				counts[relic.Tier] = (counts[relic.Tier] or 0) + 1
 			end
 			local masses = RollMath.tierMasses(tiers, 1)

@@ -34,12 +34,12 @@ local function schedule(player: Player, state: State, from: number)
 end
 
 local function performScans(player: Player, count: number, source: string)
-	local relicIds = table.create(count)
-	for index = 1, count do
-		relicIds[index] = RollService.RollRelic(player)
+	local entries = {}
+	for _, rolled in RollService.RollMany(player, count) do
+		table.insert(entries, { Id = rolled.Id, Mutation = rolled.Mutation, Source = source })
 	end
 	DataService.Increment(player, "TotalScans", count)
-	DiscoveryPipeline.Grant(player, relicIds, source)
+	DiscoveryPipeline.GrantBatch(player, entries)
 end
 
 local function tick(now: number)

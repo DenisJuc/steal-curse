@@ -27,6 +27,15 @@ local HELP = {
 	"/bindtime &lt;seconds&gt; - change hold time; /bindtime reset",
 	"/huntstats - captures, cancels, average time between captures",
 	"/forgecomplete - fake an early capture; the server must reject it",
+	"/forceroll &lt;tier|relicId&gt; [mutation] - e.g. /forceroll cosmic abyssal",
+	"/simroll [count] - simulate rolls with your current settings (no relics granted)",
+	"/setluck &lt;x&gt; - extra luck multiplier, e.g. /setluck 1e10; /setluck reset",
+	"/luckrank &lt;0-100&gt; - set your Core Luck rank",
+	"/focus &lt;tier|max&gt; - set Rarity Focus",
+	"/freq &lt;family|all&gt; - set Signal Frequency",
+	"/mutrank &lt;0-5&gt; - set Mutation Resonance rank",
+	"/savestatus - save mode, last save time, relic counts",
+	"/runtests - run the persistence tests (mock store)",
 }
 
 local function say(text: string)

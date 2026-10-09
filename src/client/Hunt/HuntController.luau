@@ -192,7 +192,8 @@ local function onBindResult(result: { [string]: any })
 		resetBind()
 		hud.ShowHint("")
 		if type(result.CapturedId) == "string" then
-			hud.ShowCapture(result.CapturedId, tonumber(result.BonusCount) or 0, result.BestBonusId)
+			local mutation = if type(result.CapturedMutation) == "string" then result.CapturedMutation else nil
+			hud.ShowCapture(result.CapturedId, mutation, tonumber(result.BonusCount) or 0, result.BestBonusId)
 		end
 		return
 	end

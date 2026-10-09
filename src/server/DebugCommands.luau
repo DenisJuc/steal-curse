@@ -8,6 +8,15 @@
 --   /regen             refill your signals to the maximum
 --   /bindtime <sec>    change your hold-to-bind time; /bindtime reset restores it
 --   /huntstats         captures, cancels and average time between captures this session
+--   /forceroll <tier|relicId> [mutation]   grant an exact relic, e.g. /forceroll cosmic abyssal
+--   /simroll [count]   simulate rolls with your current context and compare with the math (Output)
+--   /setluck <x>       extra debug luck multiplier; /setluck reset
+--   /luckrank <n>      set Core Luck rank 0..100
+--   /focus <tier|max>  set Rarity Focus
+--   /freq <family|all> set Signal Frequency
+--   /mutrank <n>       set Mutation Resonance rank 0..5
+--   /savestatus        save mode, last save time and counts
+--   /runtests          run the persistence tests on the ProfileStore mock
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,14 +24,21 @@ local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local Format = require(ReplicatedStorage.Shared.Format)
+local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
+local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
+local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RollMath = require(ReplicatedStorage.Shared.RollMath)
+local Stats = require(ReplicatedStorage.Shared.Stats)
 local BindService = require(script.Parent.Services.BindService)
 local DataService = require(script.Parent.Services.DataService)
+local MultiplierService = require(script.Parent.Services.MultiplierService)
 local RollService = require(script.Parent.Services.RollService)
 local ScanService = require(script.Parent.Services.ScanService)
+local SettingsService = require(script.Parent.Services.SettingsService)
 local SignalService = require(script.Parent.Services.SignalService)
 local DiscoveryPipeline = require(script.Parent.DiscoveryPipeline)
+local PersistenceTests = require(script.Parent.Tests.PersistenceTests)
 
 local Notify = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Notify") :: RemoteEvent
 
@@ -48,6 +64,94 @@ local function findTier(text: string): string?
 		end
 	end
 	return nil
+end
+
+local function findRelic(text: string): string?
+	local lowered = string.lower(text)
+	for _, relic in RelicConfig.Relics do
+		if string.lower(relic.Id) == lowered then
+			return relic.Id
+		end
+	end
+	return nil
+end
+
+local function findMutation(text: string): string?
+	local lowered = string.lower(text)
+	for _, mutation in MutationConfig.Mutations do
+		if string.lower(mutation.Id) == lowered then
+			return mutation.Id
+		end
+	end
+	return nil
+end
+
+local function findFamily(text: string): string?
+	local lowered = string.lower(text)
+	for _, family in RelicConfig.Families do
+		if string.lower(family) == lowered then
+			return family
+		end
+	end
+	return nil
+end
+
+local function describeLuck(player: Player): string
+	return `Luck {Format.number(RollService.GetFullLuck(player))}x, effective {Format.number(
+		RollService.BuildContext(player).Luck
+	)}x`
+end
+
+local function simulate(player: Player, count: number)
+	local ctx = RollService.BuildContext(player)
+	local rng = Random.new()
+	local nextNumber = function()
+		return rng:NextNumber()
+	end
+	local tierCounts: { [string]: number } = {}
+	local mutationCounts: { [string]: number } = {}
+	for index = 1, count do
+		local relic, mutation = RollMath.roll(ctx, nextNumber)
+		tierCounts[relic.Tier] = (tierCounts[relic.Tier] or 0) + 1
+		local key = mutation or "Normal"
+		mutationCounts[key] = (mutationCounts[key] or 0) + 1
+		if index % 50000 == 0 then
+			task.wait()
+		end
+	end
+
+	print(`[SimRoll] {count} rolls | luck {ctx.Luck} | mutation rank {ctx.MutationRank}`)
+	local masses = RollMath.tierMasses(ctx.Tiers, ctx.Luck)
+	local observed, expected = {}, {}
+	for index, tier in ctx.Tiers do
+		observed[index] = tierCounts[tier.Id] or 0
+		expected[index] = masses[index] * count
+		print(string.format("  %-10s observed %9d   expected %14.3f", tier.Id, observed[index], expected[index]))
+	end
+	local tierChi, tierDf = Stats.chiSquare(observed, expected)
+	print(string.format("  tiers chi-square %.2f (df %d, 99.9%% limit %.2f)", tierChi, tierDf, Stats.ChiSquare999[tierDf]))
+
+	local mutationOdds = RollMath.mutationProbabilities(ctx)
+	local mObserved, mExpected = {}, {}
+	for id, p in mutationOdds do
+		table.insert(mObserved, mutationCounts[id] or 0)
+		table.insert(mExpected, p * count)
+		print(string.format("  %-10s observed %9d   expected %14.3f", id, mutationCounts[id] or 0, p * count))
+	end
+	local mutationChi, mutationDf = Stats.chiSquare(mObserved, mExpected)
+	print(
+		string.format(
+			"  mutations chi-square %.2f (df %d, 99.9%% limit %.2f)",
+			mutationChi,
+			mutationDf,
+			Stats.ChiSquare999[mutationDf]
+		)
+	)
+	local passed = tierChi <= Stats.ChiSquare999[tierDf] and mutationChi <= Stats.ChiSquare999[mutationDf]
+	reply(
+		player,
+		`Simulated {Format.number(count)} rolls: {if passed then "matches the math" else "MISMATCH"} (details in Output).`
+	)
 end
 
 local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
@@ -87,8 +191,131 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 
 		wipedata = function(player)
 			DataService.Wipe(player)
+			MultiplierService.Refresh(player)
 			ScanService.Restart(player)
 			reply(player, "Your data was wiped.")
+		end,
+
+		forceroll = function(player, args)
+			local target = args[1] or ""
+			local tierId = findTier(target)
+			local relicId = if tierId then RollService.RollFromTier(player, tierId) else findRelic(target)
+			if not relicId then
+				reply(player, "Usage: /forceroll <tier|relicId> [mutation], e.g. /forceroll cosmic abyssal")
+				return
+			end
+			local mutation = nil
+			if args[2] and args[2] ~= "" then
+				mutation = findMutation(args[2])
+				if not mutation then
+					reply(player, `Unknown mutation "{args[2]}".`)
+					return
+				end
+			end
+			DiscoveryPipeline.GrantBatch(player, { { Id = relicId, Mutation = mutation, Source = "Debug" } })
+			local label = if mutation then `{mutation} {relicId}` else relicId
+			reply(player, `Granted {label}. Check /savestatus in ~{Config.Save.MinSecondsBetweenSaves}s.`)
+		end,
+
+		simroll = function(player, args)
+			local count = math.clamp(math.floor(tonumber(args[1]) or 100000), 1, Config.Debug.MaxSimulatedRolls)
+			reply(player, `Simulating {Format.number(count)} rolls...`)
+			simulate(player, count)
+		end,
+
+		setluck = function(player, args)
+			local argument = args[1]
+			if argument == "reset" then
+				RollService.SetDebugLuck(player, nil)
+			else
+				local value = tonumber(argument)
+				if not value or value < 1 then
+					reply(player, "Usage: /setluck <multiplier at least 1> or /setluck reset")
+					return
+				end
+				RollService.SetDebugLuck(player, value)
+			end
+			reply(player, describeLuck(player))
+		end,
+
+		luckrank = function(player, args)
+			local rank = tonumber(args[1])
+			local data = DataService.Get(player)
+			if not rank or not data then
+				reply(player, "Usage: /luckrank <0-100>")
+				return
+			end
+			data.Skills.CoreLuck = math.clamp(math.floor(rank), 0, Config.Luck.CoreLuckMaxRank)
+			MultiplierService.Refresh(player)
+			reply(player, `Core Luck rank {data.Skills.CoreLuck}. {describeLuck(player)}`)
+		end,
+
+		focus = function(player, args)
+			local argument = string.lower(args[1] or "")
+			local focus = if argument == "max" or argument == "maxluck" then "MaxLuck" else findTier(argument)
+			if not focus or not SettingsService.SetFocus(player, focus) then
+				reply(player, "Usage: /focus <tier|max>")
+				return
+			end
+			reply(player, `Rarity Focus: {focus}. {describeLuck(player)}`)
+		end,
+
+		freq = function(player, args)
+			local argument = string.lower(args[1] or "")
+			local frequency = if argument == "all" then "All" else findFamily(argument)
+			if not frequency or not SettingsService.SetFrequency(player, frequency) then
+				reply(player, `Usage: /freq <all|{string.lower(table.concat(RelicConfig.Families, "|"))}>`)
+				return
+			end
+			reply(player, `Signal Frequency: {frequency}.`)
+		end,
+
+		mutrank = function(player, args)
+			local rank = tonumber(args[1])
+			local data = DataService.Get(player)
+			if not rank or not data then
+				reply(player, `Usage: /mutrank <0-{MutationConfig.MaxRank}>`)
+				return
+			end
+			data.Skills.MutationResonance = math.clamp(math.floor(rank), 0, MutationConfig.MaxRank)
+			RollService.RefreshAttributes(player)
+			local chance = MutationConfig.ChanceAt(data.Skills.MutationResonance)
+			reply(player, `Mutation Resonance rank {data.Skills.MutationResonance}: {chance * 100}% mutation chance.`)
+		end,
+
+		savestatus = function(player)
+			local data = DataService.Get(player)
+			if not data then
+				return
+			end
+			local state = DataService.GetStoreState()
+			local mode = if state == "Access"
+				then "real DataStore"
+				else `mock ({state}) - nothing persists after Stop`
+			local lastSaved = player:GetAttribute("LastSavedAt")
+			local ago = if type(lastSaved) == "number"
+				then `{Format.seconds(workspace:GetServerTimeNow() - lastSaved)} ago`
+				else "not yet this session"
+			local pending = if DataService.IsSavePending(player) then "yes" else "no"
+			local discovered = player:GetAttribute("DiscoveredCount") or 0
+			local text = `Save: {mode} | Last save {ago} | Pending {pending} | Relics {#data.Inventory} | Codex {discovered} | Rare history {#data.RareHistory}`
+			reply(player, text)
+			print(`[SaveStatus] {player.Name}: {text}`)
+		end,
+
+		runtests = function(player)
+			reply(player, "Running persistence tests (mock store)...")
+			local results = PersistenceTests.Run()
+			local passed = 0
+			for _, result in results do
+				if result.Ok then
+					passed += 1
+					print(`  PASS  {result.Name}`)
+				else
+					warn(`  FAIL  {result.Name}: {result.Error}`)
+				end
+			end
+			reply(player, `Persistence tests: {passed}/{#results} passed (details in Output).`)
 		end,
 
 		hunt = function(player)

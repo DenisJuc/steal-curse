@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
+local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 
 local UIKit = {}
@@ -95,6 +96,11 @@ end
 function UIKit.tierColor(tierId: string): Color3
 	local tier = RarityConfig.Get(tierId)
 	return if tier then Color3.fromHex(tier.Color) else UIKit.Colors.Text
+end
+
+function UIKit.mutationColor(mutationId: string): Color3
+	local mutation = MutationConfig.ById[mutationId]
+	return if mutation then Color3.fromHex(mutation.Color) else UIKit.Colors.Text
 end
 
 -- Keeps a panel readable on phones and not oversized on big monitors. Scales around the panel's AnchorPoint.

@@ -29,6 +29,12 @@
         },
         "BindResult": {
           "$className": "RemoteEvent"
+        },
+        "SetRarityFocus": {
+          "$className": "RemoteEvent"
+        },
+        "SetFrequency": {
+          "$className": "RemoteEvent"
         }
       }
     },

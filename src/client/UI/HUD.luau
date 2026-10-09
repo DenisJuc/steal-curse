@@ -10,7 +10,7 @@ local UIKit = require(script.Parent.UIKit)
 
 local HUD = {}
 
-function HUD.Start(screen: ScreenGui): { SetVisible: (boolean) -> () }
+function HUD.Start(screen: ScreenGui, onOpenFocus: () -> ()): { SetVisible: (boolean) -> () }
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 
@@ -18,7 +18,7 @@ function HUD.Start(screen: ScreenGui): { SetVisible: (boolean) -> () }
 		Name = "ResonatorPanel",
 		AnchorPoint = Vector2.new(0, 0),
 		Position = UDim2.fromOffset(12, 12),
-		Size = UDim2.fromOffset(280, 134),
+		Size = UDim2.fromOffset(280, 170),
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.1,
 		Parent = screen,
@@ -76,6 +76,28 @@ function HUD.Start(screen: ScreenGui): { SetVisible: (boolean) -> () }
 		TextSize = 16,
 		Parent = panel,
 	})
+
+	local focusButton = UIKit.create("TextButton", {
+		Name = "FocusButton",
+		Font = UIKit.Font,
+		TextSize = 14,
+		TextColor3 = colors.Text,
+		BackgroundColor3 = colors.Card,
+		Position = UDim2.fromOffset(0, 116),
+		Size = UDim2.new(1, 0, 0, 28),
+		Parent = panel,
+	}, { UIKit.corner(8), UIKit.stroke(colors.Accent, 1, 0.5) })
+	focusButton.Activated:Connect(onOpenFocus)
+
+	local function refreshFocus()
+		local luck = player:GetAttribute("EffectiveLuck") or 1
+		local focus = player:GetAttribute("RarityFocus") or "MaxLuck"
+		local focusText = if focus == "MaxLuck" then "Max Luck" else focus
+		focusButton.Text = `Luck {Format.number(luck)}x  |  Focus: {focusText}`
+	end
+	player:GetAttributeChangedSignal("EffectiveLuck"):Connect(refreshFocus)
+	player:GetAttributeChangedSignal("RarityFocus"):Connect(refreshFocus)
+	refreshFocus()
 
 	local function refreshStats()
 		local scans = player:GetAttribute("TotalScans") or 0

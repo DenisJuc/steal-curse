@@ -1,5 +1,6 @@
 -- Config sanity: tiers, relic roster and placeholder rules.
 
+local MutationConfig = require("../../src/shared/MutationConfig")
 local RarityConfig = require("../../src/shared/RarityConfig")
 local RelicConfig = require("../../src/shared/RelicConfig")
 local RollMath = require("../../src/shared/RollMath")
@@ -49,6 +50,24 @@ return {
 				expect.truthy(objectTypes[relic.ObjectType], `{relic.Id} object type {relic.ObjectType}`)
 				expect.truthy(RelicConfig.ById[relic.Id] == relic, `{relic.Id} lookup`)
 			end
+		end,
+	},
+	{
+		Name = "mutations unlock in GDD order, one per rank, with rising total chance",
+		Run = function()
+			local expected = { "Golden", "Corrupted", "Bloodmoon", "Divine", "Abyssal" }
+			expect.equal(#MutationConfig.Mutations, #expected, "mutation count")
+			for index, id in expected do
+				local mutation = MutationConfig.Mutations[index]
+				expect.equal(mutation.Id, id, `mutation {index}`)
+				expect.equal(mutation.UnlockRank, index, `{id} unlock rank`)
+				expect.truthy(mutation.Weight > 0, `{id} weight`)
+			end
+			expect.equal(MutationConfig.ChanceAt(0), 0, "rank 0 chance")
+			for rank = 1, MutationConfig.MaxRank do
+				expect.truthy(MutationConfig.ChanceAt(rank) > MutationConfig.ChanceAt(rank - 1), `rank {rank} rises`)
+			end
+			expect.equal(MutationConfig.ChanceAt(MutationConfig.MaxRank), 0.5, "max chance")
 		end,
 	},
 }

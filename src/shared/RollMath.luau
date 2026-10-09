@@ -1,11 +1,34 @@
--- Pure probability math for relic rolls (GDD 5.2). No Roblox APIs, so Lune tests require it directly.
--- Tier chance at luck L: Q(T+) = min(1, L / Denominator(T)); exact tier mass = Q(T+) - Q(next+).
--- Within a tier, a relic is chosen by Weight / sum of weights in that tier.
+-- Pure probability math for relic rolls (GDD 5). No Roblox APIs, so Lune tests require it directly.
+-- This module is the ONLY source of both the server's rolls and every odds number the UI shows.
+--
+--   Tier:      Q(T+) = min(1, L / Denominator(T)); exact tier mass = Q(T+) - Q(next+).
+--              L is the player's full luck capped by Rarity Focus (effectiveLuck).
+--   Relic:     chosen inside the tier by Weight, with the Signal Frequency family's weight multiplied.
+--              Renormalized per tier, so frequency never changes tier chances.
+--   Mutation:  after the relic, chance(rank), then one UNLOCKED variant by weight. At most one.
 
 local RollMath = {}
 
-type Tier = { Id: string, Denominator: number }
-type Relic = { Id: string, Tier: string, Weight: number }
+export type Tier = { Id: string, Denominator: number }
+export type Relic = { Id: string, Tier: string, Weight: number, Family: string }
+export type Mutation = { Id: string, UnlockRank: number, Weight: number }
+
+export type Context = {
+	Tiers: { Tier },
+	ByTier: { [string]: { Relic } },
+	Luck: number,
+	Frequency: string?,
+	FrequencyMultiplier: number,
+	Mutations: { Mutation },
+	MutationRank: number,
+	MutationChance: number,
+}
+
+export type Outcome = {
+	RelicId: string,
+	Mutation: string?,
+	Probability: number,
+}
 
 function RollMath.cumulative(denominator: number, luck: number): number
 	return math.min(1, luck / denominator)
@@ -22,6 +45,19 @@ function RollMath.tierMasses(tiers: { Tier }, luck: number): { number }
 	return masses
 end
 
+-- Rarity Focus cap: luck at which P(focused tier or higher) = tierOrHigherChance (never below 1x).
+function RollMath.focusLuckCap(denominator: number, tierOrHigherChance: number): number
+	return math.max(1, tierOrHigherChance * denominator)
+end
+
+-- Purchased luck is never removed; focus only chooses a lower working value for rolls.
+function RollMath.effectiveLuck(fullLuck: number, focusDenominator: number?, tierOrHigherChance: number): number
+	if not focusDenominator then
+		return fullLuck
+	end
+	return math.min(fullLuck, RollMath.focusLuckCap(focusDenominator, tierOrHigherChance))
+end
+
 function RollMath.groupByTier(relics: { Relic }): { [string]: { Relic } }
 	local byTier = {}
 	for _, relic in relics do
@@ -33,6 +69,70 @@ function RollMath.groupByTier(relics: { Relic }): { [string]: { Relic } }
 		table.insert(list, relic)
 	end
 	return byTier
+end
+
+function RollMath.newContext(params: {
+	Tiers: { Tier },
+	ByTier: { [string]: { Relic } },
+	Luck: number?,
+	Frequency: string?,
+	FrequencyMultiplier: number?,
+	Mutations: { Mutation }?,
+	MutationRank: number?,
+	MutationChance: number?,
+}): Context
+	return {
+		Tiers = params.Tiers,
+		ByTier = params.ByTier,
+		Luck = params.Luck or 1,
+		Frequency = params.Frequency,
+		FrequencyMultiplier = params.FrequencyMultiplier or 1,
+		Mutations = params.Mutations or {},
+		MutationRank = params.MutationRank or 0,
+		MutationChance = params.MutationChance or 0,
+	}
+end
+
+-- Static game rules a context is built from (assembled once from the config modules).
+export type Rules = {
+	Tiers: { Tier },
+	ByTier: { [string]: { Relic } },
+	Mutations: { Mutation },
+	MutationChanceByRank: { [number]: number },
+	FocusTierOrHigherChance: number,
+	FrequencyMultiplierByRank: { [number]: number },
+}
+
+-- One player's current roll inputs. RarityFocus "MaxLuck" and Frequency "All" mean no effect.
+export type PlayerState = {
+	FullLuck: number,
+	RarityFocus: string?,
+	Frequency: string?,
+	FrequencyRank: number?,
+	MutationRank: number?,
+}
+
+-- The server rolls with this context and the UI shows odds from the same context.
+function RollMath.contextFor(rules: Rules, state: PlayerState): Context
+	local focusDenominator = nil
+	for _, tier in rules.Tiers do
+		if tier.Id == state.RarityFocus then
+			focusDenominator = tier.Denominator
+		end
+	end
+	local frequency = if state.Frequency == "All" then nil else state.Frequency
+	local frequencyRank = state.FrequencyRank or 0
+	local mutationRank = state.MutationRank or 0
+	return RollMath.newContext({
+		Tiers = rules.Tiers,
+		ByTier = rules.ByTier,
+		Luck = RollMath.effectiveLuck(state.FullLuck, focusDenominator, rules.FocusTierOrHigherChance),
+		Frequency = frequency,
+		FrequencyMultiplier = if frequency then rules.FrequencyMultiplierByRank[frequencyRank] or 1 else 1,
+		Mutations = rules.Mutations,
+		MutationRank = mutationRank,
+		MutationChance = rules.MutationChanceByRank[mutationRank] or 0,
+	})
 end
 
 -- Returns a list of human-readable problems; empty means the config is valid.
@@ -73,34 +173,107 @@ function RollMath.validate(tiers: { Tier }, relics: { Relic }): { string }
 	return problems
 end
 
-function RollMath.itemProbability(tiers: { Tier }, relics: { Relic }, relicId: string, luck: number): number
-	local masses = RollMath.tierMasses(tiers, luck)
-	local target: Relic? = nil
-	for _, relic in relics do
-		if relic.Id == relicId then
-			target = relic
-			break
+function RollMath.tierIndexOf(tiers: { Tier }, tierId: string): number?
+	for index, tier in tiers do
+		if tier.Id == tierId then
+			return index
 		end
 	end
-	if not target then
+	return nil
+end
+
+function RollMath.relicWeight(ctx: Context, relic: Relic): number
+	if ctx.Frequency and relic.Family == ctx.Frequency then
+		return relic.Weight * ctx.FrequencyMultiplier
+	end
+	return relic.Weight
+end
+
+local function tierWeightSum(ctx: Context, tierId: string): number
+	local sum = 0
+	for _, relic in ctx.ByTier[tierId] or {} do
+		sum += RollMath.relicWeight(ctx, relic)
+	end
+	return sum
+end
+
+local function findRelic(ctx: Context, relicId: string): Relic?
+	for _, list in ctx.ByTier do
+		for _, relic in list do
+			if relic.Id == relicId then
+				return relic
+			end
+		end
+	end
+	return nil
+end
+
+-- Probability that one roll yields this relic (any mutation).
+function RollMath.itemProbability(ctx: Context, relicId: string): number
+	local relic = findRelic(ctx, relicId)
+	if not relic then
 		return 0
 	end
+	local index = RollMath.tierIndexOf(ctx.Tiers, relic.Tier)
+	if not index then
+		return 0
+	end
+	local mass = RollMath.tierMasses(ctx.Tiers, ctx.Luck)[index]
+	return mass * RollMath.relicWeight(ctx, relic) / tierWeightSum(ctx, relic.Tier)
+end
 
-	local tierMass = 0
-	for index, tier in tiers do
-		if tier.Id == target.Tier then
-			tierMass = masses[index]
-			break
+-- Variants unlocked at the context's rank, in config order.
+function RollMath.unlockedMutations(ctx: Context): { Mutation }
+	local unlocked = {}
+	for _, mutation in ctx.Mutations do
+		if mutation.UnlockRank <= ctx.MutationRank then
+			table.insert(unlocked, mutation)
 		end
 	end
+	return unlocked
+end
 
+-- { Normal = p, [mutationId] = p } for one discovery; values sum to 1.
+function RollMath.mutationProbabilities(ctx: Context): { [string]: number }
+	local unlocked = RollMath.unlockedMutations(ctx)
+	local chance = if #unlocked > 0 then ctx.MutationChance else 0
+	local result = { Normal = 1 - chance }
 	local weightSum = 0
-	for _, relic in relics do
-		if relic.Tier == target.Tier then
-			weightSum += relic.Weight
+	for _, mutation in unlocked do
+		weightSum += mutation.Weight
+	end
+	for _, mutation in unlocked do
+		result[mutation.Id] = chance * mutation.Weight / weightSum
+	end
+	return result
+end
+
+-- Probability of this exact relic with this exact mutation (nil = no mutation).
+function RollMath.comboProbability(ctx: Context, relicId: string, mutationId: string?): number
+	local mutationChance = RollMath.mutationProbabilities(ctx)[mutationId or "Normal"] or 0
+	return RollMath.itemProbability(ctx, relicId) * mutationChance
+end
+
+-- Every possible (relic, mutation) outcome with its probability.
+function RollMath.distribution(ctx: Context): { Outcome }
+	local outcomes = {}
+	local masses = RollMath.tierMasses(ctx.Tiers, ctx.Luck)
+	local mutationOdds = RollMath.mutationProbabilities(ctx)
+	for index, tier in ctx.Tiers do
+		local list = ctx.ByTier[tier.Id] or {}
+		local weightSum = tierWeightSum(ctx, tier.Id)
+		for _, relic in list do
+			local itemP = masses[index] * RollMath.relicWeight(ctx, relic) / weightSum
+			for mutationId, mutationP in mutationOdds do
+				table.insert(outcomes, {
+					RelicId = relic.Id,
+					Mutation = if mutationId == "Normal" then nil else mutationId,
+					Probability = itemP * mutationP,
+				})
+			end
 		end
 	end
-	return tierMass * target.Weight / weightSum
+	return outcomes
 end
 
 -- Chained conditional ladder: step from tier i to i+1 with probability Q(i+1)/Q(i).
@@ -122,33 +295,44 @@ function RollMath.rollTierIndex(tiers: { Tier }, luck: number, nextNumber: () ->
 	return index
 end
 
-function RollMath.pickWeighted(list: { Relic }, nextNumber: () -> number): Relic
+function RollMath.pickWeighted<T>(list: { T }, weightOf: (T) -> number, nextNumber: () -> number): T
 	local total = 0
-	for _, relic in list do
-		total += relic.Weight
+	for _, entry in list do
+		total += weightOf(entry)
 	end
 	local target = nextNumber() * total
-	for _, relic in list do
-		target -= relic.Weight
+	for _, entry in list do
+		target -= weightOf(entry)
 		if target < 0 then
-			return relic
+			return entry
 		end
 	end
 	return list[#list]
 end
 
-function RollMath.roll(
-	tiers: { Tier },
-	byTier: { [string]: { Relic } },
-	luck: number,
-	nextNumber: () -> number
-): Relic
-	local index = RollMath.rollTierIndex(tiers, luck, nextNumber)
+function RollMath.rollMutation(ctx: Context, nextNumber: () -> number): string?
+	local unlocked = RollMath.unlockedMutations(ctx)
+	if #unlocked == 0 or ctx.MutationChance <= 0 then
+		return nil
+	end
+	if nextNumber() >= ctx.MutationChance then
+		return nil
+	end
+	return RollMath.pickWeighted(unlocked, function(mutation)
+		return mutation.Weight
+	end, nextNumber).Id
+end
+
+function RollMath.roll(ctx: Context, nextNumber: () -> number): (Relic, string?)
+	local index = RollMath.rollTierIndex(ctx.Tiers, ctx.Luck, nextNumber)
 	-- validate() guarantees every tier has relics; walking down only guards a broken config.
-	while index > 1 and not byTier[tiers[index].Id] do
+	while index > 1 and not ctx.ByTier[ctx.Tiers[index].Id] do
 		index -= 1
 	end
-	return RollMath.pickWeighted(byTier[tiers[index].Id], nextNumber)
+	local relic = RollMath.pickWeighted(ctx.ByTier[ctx.Tiers[index].Id], function(entry)
+		return RollMath.relicWeight(ctx, entry)
+	end, nextNumber)
+	return relic, RollMath.rollMutation(ctx, nextNumber)
 end
 
 return RollMath

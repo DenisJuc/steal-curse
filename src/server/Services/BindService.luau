@@ -172,14 +172,15 @@ local function onComplete(player: Player, signalId: any)
 	binds[player] = nil
 	setBindAttributes(player, nil, nil)
 
-	local capturedId = RollService.RollRelic(player)
 	local bonusCount =
 		Formulas.bonusRolls(ScanService.GetInterval(player), Config.Signals.RegenSeconds, Config.Hunt)
-	local entries = { { Id = capturedId, Source = "Capture" } }
+	local rolls = RollService.RollMany(player, 1 + bonusCount)
+	local captured = rolls[1]
+	local entries = { { Id = captured.Id, Mutation = captured.Mutation, Source = "Capture" } }
 	local bonusIds = table.create(bonusCount)
-	for index = 1, bonusCount do
-		bonusIds[index] = RollService.RollRelic(player)
-		table.insert(entries, { Id = bonusIds[index], Source = "Bonus" })
+	for index = 2, #rolls do
+		table.insert(bonusIds, rolls[index].Id)
+		table.insert(entries, { Id = rolls[index].Id, Mutation = rolls[index].Mutation, Source = "Bonus" })
 	end
 	DiscoveryPipeline.GrantBatch(player, entries)
 	DataService.Increment(player, "TotalCaptures", 1)
@@ -192,7 +193,8 @@ local function onComplete(player: Player, signalId: any)
 
 	reply(player, {
 		Ok = true,
-		CapturedId = capturedId,
+		CapturedId = captured.Id,
+		CapturedMutation = captured.Mutation,
 		BonusCount = bonusCount,
 		BestBonusId = bestRelic(bonusIds),
 	})

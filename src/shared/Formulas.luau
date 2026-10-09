@@ -2,6 +2,16 @@
 
 local Formulas = {}
 
+-- Core Luck multiplier for a purchased rank (GDD 5.3): rank 0 -> 1x, 10 -> 10x, 100 -> 10B x.
+function Formulas.coreLuck(rank: number): number
+	return 10 ^ (rank / 10)
+end
+
+-- CE cost to buy Core Luck rank n (GDD 5.3 test baseline).
+function Formulas.coreLuckCost(rank: number): number
+	return math.ceil(20 * 1.12 ^ rank)
+end
+
 -- Bonus discoveries for one successful capture (GDD 4.4). The captured relic is in addition to these.
 function Formulas.bonusRolls(
 	scanIntervalSeconds: number,

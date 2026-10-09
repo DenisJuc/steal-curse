@@ -40,4 +40,19 @@ return {
 			expect.truthy(Config.Bind.BreakRange > Config.Bind.LockRange + Config.Bind.RangeSlack, "break > lock")
 		end,
 	},
+	{
+		Name = "Core Luck follows 10^(rank/10) with rising costs (GDD 5.3)",
+		Run = function()
+			expect.equal(Formulas.coreLuck(0), 1, "rank 0")
+			expect.near(Formulas.coreLuck(10), 10, 1e-9, "rank 10")
+			expect.near(Formulas.coreLuck(50), 1e5, 1e-4, "rank 50")
+			expect.equal(Formulas.coreLuck(100), 1e10, "rank 100")
+			local previous = 0
+			for rank = 1, 100 do
+				local cost = Formulas.coreLuckCost(rank)
+				expect.truthy(cost > previous, `cost must rise at rank {rank}`)
+				previous = cost
+			end
+		end,
+	},
 }
