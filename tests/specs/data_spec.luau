@@ -3,6 +3,7 @@
 
 local Config = require("../../src/shared/Config")
 local RarityConfig = require("../../src/shared/RarityConfig")
+local RelicConfig = require("../../src/shared/RelicConfig")
 local DataTemplate = require("../../src/server/Data/DataTemplate")
 local Migrations = require("../../src/server/Data/Migrations")
 local expect = require("../lib/expect")
@@ -74,8 +75,9 @@ return {
 			expect.equal(data.DataVersion, DataTemplate.Version, "version")
 			expect.equal(#data.Inventory, 3, "inventory kept")
 			expect.equal(data.TotalScans, 40, "scans kept")
-			expect.equal(data.Discovered.CrackedPrayerBead, 1000, "first find time kept")
-			expect.equal(data.Discovered.InkboundSigilTome, 1100, "epic discovered")
+			expect.equal(data.Discovered.PaladynsNecklace, 1000, "first find time kept (renamed)")
+			expect.equal(data.Discovered.QuadLeafGrimoire, 1100, "epic discovered (renamed)")
+			expect.equal(data.Inventory[1].Id, "PaladynsNecklace", "held relic renamed")
 			expect.equal(#data.RareHistory, 0, "history starts empty")
 			expect.equal(data.Skills.CoreLuck, 0, "skills reconciled")
 		end,
@@ -106,9 +108,9 @@ return {
 			}
 			expect.equal(Migrations.run(data, DataTemplate.Version), "Migrated", "outcome")
 			reconcile(data, DataTemplate.Template)
-			expect.equal(data.CodexMutations.HeartOfTheLastEclipse.Abyssal, 50, "abyssal recorded")
-			expect.equal(data.CodexMutations.HeartOfTheLastEclipse.Golden, 70, "golden recorded")
-			expect.equal(data.CodexMutations.CrackedPrayerBead, nil, "plain relic has no mutation record")
+			expect.equal(data.CodexMutations.RedStoneOfAia.Abyssal, 50, "abyssal recorded")
+			expect.equal(data.CodexMutations.RedStoneOfAia.Golden, 70, "golden recorded")
+			expect.equal(data.CodexMutations.PaladynsNecklace, nil, "plain relic has no mutation record")
 			expect.equal(#data.Inventory, 3, "inventory kept")
 			expect.equal(data.Settings.AutoSell.ProtectFirst, true, "auto-sell settings reconciled")
 		end,
@@ -131,6 +133,36 @@ return {
 			expect.equal(data.Settings.RarityFocus, "Epic", "focus kept")
 			expect.equal(data.AfkLog.Active, false, "AFK log added")
 			expect.equal(#data.Inventory, 1, "inventory kept")
+		end,
+	},
+	{
+		Name = "v3 data renames the Slice 0 relic ids everywhere they are saved",
+		Run = function()
+			local data = {
+				DataVersion = 3,
+				Inventory = {
+					{ Uid = 1, Id = "HollowBoneFlute", Mutation = "Golden", At = 10, Source = "Scan" },
+					{ Uid = 2, Id = "SenzoBean", At = 20, Source = "Scan" },
+				},
+				Discovered = { HollowBoneFlute = 10, SenzoBean = 20 },
+				CodexMutations = { HollowBoneFlute = { Golden = 10 } },
+				Favorites = { HollowBoneFlute = true, ["HollowBoneFlute|Golden"] = true },
+				RareHistory = { { Id = "WeepingIronHalberd", At = 30, Source = "Scan" } },
+				Cosmetic = { Key = "HollowBoneFlute|Golden", Mode = "Hand" },
+			}
+			expect.equal(Migrations.run(data, DataTemplate.Version), "Migrated", "outcome")
+			expect.equal(data.Inventory[1].Id, "HolloBait", "inventory id")
+			expect.equal(data.Inventory[2].Id, "SenzoBean", "current ids untouched")
+			expect.equal(data.Discovered.HolloBait, 10, "Codex entry")
+			expect.equal(data.Discovered.HollowBoneFlute, nil, "old Codex entry removed")
+			expect.equal(data.CodexMutations.HolloBait.Golden, 10, "mutation record")
+			expect.truthy(data.Favorites.HolloBait and data.Favorites["HolloBait|Golden"], "favorites")
+			expect.equal(data.RareHistory[1].Id, "KubikiriCleaver", "rare history")
+			expect.equal(data.Cosmetic.Key, "HolloBait|Golden", "carried relic")
+			for oldId, newId in Migrations.RenamedRelics do
+				expect.truthy(RelicConfig.ById[newId], `{oldId} renames to unknown {newId}`)
+				expect.equal(RelicConfig.ById[oldId], nil, `{oldId} is still in the roster`)
+			end
 		end,
 	},
 	{

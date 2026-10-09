@@ -1,6 +1,6 @@
 # Supernatural Relic Collector (Roblox)
 
-An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 7 - Skill tree, Showcases, carried relic**.
+An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 8a - Relic roster (the 92 GDD relics with release names, designs and odds; models come in 8b/8c)**.
 
 Design sources (outside this repo): `Supernatural_Relic_Collector_GDD_FINAL.md`, `CURSOR_RELIC_GAME_BLUEPRINT.md`, `ROBLOX_GAME_PLAYBOOK.md`.
 
@@ -93,7 +93,7 @@ Type these in the chat box during Play. They do not exist outside Studio.
 | `/ce <amount>` | Adds Cursed Energy (negative removes), e.g. `/ce 20000`; `/ce set 0` |
 | `/offline <seconds>` | Pays offline earnings as if you had been away that long and opens the Welcome Back screen, e.g. `/offline 3600` |
 | `/pedlevel <slot> <level>` | Sets a pedestal's level directly, e.g. `/pedlevel 1 10` |
-| `/give <relicId> [mutation or none] [count]` | Grants exact copies through the full pipeline (auto-sell, Codex), e.g. `/give CrackedPrayerBead golden 5` or `/give CrackedPrayerBead none 5` |
+| `/give <relicId> [mutation or none] [count]` | Grants exact copies through the full pipeline (auto-sell, Codex), e.g. `/give SenzoBean golden 5` or `/give SenzoBean none 5` |
 | `/codexfill [n]` | Marks the first n relics (rarity order; default all) as discovered without giving items |
 | `/afksim [minutes]` | Simulates AFKing that long (the scans you'd have done, shrine CE, anti-AFK hops), then opens Welcome Back as if you just came back, e.g. `/afksim 60` (default 30) |
 | `/afkhop` | Skips your idle timer to the anti-AFK warning; touch nothing for 15 s to see the hop message (Studio can't really teleport) |
@@ -115,6 +115,12 @@ Rare-find waiting times under max boosts (mean, median, 90th percentile) can be 
 lune run tests/rareWaitReport
 ```
 
+The roster's odds and balance (per-tier and per-relic "1 in X", family and object type counts, essential Codex time, Cosmic count tradeoff) can be printed with:
+
+```
+lune run tests/oddsReport
+```
+
 AFK shrine pacing (when pedestals 4, 5 and 6 get bought at base luck) can be printed with:
 
 ```
@@ -128,7 +134,7 @@ default.project.json   Rojo mapping of src/ into the Roblox game tree; declares 
 src/shared/            ReplicatedStorage.Shared - config and pure math used by server, client and tests
   Config.luau            tunable numbers (scan, plots, feed, remote limits, saving, focus, frequency, luck)
   RarityConfig.luau      the 8 rarity tiers and their base cumulative odds
-  RelicConfig.luau       relic definitions (10 original placeholders)
+  RelicConfig.luau       the 92 relics (tier, in-tier weight, family, object type, VFX profile, lore); briefs in docs/ROSTER.md
   MutationConfig.luau    the 5 mutations, unlock ranks, weights and chance per rank
   RollMath.luau          ALL probability math: tiers, focus cap, frequency, mutations, joint odds, sampler
   RollRules.luau         RollMath rules assembled from config (shared by server rolls and UI odds)
@@ -198,9 +204,9 @@ tests/                 Lune headless tests (lune run tests/run)
   - Essential (unique Common-Legendary relics, any mutation counts): at 20/40/60/80/100% of that pool you get +5/+10/+10/+10/+15% Luck (total +50%) and +5% CE income at each step from 40% (total +20%). Mythic and rarer relics never gate power.
   - Family frequencies: discovering half of a family's Common-Legendary relics unlocks its Signal Frequency (a family with none starts unlocked). All of them gives a "<Family> Archivist" title.
   - Prestige titles: half / all of the roster, and any mutated Legendary+ or Cosmic. Titles only, no power.
-  Counts are fractions of the pool because the roster is still placeholder; earned milestones stay earned when relics are added.
+  Counts are fractions of the pool (70 essential relics in the current roster); earned milestones stay earned when relics are added.
 - **Skill tree** (rune tree icon). Everything is bought with CE; there are no skill points. **Resonance:** Core Luck (x10 luck every 10 ranks, 100 ranks, cost 20 x 1.12^rank), Scan Speed (4 s down to 1 s over 12 ranks), Frequency Focus (Signal Frequency x1.5 up to x3) and Mutation Resonance (unlocks mutations; costs are provisional until balancing). **Sanctuary:** Energy Conduction (+2% income per rank, 20 ranks), Spirit Merchant (+10% sell value per rank), Spirit Reservoir (offline cap 2 h -> 3 h -> 4 h). **Binding Arts:** Spirit Sight (see signals 15 studs farther and pulse 0.3 s sooner per rank), Binding Efficiency (hold to bind 0.5 s shorter per rank) and Resonant Harvest (+10% bonus finds per capture per rank, rounded up). **+1**, **+10** and **Max** buy ranks one at a time on the server, and stop at the first rank you can't afford. All numbers live in `SkillConfig` and Lune checks them against the GDD.
-- **Showcases** (Shrine menu > **Showcases >**). A Showcase is a display/pose setup on your plot's podium. There are three: **Simple Stance** (bought for 25K CE), **Crimson Throne** (unlocked by discovering Weeping Iron Halberd) and **Golden Guardian** (unlocked by reaching the Codex 60% milestone). Relic and Codex unlocks happen automatically. Every Showcase uses the same levels: Lv 1 +2% income / +1% luck, Lv 2 +5% / +3% (5K CE), Lv 3 +10% / +5% (250K), Lv 4 +15% / +10% (5M). Only the **active** Showcase gives its bonus; switching is free and moves the bonus at once. Higher levels look grander: Lv 2 adds an aura ring and light, Lv 3 sparkles and orbiting ornaments, Lv 4 a light pillar and big ornaments. Far away (150+ studs) or on Low effects, the lights, sparkles and pillar are switched off on your screen. Each Showcase has a cosmetic accessory that unlocks when you discover a particular relic, and you can show or hide it. Posing is optional: on your podium press **G** (gamepad L1 or tap the prompt) to sit on the throne or strike the pose. Moving ends a standing pose.
+- **Showcases** (Shrine menu > **Showcases >**). A Showcase is a display/pose setup on your plot's podium. There are three: **Simple Stance** (bought for 25K CE), **Crimson Throne** (unlocked by discovering Sukana's Finger, a Mythic) and **Golden Guardian** (unlocked by reaching the Codex 60% milestone). Relic and Codex unlocks happen automatically. Every Showcase uses the same levels: Lv 1 +2% income / +1% luck, Lv 2 +5% / +3% (5K CE), Lv 3 +10% / +5% (250K), Lv 4 +15% / +10% (5M). Only the **active** Showcase gives its bonus; switching is free and moves the bonus at once. Higher levels look grander: Lv 2 adds an aura ring and light, Lv 3 sparkles and orbiting ornaments, Lv 4 a light pillar and big ornaments. Far away (150+ studs) or on Low effects, the lights, sparkles and pillar are switched off on your screen. Each Showcase has a cosmetic accessory that unlocks when you discover a particular relic, and you can show or hide it. Posing is optional: on your podium press **G** (gamepad L1 or tap the prompt) to sit on the throne or strike the pose. Moving ends a standing pose.
 - **Carried relic.** In the Relics menu, **Carry** makes the selected relic float beside you; press again (**Hold**) to hold it in your hand, and once more (**Put away**) to stop. Everyone sees it. It's for show only: it stays in your inventory, gives no bonus, and disappears if you sell the last copy.
 - **Offline earnings.** Scanning stops when you leave. Your CE/min at the moment you left pays 25% for up to 2 hours of absence (3-4 h with Spirit Reservoir), once, when you return (nothing for absences under a minute). The **Welcome Back** screen shows it (no relics are found offline).
 - **Reveals.** Rewards are granted and saved first; reveals only show them and never slow scanning or movement. Common-Rare: a small spectral copy of the relic floats above your head (0.5 s) plus the feed line. Epic-Mythic: a card with the spinning relic, a rarity-colored flash and a sound (about 1-2 s). Celestial-Cosmic: the screen dims, light rays spin, the camera zooms in, about 3-5 s, with a **Skip** button. A mutated find shows the base relic first, then "+ ABYSSAL MUTATION (x4 income)" in the mutation color. Reveal cards play in the order you found them; if more than 3 are waiting, the least rare waiting one is skipped and the next card says "+N more rare finds in your Journal". Mutations use one reusable look (tint, outline, sparkles) on any relic.

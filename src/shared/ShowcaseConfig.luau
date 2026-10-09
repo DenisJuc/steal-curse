@@ -42,17 +42,17 @@ ShowcaseConfig.Showcases = {
 		Description = "A quiet spirit circle. You stand at its heart while wisps orbit.",
 		Unlock = { Kind = "CE", Price = 25000 },
 		Accessories = {
-			{ Id = "BoneFluteCharm", Name = "Bone Flute Charm", RelicId = "HollowBoneFlute" },
+			{ Id = "BoneFluteCharm", Name = "Hollo Bait Charm", RelicId = "HolloBait" },
 		},
 	},
 	{
 		Id = "CrimsonThrone",
 		Name = "Crimson Throne",
 		Style = "Throne",
-		Description = "A throne of red iron for whoever tamed a demonic weapon.",
-		Unlock = { Kind = "Relic", RelicId = "WeepingIronHalberd" },
+		Description = "A throne of red bone and iron for whoever holds the cursed king's finger.",
+		Unlock = { Kind = "Relic", RelicId = "SukanasFinger" },
 		Accessories = {
-			{ Id = "AshenBanners", Name = "Ashen Banners", RelicId = "AshenPaperCharm" },
+			{ Id = "AshenBanners", Name = "Exploding Tag Banners", RelicId = "ExplodingTag" },
 		},
 	},
 	{
@@ -62,7 +62,7 @@ ShowcaseConfig.Showcases = {
 		Description = "A golden guardian spirit stands watch behind you.",
 		Unlock = { Kind = "Codex", Milestone = "Essential60" },
 		Accessories = {
-			{ Id = "GuardianSigilTome", Name = "Guardian's Sigil Tome", RelicId = "InkboundSigilTome" },
+			{ Id = "GuardianSigilTome", Name = "Guardian's Grimoire", RelicId = "QuadLeafGrimoire" },
 		},
 	},
 } :: { Showcase }

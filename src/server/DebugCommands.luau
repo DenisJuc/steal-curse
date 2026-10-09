@@ -453,7 +453,7 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 		give = function(player, args)
 			local relicId = findRelic(args[1] or "")
 			if not relicId then
-				reply(player, "Usage: /give <relicId> [mutation|none] [count], e.g. /give CrackedPrayerBead golden 5")
+				reply(player, "Usage: /give <relicId> [mutation|none] [count], e.g. /give SenzoBean golden 5")
 				return
 			end
 			local mutation = nil

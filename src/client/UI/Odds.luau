@@ -54,7 +54,7 @@ function Odds.describe(relicId: string, mutation: string?): string
 	return text
 end
 
--- Display name including the mutation prefix, e.g. "Abyssal Heart of the Last Eclipse".
+-- Display name including the mutation prefix, e.g. "Abyssal Red Stone of Aia".
 function Odds.displayName(relicId: string, mutation: string?): string
 	local relic = RelicConfig.ById[relicId]
 	local name = if relic then relic.Name else relicId

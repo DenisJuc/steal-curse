@@ -5,6 +5,18 @@ local Stats = {}
 -- Chi-square 99.9% critical values by degrees of freedom (1..10).
 Stats.ChiSquare999 = { 10.83, 13.82, 16.27, 18.47, 20.52, 22.46, 24.32, 26.12, 27.88, 29.59 }
 
+-- 99.9% chi-square limit for any degrees of freedom: the exact table up to 10, then the
+-- Wilson-Hilferty approximation (within about 1% from df 10 up).
+function Stats.chiSquareLimit999(df: number): number
+	local exact = Stats.ChiSquare999[df]
+	if exact then
+		return exact
+	end
+	local z = 3.0902
+	local a = 2 / (9 * df)
+	return df * (1 - a + z * math.sqrt(a)) ^ 3
+end
+
 -- Pearson chi-square. Bins expecting fewer than 5 hits are pooled so tiny bins can't dominate.
 -- Returns (statistic, degrees of freedom).
 function Stats.chiSquare(observed: { number }, expected: { number }): (number, number)

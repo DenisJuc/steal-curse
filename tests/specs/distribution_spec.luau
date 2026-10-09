@@ -107,13 +107,25 @@ return {
 	{
 		Name = "Signal Frequency multiplies the chosen family's weight inside its tier",
 		Run = function()
-			-- Common: Cracked Prayer Bead (Spiritual, 60) and Rusted Ward Nail (Demonic, 40).
-			for rank = 0, MutationConfig.MaxRank do
-				local multiplier = Config.Frequency.MultiplierByRank[rank]
-				local ctx = RollMath.contextFor(rules, { FullLuck = 1, Frequency = "Demonic", FrequencyRank = rank })
-				local common = RollMath.tierMasses(tiers, 1)[1]
-				local share = RollMath.itemProbability(ctx, "RustedWardNail") / common
-				expect.near(share, 40 * multiplier / (60 + 40 * multiplier), 1e-12, `rank {rank} share`)
+			for _, family in RelicConfig.Families do
+				for rank = 0, MutationConfig.MaxRank do
+					local multiplier = Config.Frequency.MultiplierByRank[rank]
+					local ctx = RollMath.contextFor(rules, { FullLuck = 1, Frequency = family, FrequencyRank = rank })
+					local masses = RollMath.tierMasses(tiers, 1)
+					for index, tier in tiers do
+						local relics = rules.ByTier[tier.Id]
+						local total = 0
+						for _, relic in relics do
+							total += relic.Weight * (if relic.Family == family then multiplier else 1)
+						end
+						for _, relic in relics do
+							local weight = relic.Weight * (if relic.Family == family then multiplier else 1)
+							local expected = masses[index] * weight / total
+							local actual = RollMath.itemProbability(ctx, relic.Id)
+							expect.near(actual, expected, 1e-300 + expected * 1e-12, `{relic.Id} {family} rank {rank}`)
+						end
+					end
+				end
 			end
 		end,
 	},
@@ -178,19 +190,38 @@ return {
 		Run = function()
 			local ctx = RollMath.contextFor(rules, { FullLuck = 1, MutationRank = 5 })
 			local common = rules.ByTier.Common
-			local function weight(relic)
-				return RollMath.relicWeight(ctx, relic)
-			end
-			expect.equal(RollMath.pickWeighted(common, weight, sequence({ 0.5999 })).Id, "CrackedPrayerBead", "below 0.6")
-			expect.equal(RollMath.pickWeighted(common, weight, sequence({ 0.6 })).Id, "RustedWardNail", "at 0.6")
+			local EDGE = 1e-9
 
-			local demonic = RollMath.contextFor(rules, { FullLuck = 1, Frequency = "Demonic", FrequencyRank = 0 })
-			local function demonicWeight(relic)
-				return RollMath.relicWeight(demonic, relic)
+			-- Each relic owns [start, end) of the in-tier range: just below a boundary picks the
+			-- earlier relic, just above it picks the next one.
+			local function checkBoundaries(rollCtx: RollMath.Context, label: string): { number }
+				local function weight(relic)
+					return RollMath.relicWeight(rollCtx, relic)
+				end
+				local total = 0
+				for _, relic in common do
+					total += weight(relic)
+				end
+				local edges, running = {}, 0
+				for index = 1, #common - 1 do
+					running += weight(common[index])
+					local edge = running / total
+					edges[index] = edge
+					local below = RollMath.pickWeighted(common, weight, sequence({ edge - EDGE }))
+					local above = RollMath.pickWeighted(common, weight, sequence({ edge + EDGE }))
+					expect.equal(below.Id, common[index].Id, `{label} below edge {index}`)
+					expect.equal(above.Id, common[index + 1].Id, `{label} above edge {index}`)
+				end
+				expect.equal(RollMath.pickWeighted(common, weight, sequence({ 0 })).Id, common[1].Id, `{label} u = 0`)
+				expect.equal(RollMath.pickWeighted(common, weight, sequence({ 1 - EDGE })).Id, common[#common].Id, `{label} top`)
+				return edges
 			end
-			-- 60 vs 40 x 1.5 = 60: the split moves to exactly one half.
-			expect.equal(RollMath.pickWeighted(common, demonicWeight, sequence({ 0.4999 })).Id, "CrackedPrayerBead", "freq below")
-			expect.equal(RollMath.pickWeighted(common, demonicWeight, sequence({ 0.5 })).Id, "RustedWardNail", "freq at")
+			local plainEdges = checkBoundaries(ctx, "plain")
+
+			local first = common[1].Family
+			local boosted = RollMath.contextFor(rules, { FullLuck = 1, Frequency = first, FrequencyRank = 0 })
+			local boostedEdges = checkBoundaries(boosted, `frequency {first}`)
+			expect.truthy(boostedEdges[1] > plainEdges[1], "a frequency on the first relic's family widens its range")
 
 			expect.equal(RollMath.rollMutation(ctx, sequence({ 0.4999, 0 })), "Golden", "mutated, first variant")
 			expect.equal(RollMath.rollMutation(ctx, sequence({ 0.5 })), nil, "u = chance is not mutated")
@@ -198,15 +229,16 @@ return {
 			expect.equal(RollMath.rollMutation(ctx, sequence({ 0, 0.30 })), "Corrupted", "at Golden share")
 			expect.equal(RollMath.rollMutation(ctx, sequence({ 0, 0.9999 })), "Abyssal", "top of range")
 
-			-- Full roll: stay Common (0.9 >= 1/4), pick Rusted (0.7), mutate (0.1 < 0.5), Abyssal (0.95).
-			local relic, mutation = RollMath.roll(ctx, sequence({ 0.9, 0.7, 0.1, 0.95 }))
-			expect.equal(relic.Id, "RustedWardNail", "rolled relic")
+			-- Full roll: stay Common (0.9 >= 1/4), pick the second Common relic, mutate (0.1 < 0.5),
+			-- Abyssal (0.95).
+			local relic, mutation = RollMath.roll(ctx, sequence({ 0.9, plainEdges[1] + EDGE, 0.1, 0.95 }))
+			expect.equal(relic.Id, common[2].Id, "rolled relic")
 			expect.equal(mutation, "Abyssal", "rolled mutation")
 
 			-- Rank 0 never draws for mutations.
 			local plain = RollMath.contextFor(rules, { FullLuck = 1 })
-			local relic0, mutation0 = RollMath.roll(plain, sequence({ 0.9, 0.1 }))
-			expect.equal(relic0.Id, "CrackedPrayerBead", "rank 0 relic")
+			local relic0, mutation0 = RollMath.roll(plain, sequence({ 0.9, 0 }))
+			expect.equal(relic0.Id, common[1].Id, "rank 0 relic")
 			expect.equal(mutation0, nil, "rank 0 mutation")
 		end,
 	},
@@ -232,7 +264,8 @@ return {
 
 			local function check(label: string, observed: { number }, expected: { number })
 				local chi, df = Stats.chiSquare(observed, expected)
-				expect.truthy(chi <= Stats.ChiSquare999[df], `{label} chi-square {chi} > {Stats.ChiSquare999[df]} (df {df})`)
+				local limit = Stats.chiSquareLimit999(df)
+				expect.truthy(chi <= limit, `{label} chi-square {chi} > {limit} (df {df})`)
 			end
 
 			local masses = RollMath.tierMasses(tiers, ctx.Luck)
