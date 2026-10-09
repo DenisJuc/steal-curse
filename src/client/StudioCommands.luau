@@ -39,6 +39,8 @@ local HELP = {
 	"/ce &lt;amount&gt; - add CE; /ce set &lt;amount&gt;",
 	"/offline &lt;seconds&gt; - pay offline earnings as if you were away",
 	"/pedlevel &lt;slot&gt; &lt;level&gt; - set a pedestal level",
+	"/give &lt;relicId&gt; [mutation] [count] - grant exact copies (auto-sell applies)",
+	"/codexfill [n] - mark the first n relics as discovered",
 }
 
 local function say(text: string)

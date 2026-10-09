@@ -94,6 +94,27 @@ return {
 		end,
 	},
 	{
+		Name = "v1 data gains the seen-mutation Codex record from held relics",
+		Run = function()
+			local data = {
+				DataVersion = 1,
+				Discovered = { HeartOfTheLastEclipse = 50, CrackedPrayerBead = 10 },
+				Inventory = {
+					{ Uid = 1, Id = "HeartOfTheLastEclipse", Mutation = "Abyssal", At = 50, Source = "Scan" },
+					{ Uid = 2, Id = "CrackedPrayerBead", At = 10, Source = "Scan" },
+					{ Uid = 3, Id = "HeartOfTheLastEclipse", Mutation = "Golden", At = 70, Source = "Bonus" },
+				},
+			}
+			expect.equal(Migrations.run(data, DataTemplate.Version), "Migrated", "outcome")
+			reconcile(data, DataTemplate.Template)
+			expect.equal(data.CodexMutations.HeartOfTheLastEclipse.Abyssal, 50, "abyssal recorded")
+			expect.equal(data.CodexMutations.HeartOfTheLastEclipse.Golden, 70, "golden recorded")
+			expect.equal(data.CodexMutations.CrackedPrayerBead, nil, "plain relic has no mutation record")
+			expect.equal(#data.Inventory, 3, "inventory kept")
+			expect.equal(data.Settings.AutoSell.ProtectFirst, true, "auto-sell settings reconciled")
+		end,
+	},
+	{
 		Name = "every migration step up to the current version exists",
 		Run = function()
 			for step = 1, DataTemplate.Version do

@@ -1,18 +1,27 @@
 -- Top-left column: the Spirit Resonator box (scan progress and totals), then Cursed Energy,
--- then the Shrine (pedestal) and Luck (cursed lucky flower) buttons, one under the other.
--- Reads player attributes only; one UIScale keeps the whole column readable on phones.
+-- then the Shrine (pedestal), Luck (cursed lucky flower), Relics (chest) and Codex (book)
+-- buttons, one under the other. Reads player attributes only; one UIScale keeps the whole
+-- column readable on phones.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Icons = require(script.Parent.Icons)
 local UIKit = require(script.Parent.UIKit)
 
 local HUD = {}
 
-local ICON_BUTTON_SIZE = 72
+export type Callbacks = {
+	OnShrine: () -> (),
+	OnLuck: () -> (),
+	OnRelics: () -> (),
+	OnCodex: () -> (),
+}
+
+local ICON_BUTTON_SIZE = 64
 
 local function iconButton(parent: Instance, name: string, order: number, caption: string): (TextButton, TextLabel)
 	local button = UIKit.create("TextButton", {
@@ -38,14 +47,14 @@ local function iconButton(parent: Instance, name: string, order: number, caption
 	return button, label
 end
 
-function HUD.Start(screen: ScreenGui, onOpenShrine: () -> (), onOpenLuck: () -> ()): { SetVisible: (boolean) -> () }
+function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (boolean) -> () }
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 
 	local column = UIKit.create("Frame", {
 		Name = "LeftColumn",
 		Position = UDim2.fromOffset(12, 12),
-		Size = UDim2.fromOffset(280, 400),
+		Size = UDim2.fromOffset(280, 470),
 		BackgroundTransparency = 1,
 		Parent = screen,
 	}, {
@@ -133,16 +142,58 @@ function HUD.Start(screen: ScreenGui, onOpenShrine: () -> (), onOpenLuck: () -> 
 
 	local shrineButton = iconButton(column, "ShrineButton", 3, "Shrine")
 	Icons.pedestal(shrineButton)
-	shrineButton.Activated:Connect(onOpenShrine)
+	shrineButton.Activated:Connect(callbacks.OnShrine)
 
 	local luckButton, luckCaption = iconButton(column, "LuckButton", 4, "Luck")
 	Icons.cursedFlower(luckButton)
-	luckButton.Activated:Connect(onOpenLuck)
+	luckButton.Activated:Connect(callbacks.OnLuck)
 	local function refreshLuck()
 		luckCaption.Text = `Luck {Format.number(player:GetAttribute("EffectiveLuck") or 1)}x`
 	end
 	player:GetAttributeChangedSignal("EffectiveLuck"):Connect(refreshLuck)
 	refreshLuck()
+
+	local relicsButton = iconButton(column, "RelicsButton", 5, "Relics")
+	Icons.chest(relicsButton)
+	relicsButton.Activated:Connect(callbacks.OnRelics)
+
+	local codexButton, codexCaption = iconButton(column, "CodexButton", 6, "Codex")
+	Icons.book(codexButton)
+	codexButton.Activated:Connect(callbacks.OnCodex)
+	local function refreshCodex()
+		codexCaption.Text = `Codex {player:GetAttribute("DiscoveredCount") or 0}/{#CodexBook.AllIds}`
+	end
+	player:GetAttributeChangedSignal("DiscoveredCount"):Connect(refreshCodex)
+	refreshCodex()
+
+	-- "!" badge while Codex milestones are waiting to be claimed.
+	local badge = UIKit.label({
+		Name = "ClaimBadge",
+		Text = "!",
+		TextSize = 18,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = colors.Red,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -4, 0, 4),
+		Size = UDim2.fromOffset(24, 24),
+		ZIndex = 2,
+		Visible = false,
+		Parent = codexButton,
+	})
+	UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = badge })
+	UIKit.stroke(colors.Text, 2, 0).Parent = badge
+	local codexStroke = codexButton:FindFirstChildOfClass("UIStroke")
+	local function refreshBadge()
+		local claimable = (player:GetAttribute("CodexClaimable") or 0) > 0
+		badge.Visible = claimable
+		if codexStroke then
+			codexStroke.Color = if claimable then colors.Gold else colors.Accent
+			codexStroke.Transparency = if claimable then 0 else 0.35
+		end
+	end
+	player:GetAttributeChangedSignal("CodexClaimable"):Connect(refreshBadge)
+	refreshBadge()
 
 	local function refreshStats()
 		local scans = player:GetAttribute("TotalScans") or 0
@@ -156,7 +207,29 @@ function HUD.Start(screen: ScreenGui, onOpenShrine: () -> (), onOpenLuck: () -> 
 	player:GetAttributeChangedSignal("TotalCaptures"):Connect(refreshStats)
 	refreshStats()
 
+	local panelStroke = panel:FindFirstChildOfClass("UIStroke")
+	local relicsStroke = relicsButton:FindFirstChildOfClass("UIStroke")
+	local function refreshPaused()
+		local paused = player:GetAttribute("ScanPaused") == true
+		local color = if paused then colors.Red else colors.Accent
+		fill.BackgroundColor3 = color
+		timerLabel.TextColor3 = if paused then colors.Red else colors.SubText
+		for _, stroke in { panelStroke, relicsStroke } do
+			if stroke then
+				stroke.Color = color
+				stroke.Transparency = if paused then 0 else 0.35
+			end
+		end
+	end
+	player:GetAttributeChangedSignal("ScanPaused"):Connect(refreshPaused)
+	refreshPaused()
+
 	RunService.RenderStepped:Connect(function()
+		if player:GetAttribute("ScanPaused") == true then
+			fill.Size = UDim2.fromScale(1, 1)
+			timerLabel.Text = "[INVENTORY FULL] Scanning paused"
+			return
+		end
 		local nextAt = player:GetAttribute("NextScanAt")
 		local interval = player:GetAttribute("ScanInterval")
 		if type(nextAt) ~= "number" or type(interval) ~= "number" or interval <= 0 then
@@ -169,7 +242,7 @@ function HUD.Start(screen: ScreenGui, onOpenShrine: () -> (), onOpenLuck: () -> 
 	end)
 
 	return {
-		-- Spirit Sight hides management UI; scanning itself never stops.
+		-- Spirit Sight hides management UI; scanning itself only stops when the inventory is full.
 		SetVisible = function(visible: boolean)
 			column.Visible = visible
 		end,

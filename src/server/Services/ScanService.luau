@@ -1,5 +1,7 @@
 -- Automatic passive scanner (GDD 3.1): one loop for all players, one relic per completed scan.
 -- Never paused by menus, hunting or reveals. Results are decided here before any client animation.
+-- The one exception: while the inventory is full (Config.Inventory.Capacity) scanning pauses
+-- (ScanPaused attribute, red notice) and restarts from a fresh timer once there is room again.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,14 +11,28 @@ local DataService = require(script.Parent.DataService)
 local RollService = require(script.Parent.RollService)
 local DiscoveryPipeline = require(script.Parent.Parent.DiscoveryPipeline)
 
+local Notify = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Notify") :: RemoteEvent
+
 local ScanService = {}
+
+ScanService.FullMessage = "[INVENTORY FULL] Scanning paused. Sell relics to make room."
 
 type State = {
 	NextAt: number,
 	IntervalOverride: number?,
+	Paused: boolean?,
 }
 
 local states: { [Player]: State } = {}
+
+-- Free inventory slots (0 when full or not loaded).
+function ScanService.Room(player: Player): number
+	local data = DataService.Get(player)
+	if not data then
+		return 0
+	end
+	return math.max(0, Config.Inventory.Capacity - #data.Inventory)
+end
 
 function ScanService.GetInterval(player: Player): number
 	local state = states[player]
@@ -42,9 +58,24 @@ local function performScans(player: Player, count: number, source: string)
 	DiscoveryPipeline.GrantBatch(player, entries)
 end
 
+local function setPaused(player: Player, state: State, paused: boolean, now: number)
+	if (state.Paused == true) == paused then
+		return
+	end
+	state.Paused = paused
+	player:SetAttribute("ScanPaused", paused)
+	if paused then
+		Notify:FireClient(player, ScanService.FullMessage, "Error")
+	else
+		schedule(player, state, now)
+	end
+end
+
 local function tick(now: number)
 	for player, state in states do
-		if now < state.NextAt then
+		local room = ScanService.Room(player)
+		setPaused(player, state, room <= 0, now)
+		if state.Paused or now < state.NextAt then
 			continue
 		end
 		local interval = ScanService.GetInterval(player)
@@ -54,6 +85,7 @@ local function tick(now: number)
 			due = Config.Scan.MaxCatchUpScans
 			base = now
 		end
+		due = math.min(due, room)
 		local ok, err = pcall(performScans, player, due, "Scan")
 		if not ok then
 			warn(`[ScanService] Scan failed for {player.Name}: {err}`)
@@ -84,11 +116,16 @@ function ScanService.Init()
 end
 
 -- Debug: immediately grant extra scans without changing the regular schedule.
-function ScanService.ForceScans(player: Player, count: number, source: string)
+-- Stops at the inventory limit like normal scans; returns how many scans ran.
+function ScanService.ForceScans(player: Player, count: number, source: string): number
 	if not states[player] then
-		return
+		return 0
 	end
-	performScans(player, count, source)
+	count = math.min(count, ScanService.Room(player))
+	if count > 0 then
+		performScans(player, count, source)
+	end
+	return count
 end
 
 -- Debug: override this player's interval (nil restores the normal value).

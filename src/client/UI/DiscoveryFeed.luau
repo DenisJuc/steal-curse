@@ -3,7 +3,9 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local AutoSell = require(ReplicatedStorage.Shared.AutoSell)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Format = require(ReplicatedStorage.Shared.Format)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local Odds = require(script.Parent.Odds)
@@ -13,7 +15,17 @@ local DiscoveryResult = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("
 
 local DiscoveryFeed = {}
 
-type Result = { Uid: number, Id: string, Mutation: string?, Source: string, First: boolean?, Displayed: boolean? }
+type Result = {
+	Uid: number,
+	Id: string,
+	Mutation: string?,
+	Source: string,
+	First: boolean?,
+	NewVariant: boolean?,
+	Displayed: boolean?,
+	Sold: number?,
+	SoldReason: string?,
+}
 
 local LINE_HEIGHT = 44
 local order = 0
@@ -107,11 +119,16 @@ local function showRelic(list: Frame, result: Result)
 	local title = Odds.displayName(relic.Id, result.Mutation)
 	if result.First then
 		title = "NEW! " .. title
+	elseif result.NewVariant then
+		title = "NEW VARIANT! " .. title
 	end
 	local color = if result.Mutation then UIKit.mutationColor(result.Mutation) else UIKit.tierColor(relic.Tier)
 	local subtitle = Odds.describe(relic.Id, result.Mutation)
 	if result.Displayed then
 		subtitle ..= "  |  on pedestal"
+	elseif result.Sold then
+		local reason = AutoSell.ReasonText[result.SoldReason or ""] or "auto-sell"
+		subtitle ..= `  |  sold +{Format.number(result.Sold)} CE ({reason})`
 	end
 	makeLine(list, title, subtitle, color, highlight)
 end
@@ -154,7 +171,17 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 			return rarityKey(a) < rarityKey(b)
 		end)
 		local shown = Config.Feed.MaxLines - 1
-		makeLine(list, `+{#results - shown} more discoveries`, "Batch summary", UIKit.Colors.SubText, false)
+		local soldCount, soldCE = 0, 0
+		for _, result in results do
+			if result.Sold then
+				soldCount += 1
+				soldCE += result.Sold
+			end
+		end
+		local summary = if soldCount > 0
+			then `Batch summary  |  {soldCount} auto-sold for {Format.number(soldCE)} CE`
+			else "Batch summary"
+		makeLine(list, `+{#results - shown} more discoveries`, summary, UIKit.Colors.SubText, false)
 		for index = #sorted - shown + 1, #sorted do
 			showRelic(list, sorted[index])
 		end

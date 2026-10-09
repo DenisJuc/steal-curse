@@ -31,7 +31,8 @@ for _, family in RelicConfig.Families do
 	table.insert(FREQUENCY_OPTIONS, { Id = family, Label = family })
 end
 
-local WATCHED_ATTRIBUTES = { "FullLuck", "EffectiveLuck", "RarityFocus", "Frequency", "FrequencyRank", "MutationRank" }
+local WATCHED_ATTRIBUTES =
+	{ "FullLuck", "EffectiveLuck", "RarityFocus", "Frequency", "FrequencyRank", "MutationRank", "FrequenciesUnlocked" }
 
 local function sectionLabel(parent: Instance, text: string, y: number)
 	UIKit.label({
@@ -159,6 +160,17 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		luckLabel.Text = `Luck {Format.number(fullLuck)}x  |  used {Format.number(ctx.Luck)}x{capped}`
 		highlight(focusChips, focus)
 		highlight(frequencyChips, frequency)
+		local unlocked = {}
+		for _, family in string.split(player:GetAttribute("FrequenciesUnlocked") or "", ",") do
+			unlocked[family] = true
+		end
+		for _, option in FREQUENCY_OPTIONS do
+			local isLocked = option.Id ~= "All" and not unlocked[option.Id]
+			local chip = frequencyChips[option.Id]
+			chip.Text = if isLocked then `{option.Label}\nlocked (Codex)` else option.Label
+			chip.TextSize = if isLocked then 12 else 14
+			chip.TextColor3 = if isLocked then colors.SubText else colors.Text
+		end
 
 		local masses = RollMath.tierMasses(ctx.Tiers, ctx.Luck)
 		for index, tier in ctx.Tiers do

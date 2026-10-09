@@ -40,6 +40,7 @@ function Toasts.Start(screen: ScreenGui)
 		local color = KIND_COLORS[kind or ""] or UIKit.Colors.Accent
 		local toast = UIKit.label({
 			Text = text,
+			TextColor3 = if kind == "Error" then color else UIKit.Colors.Text,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextSize = 16,
 			AutomaticSize = Enum.AutomaticSize.X,

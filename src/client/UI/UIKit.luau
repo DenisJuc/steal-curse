@@ -69,6 +69,27 @@ function UIKit.padding(pixels: number): UIPadding
 	})
 end
 
+-- Rounded text button; `onClick` runs on mouse, touch and gamepad activation.
+function UIKit.button(props: Props, onClick: (() -> ())?): TextButton
+	local button = UIKit.create("TextButton", {
+		Font = UIKit.Font,
+		TextSize = 14,
+		TextColor3 = UIKit.Colors.Text,
+		BackgroundColor3 = UIKit.Colors.Accent,
+		AutoButtonColor = true,
+	}, { UIKit.corner(8) })
+	for key, value in props do
+		if key ~= "Parent" then
+			(button :: any)[key] = value
+		end
+	end
+	button.Parent = props.Parent
+	if onClick then
+		button.Activated:Connect(onClick)
+	end
+	return button
+end
+
 function UIKit.label(props: Props): TextLabel
 	local defaults: Props = {
 		BackgroundTransparency = 1,

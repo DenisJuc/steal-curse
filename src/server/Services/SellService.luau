@@ -1,129 +1,75 @@
--- Manual selling (GDD 6.5): a small CE drip, never the main income.
+-- Selling (GDD 6.5): a small CE drip, never the main income.
 --   sale = SellFraction x relic income (mutation included) x (1 + sell bonus)
--- The "Sell" additive multiplier is where Spirit Merchant plugs in later. Displayed relics can't
--- be sold. Inventory is shown to the client as groups (relic + mutation), which stays small no
--- matter how many copies are held. Auto-sell rules arrive with the inventory slice.
+-- The "Sell" additive multiplier is where Spirit Merchant plugs in later. Displayed and locked
+-- copies are never sold, whichever path asks (manual sell, auto-sell, full inventory).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Economy = require(ReplicatedStorage.Shared.Economy)
-local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
-local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local MultiplierService = require(script.Parent.MultiplierService)
 local PedestalService = require(script.Parent.PedestalService)
-local RemoteGuard = require(script.Parent.RemoteGuard)
-
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
-local GetRelicGroups = Remotes:WaitForChild("GetRelicGroups") :: RemoteFunction
-local SellRelics = Remotes:WaitForChild("SellRelics") :: RemoteFunction
 
 local SellService = {}
-
-export type Group = {
-	Id: string,
-	Mutation: string?,
-	Count: number,
-	Displayed: number,
-	IncomePerMin: number,
-	SellValue: number,
-}
 
 function SellService.SellValue(player: Player, item: any): number
 	local bonus = MultiplierService.Get(player, "Sell") - 1
 	return Economy.sellValue(Config.Economy, PedestalService.RelicIncome(item), bonus)
 end
 
-function SellService.Groups(player: Player): { Group }
-	local data = DataService.Get(player)
-	if not data then
-		return {}
-	end
-	local byKey: { [string]: Group } = {}
-	local list = {}
-	for _, item in data.Inventory do
-		local key = `{item.Id}|{item.Mutation or ""}`
-		local group = byKey[key]
-		if not group then
-			group = {
-				Id = item.Id,
-				Mutation = item.Mutation,
-				Count = 0,
-				Displayed = 0,
-				IncomePerMin = PedestalService.RelicIncome(item),
-				SellValue = SellService.SellValue(player, item),
-			}
-			byKey[key] = group
-			table.insert(list, group)
-		end
-		group.Count += 1
-		if PedestalService.IsDisplayed(player, item.Uid) then
-			group.Displayed += 1
-		end
-	end
-	table.sort(list, function(a, b)
-		if a.IncomePerMin ~= b.IncomePerMin then
-			return a.IncomePerMin > b.IncomePerMin
-		end
-		return a.Id < b.Id
-	end)
-	return list
+function SellService.IsSellable(player: Player, item: any): boolean
+	return item.Locked ~= true and not PedestalService.IsDisplayed(player, item.Uid)
 end
 
--- Sells up to `count` undisplayed copies of one relic + mutation. Returns (sold, CE earned).
-function SellService.Sell(player: Player, relicId: string, mutationId: string?, count: number): (number, number)
+-- Sells every sellable item the predicate accepts, in inventory order, as one CE payment.
+-- Returns (count sold, CE earned, [uid] = CE for each sold item).
+function SellService.SellWhere(player: Player, shouldSell: (any) -> boolean): (number, number, { [number]: number })
 	local data = DataService.Get(player)
-	if not data or count <= 0 then
-		return 0, 0
+	local values: { [number]: number } = {}
+	if not data then
+		return 0, 0, values
 	end
 	local kept = table.create(#data.Inventory)
 	local sold, earned = 0, 0
 	for _, item in data.Inventory do
-		if
-			sold < count
-			and item.Id == relicId
-			and item.Mutation == mutationId
-			and not PedestalService.IsDisplayed(player, item.Uid)
-		then
+		if SellService.IsSellable(player, item) and shouldSell(item) then
+			local value = SellService.SellValue(player, item)
 			sold += 1
-			earned += SellService.SellValue(player, item)
+			earned += value
+			values[item.Uid] = value
 		else
 			table.insert(kept, item)
 		end
 	end
 	if sold == 0 then
-		return 0, 0
+		return 0, 0, values
 	end
 	data.Inventory = kept
 	EconomyService.Add(player, earned)
 	DataService.MirrorAttributes(player)
-	return sold, earned
+	return sold, earned, values
 end
 
-local function onSell(player: Player, relicId: any, mutationId: any, amount: any)
-	if type(relicId) ~= "string" or not RelicConfig.ById[relicId] then
-		return nil
+-- Sells up to `count` sellable copies of one relic + mutation. Returns (sold, CE earned).
+function SellService.Sell(player: Player, relicId: string, mutationId: string?, count: number): (number, number)
+	if count <= 0 then
+		return 0, 0
 	end
-	if mutationId ~= nil and (type(mutationId) ~= "string" or not MutationConfig.ById[mutationId]) then
-		return nil
-	end
-	local count
-	if amount == "Spare" then
-		count = math.huge
-	elseif type(amount) == "number" and amount == math.floor(amount) and amount >= 1 then
-		count = amount
-	else
-		return nil
-	end
-	local sold, earned = SellService.Sell(player, relicId, mutationId, count)
-	return { Sold = sold, Earned = earned, Groups = SellService.Groups(player) }
+	local remaining = count
+	local sold, earned = SellService.SellWhere(player, function(item)
+		if remaining > 0 and item.Id == relicId and item.Mutation == mutationId then
+			remaining -= 1
+			return true
+		end
+		return false
+	end)
+	return sold, earned
 end
 
 function SellService.Init()
 	MultiplierService.DefineKind("Sell", "Additive")
-	RemoteGuard.Function(GetRelicGroups, SellService.Groups, "Shrine")
-	RemoteGuard.Function(SellRelics, onSell, "Shrine")
 end
+
 return SellService

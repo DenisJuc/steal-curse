@@ -1,6 +1,6 @@
 # Supernatural Relic Collector (Roblox)
 
-An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 3 - Shrine economy**.
+An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 4 - Inventory, Codex, Auto-Sell**.
 
 Design sources (outside this repo): `Supernatural_Relic_Collector_GDD_FINAL.md`, `CURSOR_RELIC_GAME_BLUEPRINT.md`, `ROBLOX_GAME_PLAYBOOK.md`.
 
@@ -88,6 +88,8 @@ Type these in the chat box during Play. They do not exist outside Studio.
 | `/ce <amount>` | Adds Cursed Energy (negative removes), e.g. `/ce 20000`; `/ce set 0` |
 | `/offline <seconds>` | Pays offline earnings as if you had been away that long, e.g. `/offline 3600` |
 | `/pedlevel <slot> <level>` | Sets a pedestal's level directly, e.g. `/pedlevel 1 10` |
+| `/give <relicId> [mutation] [count]` | Grants exact copies through the full pipeline (auto-display, auto-sell, Codex), e.g. `/give CrackedPrayerBead golden 5` |
+| `/codexfill [n]` | Marks the first n relics (rarity order; default all) as discovered without giving items |
 
 ## 7. Automated checks (run before every commit)
 
@@ -125,18 +127,22 @@ src/shared/            ReplicatedStorage.Shared - config and pure math used by s
   Stats.luau             chi-square and waiting-time helpers
   Formulas.luau          gameplay formulas (Core Luck, hunt bonus rolls)
   Economy.luau           shrine economy formulas (pedestal costs/levels, income, selling, offline, Auto-Display)
+  AutoSell.luau          auto-sell rule order (decide), defaults and input cleaning
+  CodexConfig.luau       Codex milestone data (essential pool, titles, family sets)
+  Codex.luau             Codex rules: thresholds, progress, bonuses, frequency unlocks, collection-time math
+  CodexBook.luau         the game's Codex built from the real config (server + UI)
   Format.luau            number / odds formatting (1.5K, 1 in 1.32Qd)
 src/server/            ServerScriptService.Server
   Main.server.luau       builds the map, then starts services in order
   DiscoveryPipeline.luau the single path every relic grant goes through
   DebugCommands.luau     Studio-only chat commands
   Data/                  saved data template + migrations (pure, tested by Lune)
-  Services/              one module per system (Data, Economy, Pedestal, Sell, Multiplier, Roll, Settings, Plot, Scan, Signal, Bind, RemoteGuard, GameEvents)
+  Services/              one module per system (Data, Economy, Pedestal, Sell, AutoSell, Inventory, Codex, Multiplier, Roll, Settings, Plot, Scan, Signal, Bind, RemoteGuard, GameEvents)
   Tests/                 Studio persistence tests (/runtests)
   World/                 code-built map (BuildUtil, MapBuilder, PlotBuilder, PedestalVisuals, HuntAreaBuilder)
 src/client/            StarterPlayerScripts.Client
   Main.client.luau       builds the UI and hunt controls
-  UI/                    UIKit, Icons, HUD, ShrinePanel, FocusPanel, Odds, DiscoveryFeed, Toasts, HuntHUD
+  UI/                    UIKit, Icons, HUD, ShrinePanel, FocusPanel, InventoryPanel, AutoSellPanel, CodexPanel, Odds, DiscoveryFeed, Toasts, HuntHUD
   Hunt/HuntController    Spirit Sight / pulse / hold-to-bind input and state
   Effects/               SpiritSight (orbs, trails, tint), BindEffects (chains, camera, seal flash)
   StudioCommands.luau    Studio-only /help and /forgecomplete
@@ -148,19 +154,26 @@ tests/                 Lune headless tests (lune run tests/run)
 - **Server authority.** The server rolls every relic and owns all data. The client only displays results.
 - **Passive scanner.** `ScanService` runs one loop for all players. Every 4 seconds (Config.Scan.BaseIntervalSeconds) each player gets exactly one relic. It never pauses for menus or effects. After a server hitch it grants at most 3 overdue scans.
 - **Rolls.** `RollMath` uses the GDD tier odds (Uncommon+ 1 in 4 ... Cosmic 1 in 1.32 quadrillion). It climbs tier by tier, then picks a relic inside the tier by its weight, then rolls at most one mutation. The server and the UI build the same roll context with `RollMath.contextFor`, so every displayed "1 in X" is the real chance.
-- **Luck.** `MultiplierService` multiplies every luck source (Core Luck rank now; Codex, Showcases, consumables and events later). Core Luck = 10^(rank/10), so rank 100 = 10 billion x.
+- **Luck.** `MultiplierService` multiplies every luck source (Core Luck rank and Codex now; Showcases, consumables and events later). Core Luck = 10^(rank/10), so rank 100 = 10 billion x.
 - **Rarity Focus.** Picking a tier caps the luck used for rolls so that tier (or higher) comes up 50% of the time. Your bought luck is never removed; "Max Luck" uses all of it. Focus only lowers luck when your luck is above the cap.
 - **Signal Frequency.** Picking a family (Demonic, Spiritual, Arcane, Astral) multiplies that family's weight inside whatever tier was rolled (1.5x at Frequency Focus rank 0, up to 3x at rank 5). It never changes tier chances.
 - **Mutations.** Mutation Resonance rank 0 = none. Each rank unlocks one more (Golden, Corrupted, Bloodmoon, Divine, Abyssal) and raises the total chance (10% ... 50%). Weights 30/22/18/15/15 split that chance among unlocked mutations. A mutated relic counts as the same Codex entry as the normal one.
-- **Discovery pipeline.** Every grant goes through `DiscoveryPipeline.GrantBatch`: store the relic, record a first Codex discovery (by base relic id), add Epic+ finds (and mutated Legendary+) to the rare history (last 50), request a priority save for rare finds, then tell the owner's client.
+- **Discovery pipeline.** Every grant goes through `DiscoveryPipeline.GrantBatch`: store the relic, record a first Codex discovery (by base relic id) and any new mutation, add Epic+ finds (and mutated Legendary+) to the rare history (last 50), Auto-Display, auto-sell (rules, then capacity), claim Codex milestones, request a priority save for rare finds, then tell the owner's client.
 - **Saving.** ProfileStore autosaves every 5 minutes and saves when you leave and when the server shuts down. A first discovery, any Mythic+ or any mutated Legendary+ requests an extra save, merged to at most one save every 7 seconds. Limit: if a Roblox server crashes hard, finds made after the last completed save can be lost; priority saves keep that window to about 7 seconds for rare finds.
-- **Cursed Energy (CE).** The only currency. Every second, each relic displayed on a pedestal pays its tier's CE/min (Common 10 ... Cosmic 20,000) x its mutation multiplier (Golden 1.5x ... Abyssal 4x) x the pedestal's level multiplier (x1 at level 1 up to x2 at level 10). Global income bonuses (Codex, Showcases, skills; none yet) add together into one multiplier applied once.
+- **Cursed Energy (CE).** The only currency. Every second, each relic displayed on a pedestal pays its tier's CE/min (Common 10 ... Cosmic 20,000) x its mutation multiplier (Golden 1.5x ... Abyssal 4x) x the pedestal's level multiplier (x1 at level 1 up to x2 at level 10). Global income bonuses (Codex now; Showcases and skills later) add together into one multiplier applied once.
 - **Pedestals.** Pedestals 1-3 are free. Pedestals 4, 5 and 6 cost 500, 15,000 and 250,000 CE. Each pedestal has its own level 1-10; level 1 to 2 costs 500 CE and each next level costs double (255,500 CE for a full pedestal). "Max" buys as many levels as you can afford. Levels stay with the pedestal when relics move.
 - **Auto-Display.** ON by default. Each new find goes on the pedestal where it raises CE/min the most, and only if it strictly improves income. A replaced relic goes back to your relics (and may move to another pedestal if that helps). Locked pedestals are never changed automatically. Displayed relics stay in your inventory and can't be sold.
-- **Selling.** Manual for now (auto-sell rules come with the inventory slice). A sale pays 1% of one minute of that relic's income, so Commons sell for 0.1 CE: a small top-up, not the main income.
+- **Selling.** A sale pays 1% of one minute of that relic's income, so Commons sell for 0.1 CE: a small top-up, not the main income. Displayed and locked copies are never sold by any path.
+- **Inventory.** Every relic is its own item with a unique id; the Relics menu groups them by relic + mutation and shows base and your current "1 in X" odds. Capacity is 100 (Config.Inventory; skill tree upgrades will raise it). **Favorite** (per relic + mutation) pins it to the top and auto-sell never sells new copies. **Lock** stops the copies from being sold at all. **Inventory full:** at 100 relics the resonator pauses (red "[INVENTORY FULL]" in the HUD and a red message) and resumes with a fresh timer as soon as you sell something. Other sources (signal captures, debug grants) still work when full: a find the rules would keep is sold instead, unless it is a first discovery, Legendary or rarer, or a mutated Epic or rarer; those go over the limit ("protected") and are never discarded.
+- **Auto-sell.** Runs on new finds after Auto-Display. Rule order (first match wins): favorite = keep; first discovery = keep if "Protect first discoveries" is on; mutated = keep if "Protect mutated relics" is on; rarity rule Sell All = sell; duplicate with Sell Duplicates (or the global "duplicates of every rarity" toggle) = sell; base odds more common than your "1 in X" setting = sell; otherwise keep. A duplicate means you already hold a copy of the same relic that earns at least as much, so a stronger mutated copy is never a duplicate. The rules menu previews what happens to your next find of each relic. Sold finds show in the feed with the CE earned and the reason.
+- **Codex.** Every first find is recorded by base relic id, even if it is auto-sold right away; mutated finds count for the same entry and add a colored mutation dot on the relic's card. A reached milestone puts a "!" on the Codex icon; open the Codex and press **Claim** (or **Claim all**) to get the reward, confirmed by a banner at the top of the screen. Rewards only apply once claimed. Reached and claimed milestones are saved and never taken away:
+  - Essential (unique Common-Legendary relics, any mutation counts): at 20/40/60/80/100% of that pool you get +5/+10/+10/+10/+15% Luck (total +50%) and +5% CE income at each step from 40% (total +20%). Mythic and rarer relics never gate power.
+  - Family frequencies: discovering half of a family's Common-Legendary relics unlocks its Signal Frequency (a family with none starts unlocked). All of them gives a "<Family> Archivist" title.
+  - Prestige titles: half / all of the roster, and any mutated Legendary+ or Cosmic. Titles only, no power.
+  Counts are fractions of the pool because the roster is still placeholder; earned milestones stay earned when relics are added.
 - **Offline earnings.** Scanning stops when you leave. Your CE/min at the moment you left pays 25% for up to 2 hours of absence, once, when you return (nothing for absences under a minute).
 - **Plots.** 8 shrine plots surround the hub. Each player gets the first free plot, their name appears on the gate sign, and they spawn there. **Set Max Players to 8 or fewer** when publishing.
-- **UI.** Top-left column, one under the other: the Spirit Resonator box (scan progress, interval, scans, relics held, signals sealed), your Cursed Energy number, a **pedestal** icon that opens the Shrine menu (pedestals, upgrades, locks, relic list with selling, CE/min) and a **cursed lucky flower** icon that opens the Luck menu (Rarity Focus, Signal Frequency, live odds). Menus open in the screen center, fit phone screens and scroll when they don't fit. The top-middle feed shows each discovery with its tier (or mutation) color and base odds; "NEW!" marks first discoveries. Server messages (offline earnings, errors) appear at the bottom center. Icons are frame-drawn placeholders (`UI/Icons.luau`) until real art arrives.
+- **UI.** Top-left column, one under the other: the Spirit Resonator box (scan progress, interval, scans, relics held, signals sealed), your Cursed Energy number, a **pedestal** icon (Shrine menu: pedestals, upgrades, locks, choosing displays, CE/min), a **cursed lucky flower** (Luck menu: Rarity Focus, Signal Frequency, live odds), a **chest** (Relics menu: inventory, favorites, locks, selling, Auto-Sell Rules) and a **book** (Codex menu: milestones, titles, relic cards). Menus open in the screen center, fit phone screens and scroll when they don't fit. The top-middle feed shows each discovery with its tier (or mutation) color and base odds; "NEW!" marks first discoveries. Server messages (offline earnings, errors) appear at the bottom center. Icons are frame-drawn placeholders (`UI/Icons.luau`) until real art arrives.
 - **Haunted Grove.** A greybox hunting ground between plots 1 and 2, reached by its own path from the hub. Trees, rocks and ruined walls block line of sight. 15 hidden spawn points (tagged `SignalSpawn`) are where signals can appear.
 - **Personal signals.** `SignalService` gives each player 3 signals at start, adds 1 every 2 minutes up to 5, and sends positions only to that player. Other players never see or receive them. All signals look identical, and no rarity exists until a capture succeeds.
 - **Spirit Sight.** A client view mode: it hides the resonator panel, tints the screen, shows your signal orbs within 90 studs, and a pulse draws trails to all of them. Passive scanning keeps running.

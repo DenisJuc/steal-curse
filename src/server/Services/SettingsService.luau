@@ -1,11 +1,12 @@
 -- Saved player choices that change rolls: Rarity Focus (GDD 5.2) and Signal Frequency (GDD 3.3).
 -- The client only sends the chosen id; the server validates it against config.
--- Every frequency is selectable until the Codex unlock rules arrive in Slice 4.
+-- A family frequency must first be unlocked by its themed Codex milestone (GDD 7.1); "All" never is.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local CodexService = require(script.Parent.CodexService)
 local DataService = require(script.Parent.DataService)
 local RemoteGuard = require(script.Parent.RemoteGuard)
 local RollService = require(script.Parent.RollService)
@@ -13,6 +14,7 @@ local RollService = require(script.Parent.RollService)
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local SetRarityFocus = Remotes:WaitForChild("SetRarityFocus") :: RemoteEvent
 local SetFrequency = Remotes:WaitForChild("SetFrequency") :: RemoteEvent
+local Notify = Remotes:WaitForChild("Notify") :: RemoteEvent
 
 local SettingsService = {}
 
@@ -39,6 +41,13 @@ end
 function SettingsService.SetFrequency(player: Player, frequency: any): boolean
 	local data = DataService.Get(player)
 	if not data or type(frequency) ~= "string" or not VALID_FREQUENCY[frequency] then
+		return false
+	end
+	if not CodexService.IsFrequencyUnlocked(player, frequency) then
+		local text = if data.CodexReady[`Frequency_{frequency}`]
+			then `{frequency} is ready: claim it in the Codex to unlock it.`
+			else `{frequency} is locked. {CodexService.FrequencyGoal(frequency) or ""} to unlock it.`
+		Notify:FireClient(player, text, "Error")
 		return false
 	end
 	data.Settings.Frequency = frequency

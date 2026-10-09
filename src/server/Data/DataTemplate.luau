@@ -4,7 +4,7 @@
 
 local DataTemplate = {}
 
-DataTemplate.Version = 1
+DataTemplate.Version = 2
 
 export type Item = {
 	Uid: number,
@@ -12,6 +12,8 @@ export type Item = {
 	Mutation: string?,
 	At: number,
 	Source: string,
+	-- Locked copies can't be sold by any path.
+	Locked: boolean?,
 }
 
 export type RareFind = {
@@ -46,11 +48,26 @@ export type Data = {
 	},
 	-- Codex discovery keyed by BASE relic id (mutations never create separate entries).
 	Discovered: { [string]: number },
+	-- Mutations seen per base relic id (item-detail flags, prestige titles): [id][mutation] = time.
+	CodexMutations: { [string]: { [string]: number } },
+	-- Milestones reached but not yet claimed (kept even if a bigger roster raises the threshold).
+	CodexReady: { [string]: number },
+	-- Claimed Codex milestones; only these give rewards (never removed): [milestoneId] = time.
+	CodexMilestones: { [string]: number },
+	-- Favorite relic + mutation keys (AutoSell.favoriteKey); protects future copies from auto-sell.
+	Favorites: { [string]: boolean },
 	RareHistory: { RareFind },
 	Settings: {
 		RarityFocus: string,
 		Frequency: string,
 		AutoDisplay: boolean,
+		AutoSell: {
+			Tiers: { [string]: string },
+			SellAllDuplicates: boolean,
+			SellEasierThan: number,
+			ProtectFirst: boolean,
+			ProtectMutated: boolean,
+		},
 	},
 	Skills: {
 		CoreLuck: number,
@@ -77,11 +94,32 @@ DataTemplate.Template = {
 		At = 0,
 	},
 	Discovered = {},
+	CodexMutations = {},
+	CodexReady = {},
+	CodexMilestones = {},
+	Favorites = {},
 	RareHistory = {},
 	Settings = {
 		RarityFocus = "MaxLuck",
 		Frequency = "All",
 		AutoDisplay = true,
+		-- Must equal AutoSell.defaults() (checked by a Lune test).
+		AutoSell = {
+			Tiers = {
+				Common = "Keep",
+				Uncommon = "Keep",
+				Rare = "Keep",
+				Epic = "Keep",
+				Legendary = "Keep",
+				Mythic = "Keep",
+				Celestial = "Keep",
+				Cosmic = "Keep",
+			},
+			SellAllDuplicates = false,
+			SellEasierThan = 0,
+			ProtectFirst = true,
+			ProtectMutated = true,
+		},
 	},
 	Skills = {
 		CoreLuck = 0,

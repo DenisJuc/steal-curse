@@ -4,8 +4,12 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local HUD = require(script.Parent.UI.HUD)
+local AutoSellPanel = require(script.Parent.UI.AutoSellPanel)
+local Banner = require(script.Parent.UI.Banner)
+local CodexPanel = require(script.Parent.UI.CodexPanel)
 local DiscoveryFeed = require(script.Parent.UI.DiscoveryFeed)
 local FocusPanel = require(script.Parent.UI.FocusPanel)
+local InventoryPanel = require(script.Parent.UI.InventoryPanel)
 local ShrinePanel = require(script.Parent.UI.ShrinePanel)
 local Toasts = require(script.Parent.UI.Toasts)
 local HuntController = require(script.Parent.Hunt.HuntController)
@@ -17,24 +21,53 @@ screen.ResetOnSpawn = false
 screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screen.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 
--- Both menus open in the screen center; opening one closes the other.
-local focusPanel = FocusPanel.Start(screen)
-local shrinePanel = ShrinePanel.Start(screen)
-local hud = HUD.Start(screen, function()
-	focusPanel.SetVisible(false)
-	shrinePanel.Toggle()
-end, function()
-	shrinePanel.SetVisible(false)
-	focusPanel.Toggle()
+-- Every menu opens in the screen center; only one is open at a time.
+type Menu = { SetVisible: (boolean) -> () }
+local menus: { Menu } = {}
+local function closeAllExcept(keep: Menu?)
+	for _, menu in menus do
+		if menu ~= keep then
+			menu.SetVisible(false)
+		end
+	end
+end
+
+local autoSellPanel = AutoSellPanel.Start(screen)
+local inventoryPanel = InventoryPanel.Start(screen, function()
+	closeAllExcept(autoSellPanel)
+	autoSellPanel.Open()
 end)
+local shrinePanel = ShrinePanel.Start(screen, function()
+	closeAllExcept(inventoryPanel)
+	inventoryPanel.Toggle()
+end)
+local focusPanel = FocusPanel.Start(screen)
+local codexPanel = CodexPanel.Start(screen)
+menus = { shrinePanel, focusPanel, inventoryPanel, autoSellPanel, codexPanel }
+
+local function toggleOnly(menu: Menu & { Toggle: () -> () })
+	return function()
+		closeAllExcept(menu)
+		menu.Toggle()
+	end
+end
+
+local hud = HUD.Start(screen, {
+	OnShrine = toggleOnly(shrinePanel),
+	OnLuck = toggleOnly(focusPanel),
+	OnRelics = toggleOnly(inventoryPanel),
+	OnCodex = toggleOnly(codexPanel),
+})
 DiscoveryFeed.Start(screen)
 Toasts.Start(screen)
+Banner.Start(screen)
 HuntController.Start(screen, {
 	-- Spirit Sight hides management UI; scanning itself never stops.
 	SetManagementVisible = function(visible: boolean)
 		hud.SetVisible(visible)
-		focusPanel.SetVisible(visible)
-		shrinePanel.SetVisible(visible)
+		if not visible then
+			closeAllExcept(nil)
+		end
 	end,
 })
 

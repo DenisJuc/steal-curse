@@ -42,10 +42,16 @@
         "ShrineState": {
           "$className": "RemoteEvent"
         },
-        "GetRelicGroups": {
+        "GetInventory": {
           "$className": "RemoteFunction"
         },
-        "SellRelics": {
+        "InventoryAction": {
+          "$className": "RemoteFunction"
+        },
+        "GetCodex": {
+          "$className": "RemoteFunction"
+        },
+        "ClaimCodex": {
           "$className": "RemoteFunction"
         }
       }

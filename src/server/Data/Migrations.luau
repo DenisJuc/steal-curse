@@ -14,6 +14,19 @@ Migrations.Steps = {
 		end
 		data.RareHistory = data.RareHistory or {}
 	end,
+	-- 1 -> 2: the Codex now remembers which mutations were seen per relic; rebuild it from held items.
+	[2] = function(data: any)
+		data.CodexMutations = data.CodexMutations or {}
+		for _, item in data.Inventory or {} do
+			if type(item) == "table" and type(item.Id) == "string" and type(item.Mutation) == "string" then
+				local seen = data.CodexMutations[item.Id] or {}
+				data.CodexMutations[item.Id] = seen
+				if seen[item.Mutation] == nil then
+					seen[item.Mutation] = item.At or 0
+				end
+			end
+		end
+	end,
 } :: { [number]: (any) -> () }
 
 export type Outcome = "Current" | "Migrated" | "Newer"

@@ -8,11 +8,11 @@ local function box(parent: Instance): Frame
 	return UIKit.create("Frame", {
 		Name = "Icon",
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 4),
+		Position = UDim2.new(0.5, 0, 0, 3),
 		Size = UDim2.fromOffset(48, 48),
 		BackgroundTransparency = 1,
 		Parent = parent,
-	})
+	}, { UIKit.create("UIScale", { Scale = 0.85 }) })
 end
 
 local function rect(parent: Instance, x: number, y: number, w: number, h: number, color: Color3, radius: number): Frame
@@ -70,6 +70,39 @@ function Icons.cursedFlower(parent: Instance): Frame
 		UIKit.stroke(Color3.fromRGB(40, 70, 20), 2, 0),
 	})
 	rect(core, 5, 5, 4, 4, Color3.fromRGB(30, 10, 30), 2)
+	return icon
+end
+
+-- Relic chest with a gold band and lock.
+function Icons.chest(parent: Instance): Frame
+	local icon = box(parent)
+	local wood = Color3.fromRGB(120, 74, 44)
+	local woodDark = Color3.fromRGB(88, 52, 30)
+	local gold = UIKit.Colors.Gold
+	rect(icon, 5, 10, 38, 14, wood, 6)
+	rect(icon, 5, 22, 38, 22, woodDark, 3)
+	rect(icon, 5, 21, 38, 3, gold, 1)
+	rect(icon, 21, 10, 6, 34, gold, 1)
+	local lock = rect(icon, 19, 24, 10, 10, gold, 2)
+	rect(lock, 4, 3, 2, 4, woodDark, 1)
+	return icon
+end
+
+-- Codex: a dark grimoire with a glowing eye sigil.
+function Icons.book(parent: Instance): Frame
+	local icon = box(parent)
+	rect(icon, 10, 6, 30, 38, Color3.fromRGB(232, 222, 200), 3)
+	rect(icon, 8, 4, 30, 38, Color3.fromRGB(70, 32, 100), 3)
+	rect(icon, 8, 4, 5, 38, Color3.fromRGB(45, 18, 65), 2)
+	local eye = UIKit.create("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(25, 23),
+		Size = UDim2.fromOffset(16, 10),
+		BackgroundColor3 = Color3.fromRGB(170, 255, 95),
+		BorderSizePixel = 0,
+		Parent = icon,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	rect(eye, 6, 2, 4, 6, Color3.fromRGB(30, 10, 30), 2)
 	return icon
 end
 

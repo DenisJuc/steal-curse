@@ -1,13 +1,17 @@
 -- The single path every relic grant goes through (passive scans, captures, bonus rolls, debug).
--- Stages (GDD 9.3 order; auto-sell arrives with the inventory slice):
---   store item -> Codex discovery (base relic id) -> rare history -> auto-display
+-- Stages (GDD 9.3 order):
+--   store item -> Codex discovery (base relic id) + seen mutation -> rare history
+--   -> auto-display -> auto-sell (rules, then capacity) -> Codex milestones
 --   -> priority save -> notify owner.
+-- The Codex is written before auto-sell, so a first find counts even if it is sold right away.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local AutoSellService = require(script.Parent.Services.AutoSellService)
+local CodexService = require(script.Parent.Services.CodexService)
 local DataService = require(script.Parent.Services.DataService)
 local GameEvents = require(script.Parent.Services.GameEvents)
 local PedestalService = require(script.Parent.Services.PedestalService)
@@ -29,7 +33,11 @@ export type Result = {
 	Mutation: string?,
 	Source: string,
 	First: boolean,
+	NewVariant: boolean,
 	Displayed: boolean,
+	-- Set when the find was auto-sold: CE earned and why.
+	Sold: number?,
+	SoldReason: string?,
 }
 
 local PRIORITY_INDEX = RarityConfig.IndexById[Config.Save.PriorityTier]
@@ -42,8 +50,9 @@ local function tierIndex(relicId: string): number
 end
 
 -- Applies one entry to a data table. Returns the stored item, whether it was a first Codex
--- discovery, and whether it should trigger a priority save.
-function DiscoveryPipeline.ApplyEntry(data: any, entry: Entry, now: number): (any, boolean, boolean)
+-- discovery, whether it should trigger a priority save, and whether this mutation of this
+-- relic was seen for the first time.
+function DiscoveryPipeline.ApplyEntry(data: any, entry: Entry, now: number): (any, boolean, boolean, boolean)
 	local item = {
 		Uid = data.NextUid,
 		Id = entry.Id,
@@ -57,6 +66,19 @@ function DiscoveryPipeline.ApplyEntry(data: any, entry: Entry, now: number): (an
 	local first = data.Discovered[entry.Id] == nil
 	if first then
 		data.Discovered[entry.Id] = now
+	end
+
+	local newVariant = false
+	if entry.Mutation then
+		local seen = data.CodexMutations[entry.Id]
+		if not seen then
+			seen = {}
+			data.CodexMutations[entry.Id] = seen
+		end
+		if seen[entry.Mutation] == nil then
+			seen[entry.Mutation] = now
+			newVariant = true
+		end
 	end
 
 	local index = tierIndex(entry.Id)
@@ -74,7 +96,7 @@ function DiscoveryPipeline.ApplyEntry(data: any, entry: Entry, now: number): (an
 	end
 
 	local priority = first or index >= PRIORITY_INDEX or mutatedRare
-	return item, first, priority
+	return item, first, priority, newVariant
 end
 
 -- Grants every entry as one batch: one data update, at most one save request, one client message.
@@ -87,10 +109,13 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 	local now = os.time()
 	local results = {}
 	local items = {}
-	local needsSave = false
+	local firsts: { [number]: boolean } = {}
+	local needsSave, codexChanged = false, false
 	for _, entry in entries do
-		local item, first, priority = DiscoveryPipeline.ApplyEntry(data, entry, now)
+		local item, first, priority, newVariant = DiscoveryPipeline.ApplyEntry(data, entry, now)
 		needsSave = needsSave or priority
+		codexChanged = codexChanged or first or newVariant
+		firsts[item.Uid] = first
 		table.insert(items, item)
 		table.insert(results, {
 			Uid = item.Uid,
@@ -98,16 +123,26 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 			Mutation = item.Mutation,
 			Source = item.Source,
 			First = first,
+			NewVariant = newVariant,
 			Displayed = false,
 		})
 		GameEvents.Fire("Discovery", player, item, first)
 	end
 
 	local shown = PedestalService.AutoDisplayNew(player, items)
+	local sold = AutoSellService.Apply(player, items, firsts, shown)
 	for _, result in results do
 		result.Displayed = shown[result.Uid] == true
+		local sale = sold[result.Uid]
+		if sale then
+			result.Sold = sale.Earned
+			result.SoldReason = sale.Reason
+		end
 	end
 
+	if codexChanged then
+		CodexService.Evaluate(player)
+	end
 	DataService.MirrorAttributes(player)
 	if needsSave then
 		DataService.RequestSave(player)

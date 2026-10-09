@@ -20,12 +20,15 @@
 --   /ce <amount>       add CE (negative removes); /ce set <amount>
 --   /offline <seconds> pretend you were away that long and pay offline earnings now
 --   /pedlevel <slot> <level>   set a pedestal level directly
+--   /give <relicId> [mutation] [count]   grant exact copies through the full pipeline (auto-sell included)
+--   /codexfill [n]     mark the first n relics (rarity order, default all) as discovered, without items
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
+local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
@@ -34,6 +37,7 @@ local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local Stats = require(ReplicatedStorage.Shared.Stats)
 local BindService = require(script.Parent.Services.BindService)
+local CodexService = require(script.Parent.Services.CodexService)
 local DataService = require(script.Parent.Services.DataService)
 local EconomyService = require(script.Parent.Services.EconomyService)
 local MultiplierService = require(script.Parent.Services.MultiplierService)
@@ -174,8 +178,12 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				return
 			end
 			local count = math.clamp(math.floor(tonumber(argument) or 1), 1, Config.Debug.MaxRollsPerCommand)
-			ScanService.ForceScans(player, count, "Debug")
-			reply(player, `Ran {count} instant scan(s).`)
+			local ran = ScanService.ForceScans(player, count, "Debug")
+			if ran == 0 then
+				Notify:FireClient(player, ScanService.FullMessage, "Error")
+				return
+			end
+			reply(player, `Ran {ran} instant scan(s){if ran < count then " (stopped: inventory full)" else ""}.`)
 		end,
 
 		scanspeed = function(player, args)
@@ -349,6 +357,56 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				return
 			end
 			reply(player, `Pedestal {slot} is now level {math.clamp(math.floor(level), 1, Config.Economy.PedestalMaxLevel)}.`)
+		end,
+
+		give = function(player, args)
+			local relicId = findRelic(args[1] or "")
+			if not relicId then
+				reply(player, "Usage: /give <relicId> [mutation] [count], e.g. /give CrackedPrayerBead golden 5")
+				return
+			end
+			local mutation = nil
+			local countArg = args[2]
+			if args[2] and not tonumber(args[2]) and args[2] ~= "" then
+				mutation = findMutation(args[2])
+				if not mutation then
+					reply(player, `Unknown mutation "{args[2]}".`)
+					return
+				end
+				countArg = args[3]
+			end
+			local count = math.clamp(math.floor(tonumber(countArg) or 1), 1, Config.Debug.MaxRollsPerCommand)
+			local entries = table.create(count)
+			for index = 1, count do
+				entries[index] = { Id = relicId, Mutation = mutation, Source = "Debug" }
+			end
+			local results = DiscoveryPipeline.GrantBatch(player, entries)
+			local sold = 0
+			for _, result in results do
+				if result.Sold then
+					sold += 1
+				end
+			end
+			reply(player, `Granted {count} x {if mutation then mutation .. " " else ""}{relicId} ({sold} auto-sold).`)
+		end,
+
+		codexfill = function(player, args)
+			local data = DataService.Get(player)
+			if not data then
+				return
+			end
+			local count = math.clamp(math.floor(tonumber(args[1]) or #CodexBook.AllIds), 0, #CodexBook.AllIds)
+			local now = os.time()
+			for index = 1, count do
+				local relicId = CodexBook.AllIds[index]
+				if data.Discovered[relicId] == nil then
+					data.Discovered[relicId] = now
+				end
+			end
+			CodexService.Evaluate(player)
+			DataService.MirrorAttributes(player)
+			DataService.RequestSave(player)
+			reply(player, `Codex: first {count} relics marked as discovered.`)
 		end,
 
 		runtests = function(player)

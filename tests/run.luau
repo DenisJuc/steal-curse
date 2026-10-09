@@ -11,6 +11,8 @@ local suites = {
 	{ Name = "data", Tests = require("./specs/data_spec") },
 	{ Name = "rarewait", Tests = require("./specs/rarewait_spec") },
 	{ Name = "economy", Tests = require("./specs/economy_spec") },
+	{ Name = "autosell", Tests = require("./specs/autosell_spec") },
+	{ Name = "codex", Tests = require("./specs/codex_spec") },
 }
 
 local passed, failed = 0, 0

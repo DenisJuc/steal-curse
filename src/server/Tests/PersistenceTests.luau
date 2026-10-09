@@ -179,6 +179,29 @@ local TESTS: { { Name: string, Run: () -> () } } = {
 		end,
 	},
 	{
+		Name = "a mutated-only find marks the base Codex entry and its mutation, and both survive reload",
+		Run = function()
+			local key = newKey()
+			local profile = open(key)
+			local relicId = firstRelicOfTier("Rare")
+			local _, first, _, newVariant =
+				DiscoveryPipeline.ApplyEntry(profile.Data, { Id = relicId, Mutation = "Corrupted", Source = "Scan" }, 1234)
+			check(first and newVariant, "mutated-only find should be first + new variant")
+			local _, againFirst, _, againVariant =
+				DiscoveryPipeline.ApplyEntry(profile.Data, { Id = relicId, Source = "Scan" }, 1300)
+			check(not againFirst and not againVariant, "plain copy is neither a new entry nor a new variant")
+			profile.Data.CodexMilestones.Essential20 = 1234
+			profile.Data.CodexReady.Essential40 = 1240
+			local reloaded = endAndReopen(profile, key)
+			local after = reloaded.Data
+			check(after.Discovered[relicId] == 1234, "base Codex entry lost")
+			check(after.CodexMutations[relicId] and after.CodexMutations[relicId].Corrupted == 1234, "seen mutation lost")
+			check(after.CodexMilestones.Essential20 == 1234, "claimed milestone lost")
+			check(after.CodexReady.Essential40 == 1240, "ready-to-claim milestone lost")
+			reloaded:EndSession()
+		end,
+	},
+	{
 		Name = "old unversioned data migrates and keeps its relics",
 		Run = function()
 			local key = newKey()
