@@ -1,10 +1,16 @@
 -- Compact hunt HUD: Spirit Sight toggle, Pulse and Hold-to-Bind buttons (mouse/touch),
--- signal counter, hint line, bind progress meter and the capture result card.
+-- signal counter, hint line, bind progress meter and the capture summary card.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local CaptureSummary = require(ReplicatedStorage.Shared.CaptureSummary)
+local Config = require(ReplicatedStorage.Shared.Config)
+local Format = require(ReplicatedStorage.Shared.Format)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RelicShapes = require(ReplicatedStorage.Shared.RelicShapes)
+local MutationVFX = require(script.Parent.Parent.Effects.MutationVFX)
 local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
 
@@ -24,7 +30,7 @@ export type Hud = {
 	SetProgress: (progress: number?) -> (),
 	SetSignalInfo: (text: string) -> (),
 	ShowHint: (text: string, seconds: number?) -> (),
-	ShowCapture: (capturedId: string, mutation: string?, bonusCount: number, bestBonusId: string?) -> (),
+	ShowSummary: (summary: CaptureSummary.Summary, onClosed: () -> ()) -> (),
 }
 
 local function keyHint(key: string): string
@@ -145,7 +151,7 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		Name = "SignalInfo",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -186),
-		Size = UDim2.fromOffset(360, 28),
+		Size = UDim2.fromOffset(460, 28),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextSize = 18,
 		TextColor3 = Color3.fromRGB(170, 230, 255),
@@ -155,58 +161,125 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 	})
 	UIKit.scaler(signalInfo)
 
-	local card = UIKit.create("Frame", {
-		Name = "CaptureCard",
+	-- Capture summary (GDD 4.3 step 6): model, name, base odds, mutation, bonus count, notable finds.
+	local card = UIKit.create("TextButton", {
+		Name = "CaptureSummary",
+		Text = "",
+		AutoButtonColor = false,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.46),
-		Size = UDim2.fromOffset(380, 132),
+		Position = UDim2.fromScale(0.5, 0.42),
+		Size = UDim2.fromOffset(440, 236),
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.05,
 		Visible = false,
+		ZIndex = 20,
 		Parent = screen,
 	}, { UIKit.corner(14), UIKit.padding(12) })
 	UIKit.scaler(card)
 	local cardStroke = UIKit.stroke(colors.Accent, 3, 0)
 	cardStroke.Parent = card
-	UIKit.label({
+	local function cardLabel(props: { [string]: any }): TextLabel
+		props.ZIndex = 21
+		props.Parent = card
+		return UIKit.label(props)
+	end
+	cardLabel({
 		Name = "Header",
 		Text = "SEALED",
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextSize = 16,
-		TextColor3 = colors.SubText,
-		Size = UDim2.new(1, 0, 0, 18),
-		Parent = card,
-	})
-	local cardName = UIKit.label({
-		Name = "RelicName",
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextSize = 26,
-		Position = UDim2.fromOffset(0, 22),
-		Size = UDim2.new(1, 0, 0, 32),
-		Parent = card,
-	})
-	local cardOdds = UIKit.label({
-		Name = "Odds",
-		TextXAlignment = Enum.TextXAlignment.Center,
-		TextSize = 16,
-		Position = UDim2.fromOffset(0, 56),
-		Size = UDim2.new(1, 0, 0, 20),
-		Parent = card,
-	})
-	local cardBonus = UIKit.label({
-		Name = "Bonus",
-		TextXAlignment = Enum.TextXAlignment.Center,
 		TextSize = 15,
-		TextColor3 = colors.Gold,
-		TextWrapped = true,
-		Position = UDim2.fromOffset(0, 80),
-		Size = UDim2.new(1, 0, 0, 28),
+		TextColor3 = colors.SubText,
+		Position = UDim2.fromOffset(122, 0),
+		Size = UDim2.new(1, -122, 0, 18),
+	})
+	local viewport = UIKit.create("ViewportFrame", {
+		Name = "Model",
+		Size = UDim2.fromOffset(112, 112),
+		BackgroundColor3 = colors.Card,
+		BackgroundTransparency = 0.3,
+		Ambient = Color3.fromRGB(190, 190, 200),
+		LightColor = Color3.new(1, 1, 1),
+		LightDirection = Vector3.new(-1, -1, -1),
+		ZIndex = 21,
 		Parent = card,
+	}, { UIKit.corner(10) })
+	local viewCamera = Instance.new("Camera")
+	viewCamera.FieldOfView = 40
+	viewCamera.CFrame = CFrame.lookAt(Vector3.new(0, 1, 7.5), Vector3.new(0, 0.3, 0))
+	viewCamera.Parent = viewport
+	viewport.CurrentCamera = viewCamera
+	local cardName = cardLabel({
+		Name = "RelicName",
+		TextSize = 24,
+		TextWrapped = true,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(122, 20),
+		Size = UDim2.new(1, -122, 0, 52),
+	})
+	local cardOdds = cardLabel({
+		Name = "Odds",
+		TextSize = 15,
+		Position = UDim2.fromOffset(122, 74),
+		Size = UDim2.new(1, -122, 0, 18),
+	})
+	local cardBonus = cardLabel({
+		Name = "Bonus",
+		TextSize = 16,
+		TextColor3 = colors.Gold,
+		Position = UDim2.fromOffset(122, 94),
+		Size = UDim2.new(1, -122, 0, 20),
+	})
+	local notableLines = {}
+	for index = 1, 3 do
+		notableLines[index] = cardLabel({
+			Name = "Notable" .. index,
+			TextSize = 15,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			Position = UDim2.fromOffset(0, 120 + (index - 1) * 20),
+			Size = UDim2.new(1, 0, 0, 20),
+		})
+	end
+	local cardFooter = cardLabel({
+		Name = "Footer",
+		TextSize = 13,
+		TextColor3 = colors.SubText,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, 16),
 	})
 
 	local hintToken = 0
 	local cardToken = 0
 	local sightOn = false
+	local cardModel: BasePart? = nil
+	local onCardClosed: (() -> ())? = nil
+
+	local function closeCard()
+		cardToken += 1
+		card.Visible = false
+		if cardModel then
+			cardModel:Destroy()
+			cardModel = nil
+		end
+		local callback = onCardClosed
+		onCardClosed = nil
+		if callback then
+			callback()
+		end
+	end
+	card.Activated:Connect(closeCard)
+	RunService.RenderStepped:Connect(function(dt)
+		if cardModel and card.Visible then
+			cardModel.CFrame = CFrame.Angles(0, dt * 1.4, 0) * cardModel.CFrame
+		end
+	end)
+
+	local function relicColor(relicId: string, mutation: string?): Color3
+		local relic = RelicConfig.ById[relicId]
+		if mutation then
+			return UIKit.mutationColor(mutation)
+		end
+		return if relic then UIKit.tierColor(relic.Tier) else colors.Text
+	end
 
 	local hud = {}
 
@@ -262,26 +335,63 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		end
 	end
 
-	function hud.ShowCapture(capturedId: string, mutation: string?, bonusCount: number, bestBonusId: string?)
-		local relic = RelicConfig.ById[capturedId]
+	function hud.ShowSummary(summary: CaptureSummary.Summary, onClosed: () -> ())
+		local relic = RelicConfig.ById[summary.CapturedId]
 		if not relic then
+			onClosed()
 			return
 		end
-		local color = if mutation then UIKit.mutationColor(mutation) else UIKit.tierColor(relic.Tier)
-		cardName.Text = Odds.displayName(relic.Id, mutation)
+		-- A newer capture replaces the card without running the old card's close callback.
+		onCardClosed = nil
+		closeCard()
+		local mutation = summary.CapturedMutation
+		local color = relicColor(relic.Id, mutation)
+		cardName.Text = (if summary.CapturedFirst then "NEW! " else "") .. Odds.displayName(relic.Id, mutation)
 		cardName.TextColor3 = color
 		cardStroke.Color = color
 		cardOdds.Text = Odds.describe(relic.Id, mutation)
 		cardOdds.TextColor3 = color
-		local best = bestBonusId and RelicConfig.ById[bestBonusId]
-		cardBonus.Text = `+{bonusCount} bonus discoveries` .. (if best then `  |  best: {best.Name}` else "")
+		cardBonus.Text = `+{summary.BonusCount} bonus discoveries`
 
-		cardToken += 1
+		for index, line in notableLines do
+			local notable = summary.Notable[index]
+			line.Visible = notable ~= nil
+			if notable then
+				local tag = if notable.First then "  NEW!" elseif notable.NewVariant then "  NEW VARIANT" else ""
+				line.Text = `  {Odds.displayName(notable.Id, notable.Mutation)}  ({Format.odds(Odds.baseItem(notable.Id))}){tag}`
+				line.TextColor3 = relicColor(notable.Id, notable.Mutation)
+			end
+		end
+		local footer = {}
+		if summary.NewCount > 0 then
+			table.insert(footer, `{summary.NewCount} new to your Codex`)
+		end
+		if summary.SoldCount > 0 then
+			table.insert(footer, `{summary.SoldCount} auto-sold (+{Format.number(summary.SoldCE)} CE)`)
+		end
+		table.insert(footer, "Tap to close")
+		cardFooter.Text = table.concat(footer, "   |   ")
+
+		local props = RelicShapes.props(relic.ObjectType, CFrame.new(), 1.15)
+		local part = Instance.new("Part")
+		part.Anchored = true
+		part.Material = Enum.Material.SmoothPlastic
+		part.Color = UIKit.tierColor(relic.Tier)
+		part.Shape = props.Shape or Enum.PartType.Block
+		part.Size = props.Size
+		part.CFrame = props.CFrame
+		if mutation then
+			MutationVFX.Apply(part, mutation, { Highlight = false, Particles = false })
+		end
+		part.Parent = viewport
+		cardModel = part
+
+		onCardClosed = onClosed
 		local token = cardToken
 		card.Visible = true
-		task.delay(3.5, function()
-			if cardToken == token then
-				card.Visible = false
+		task.delay(Config.Hunt.SummarySeconds, function()
+			if cardToken == token and card.Visible then
+				closeCard()
 			end
 		end)
 	end

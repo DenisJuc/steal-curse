@@ -7,10 +7,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local CaptureFamilies = require(ReplicatedStorage.Shared.CaptureFamilies)
 local Config = require(ReplicatedStorage.Shared.Config)
+local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RevealController = require(script.Parent.Parent.Controllers.RevealController)
 local BindEffects = require(script.Parent.Parent.Effects.BindEffects)
+local CaptureAnimation = require(script.Parent.Parent.Effects.CaptureAnimation)
 local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
 local HuntHUD = require(script.Parent.Parent.UI.HuntHUD)
+local Settings = require(script.Parent.Parent.Settings)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local SignalsUpdated = Remotes:WaitForChild("SignalsUpdated") :: RemoteEvent
@@ -47,8 +52,16 @@ local pendingSince = 0
 local lastCompleteSent = 0
 local lastPulse = -math.huge
 local savedMovement: { WalkSpeed: number, JumpPower: number, JumpHeight: number, AutoRotate: boolean }? = nil
+-- True from the first Complete until the result: rare-find overlays wait for the capture.
+local holdingReveals = false
+local captureToken = 0
 local hud: HuntHUD.Hud
 local options: Options
+
+local DISTRICT_NAMES: { [string]: string } = {}
+for _, district in Config.Districts do
+	DISTRICT_NAMES[district.Id] = district.Name
+end
 
 local function getRoot(): BasePart?
 	local character = player.Character
@@ -181,24 +194,66 @@ local function onBindConfirmed()
 	hud.ShowHint("Keep holding...")
 end
 
+local function stopHoldingReveals()
+	if holdingReveals then
+		holdingReveals = false
+		RevealController.Release()
+	end
+end
+
+-- Family animation at the seal, then the summary card; overlays for rare finds wait until the
+-- card closes (tap or timeout).
+local function presentCapture(result: { [string]: any }, position: Vector3?)
+	local relicId = result.CapturedId
+	local relic = type(relicId) == "string" and RelicConfig.ById[relicId]
+	local rootPart = getRoot()
+	if not relic or not rootPart then
+		stopHoldingReveals()
+		return
+	end
+	holdingReveals = false
+	captureToken += 1
+	local token = captureToken
+	local function release()
+		if captureToken == token then
+			RevealController.Release()
+		end
+	end
+	local mutation = if type(result.CapturedMutation) == "string" then result.CapturedMutation else nil
+	local family = CaptureFamilies.forObjectType(relic.ObjectType)
+	local seconds = CaptureFamilies.totalSeconds(family)
+	RevealController.Hold(seconds + Config.Hunt.SummarySeconds + 1)
+	if position then
+		BindEffects.Seal(position)
+		CaptureAnimation.Play(relic.Id, mutation, position, rootPart, { Low = Settings.LowEffects(), Sound = true })
+	end
+	local summary = result.Summary
+	task.delay(if position then seconds else 0, function()
+		if type(summary) == "table" and type(summary.CapturedId) == "string" then
+			hud.ShowSummary(summary, release)
+		else
+			release()
+		end
+	end)
+end
+
 local function onBindResult(result: { [string]: any })
 	if type(result) ~= "table" then
 		return
 	end
 	if result.Ok then
-		if bindPosition then
-			BindEffects.Seal(bindPosition)
-		end
+		local position = bindPosition
 		resetBind()
 		hud.ShowHint("")
-		if type(result.CapturedId) == "string" then
-			local mutation = if type(result.CapturedMutation) == "string" then result.CapturedMutation else nil
-			hud.ShowCapture(result.CapturedId, mutation, tonumber(result.BonusCount) or 0, result.BestBonusId)
-		end
+		presentCapture(result, position)
 		return
 	end
 	-- TooEarly: keep holding, Complete is re-sent. Idle: a late reply to a bind that already ended.
-	if result.Reason == "TooEarly" or state == "Idle" then
+	if result.Reason == "TooEarly" then
+		return
+	end
+	stopHoldingReveals()
+	if state == "Idle" then
 		return
 	end
 	resetBind()
@@ -222,7 +277,8 @@ local function step(dt: number)
 	local regen = if type(nextAt) == "number"
 		then `next in {formatCountdown(nextAt - workspace:GetServerTimeNow())}`
 		else "full"
-	hud.SetSignalInfo(`Signals {count}/{max}  |  {regen}`)
+	local district = DISTRICT_NAMES[player:GetAttribute("SignalDistrict") :: string] or "?"
+	hud.SetSignalInfo(`{district}: signals {count}/{max}  |  {regen}`)
 	hud.SetPulseCooldown(Config.SpiritSight.PulseCooldownSeconds - (os.clock() - lastPulse))
 	hud.SetBindAvailable(state ~= "Idle" or nearestInRange() ~= nil)
 
@@ -243,6 +299,10 @@ local function step(dt: number)
 		-- Ask the server to finish once the hold is done; it re-checks the time itself.
 		if progress >= 1 and os.clock() - lastCompleteSent > 0.2 then
 			lastCompleteSent = os.clock()
+			if not holdingReveals then
+				holdingReveals = true
+				RevealController.Hold(3)
+			end
 			CompleteBind:FireServer(activeId)
 		end
 	end

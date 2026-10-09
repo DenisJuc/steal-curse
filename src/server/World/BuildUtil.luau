@@ -17,6 +17,19 @@ function BuildUtil.part(parent: Instance, props: Props): Part
 	return part
 end
 
+-- WedgePart: full height at the back (+Z), sloping down toward the front (-Z).
+function BuildUtil.wedge(parent: Instance, props: Props): WedgePart
+	local part = Instance.new("WedgePart")
+	part.Anchored = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	for key, value in props do
+		(part :: any)[key] = value
+	end
+	part.Parent = parent
+	return part
+end
+
 -- Upright cylinder centered at cframe. Cylinder parts lie along X, so rotate 90 degrees about Z.
 function BuildUtil.cylinder(parent: Instance, cframe: CFrame, height: number, diameter: number, props: Props): Part
 	local part = BuildUtil.part(parent, props)

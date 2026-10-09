@@ -22,6 +22,8 @@ local WelcomeBack = require(script.Parent.UI.WelcomeBack)
 local Announcements = require(script.Parent.Announcements)
 local AfkController = require(script.Parent.Controllers.AfkController)
 local GamepadController = require(script.Parent.Controllers.GamepadController)
+local KioskController = require(script.Parent.Controllers.KioskController)
+local OtherBinds = require(script.Parent.Effects.OtherBinds)
 local RevealController = require(script.Parent.Controllers.RevealController)
 local HuntController = require(script.Parent.Hunt.HuntController)
 local Settings = require(script.Parent.Settings)
@@ -78,14 +80,23 @@ local function toggleOnly(menu: Menu & { Toggle: () -> () })
 	end
 end
 
+local openers = {
+	Shrine = toggleOnly(shrinePanel),
+	Luck = toggleOnly(focusPanel),
+	Relics = toggleOnly(inventoryPanel),
+	Codex = toggleOnly(codexPanel),
+	Journal = toggleOnly(journalPanel),
+	Settings = toggleOnly(settingsPanel),
+}
 local hud = HUD.Start(screen, {
-	OnShrine = toggleOnly(shrinePanel),
-	OnLuck = toggleOnly(focusPanel),
-	OnRelics = toggleOnly(inventoryPanel),
-	OnCodex = toggleOnly(codexPanel),
-	OnJournal = toggleOnly(journalPanel),
-	OnSettings = toggleOnly(settingsPanel),
+	OnShrine = openers.Shrine,
+	OnLuck = openers.Luck,
+	OnRelics = openers.Relics,
+	OnCodex = openers.Codex,
+	OnJournal = openers.Journal,
+	OnSettings = openers.Settings,
 })
+KioskController.Start(openers)
 DiscoveryFeed.Start(screen)
 RevealController.Start(screen)
 Toasts.Start(screen)
@@ -103,6 +114,7 @@ HuntController.Start(screen, {
 GamepadController.Start(screen, function()
 	return screen:FindFirstChild("Buttons", true)
 end)
+OtherBinds.Start()
 Onboarding.Start(screen)
 local afk = AfkController.Start()
 

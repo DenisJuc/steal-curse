@@ -16,6 +16,7 @@ local suites = {
 	{ Name = "presentation", Tests = require("./specs/presentation_spec") },
 	{ Name = "settings", Tests = require("./specs/settings_spec") },
 	{ Name = "afk", Tests = require("./specs/afk_spec") },
+	{ Name = "world", Tests = require("./specs/world_spec") },
 }
 
 local passed, failed = 0, 0

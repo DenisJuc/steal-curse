@@ -1,11 +1,13 @@
--- Builds the whole map from code at server start: lighting, ground, hub plaza and the plot ring.
+-- Builds the whole map from code at server start (GDD 4.1): lighting, ground, the hub, the plot
+-- ring, the three hunting districts and the paths between them, then checks the part budget.
 
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local BuildUtil = require(script.Parent.BuildUtil)
-local HuntAreaBuilder = require(script.Parent.HuntAreaBuilder)
+local DistrictBuilder = require(script.Parent.DistrictBuilder)
+local HubBuilder = require(script.Parent.HubBuilder)
 local PlotBuilder = require(script.Parent.PlotBuilder)
 
 local MapBuilder = {}
@@ -13,11 +15,15 @@ local MapBuilder = {}
 export type Map = {
 	Folder: Folder,
 	Plots: { Model },
-	HuntArea: HuntAreaBuilder.HuntArea,
+	Districts: { DistrictBuilder.District },
+	PartCount: number,
 }
 
-local SPIRIT = Color3.fromRGB(170, 110, 255)
-local LANTERN = Color3.fromRGB(255, 176, 96)
+local THEMES = {
+	HauntedForest = require(script.Parent.Districts.HauntedForest),
+	AbandonedVillage = require(script.Parent.Districts.AbandonedVillage),
+	AncientRuins = require(script.Parent.Districts.AncientRuins),
+}
 
 local function setupLighting()
 	for _, child in Lighting:GetChildren() do
@@ -63,85 +69,6 @@ local function setupLighting()
 	rays.Parent = Lighting
 end
 
-local function buildHub(parent: Instance)
-	local hub = Instance.new("Model")
-	hub.Name = "Hub"
-	local radius = Config.Hub.PlazaRadius
-
-	BuildUtil.cylinder(hub, CFrame.new(0, 0.5, 0), 1, radius * 2, {
-		Name = "Plaza",
-		Material = Enum.Material.Slate,
-		Color = Color3.fromRGB(92, 88, 104),
-	})
-	BuildUtil.decor(BuildUtil.cylinder(hub, CFrame.new(0, 1.05, 0), 0.1, 30, {
-		Name = "SigilRing",
-		Material = Enum.Material.Neon,
-		Color = SPIRIT,
-		Transparency = 0.35,
-	}))
-
-	BuildUtil.part(hub, {
-		Name = "ObeliskBase",
-		Size = Vector3.new(10, 3, 10),
-		CFrame = CFrame.new(0, 2.5, 0),
-		Material = Enum.Material.Slate,
-		Color = Color3.fromRGB(60, 56, 72),
-	})
-	BuildUtil.part(hub, {
-		Name = "Obelisk",
-		Size = Vector3.new(5, 22, 5),
-		CFrame = CFrame.new(0, 15, 0),
-		Material = Enum.Material.Basalt,
-		Color = Color3.fromRGB(36, 32, 48),
-	})
-	local crystal = BuildUtil.part(hub, {
-		Name = "HubCrystal",
-		Size = Vector3.new(4, 6, 4),
-		CFrame = CFrame.new(0, 30, 0) * CFrame.Angles(0, math.rad(45), 0),
-		Material = Enum.Material.Neon,
-		Color = SPIRIT,
-	})
-	BuildUtil.decor(crystal)
-	BuildUtil.light(crystal, SPIRIT, 40, 3)
-	BuildUtil.sparkles(crystal, SPIRIT, 10)
-	BuildUtil.billboard(crystal, Config.GameName, 40, 5, 9, Color3.fromRGB(235, 215, 255))
-
-	for index = 1, Config.Hub.LanternCount do
-		local angle = (index - 0.5) / Config.Hub.LanternCount * math.pi * 2
-		local position = Vector3.new(math.cos(angle) * (radius - 5), 0, math.sin(angle) * (radius - 5))
-		BuildUtil.part(hub, {
-			Name = "LanternPost",
-			Size = Vector3.new(1, 8, 1),
-			CFrame = CFrame.new(position + Vector3.new(0, 5, 0)),
-			Material = Enum.Material.Wood,
-			Color = Color3.fromRGB(50, 38, 34),
-		})
-		local lamp = BuildUtil.part(hub, {
-			Name = "Lantern",
-			Size = Vector3.new(2, 2, 2),
-			CFrame = CFrame.new(position + Vector3.new(0, 10, 0)),
-			Material = Enum.Material.Neon,
-			Color = LANTERN,
-		})
-		BuildUtil.decor(lamp)
-		BuildUtil.light(lamp, LANTERN, 16, 1.5)
-	end
-
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "HubSpawn"
-	spawn.Anchored = true
-	spawn.Neutral = true
-	spawn.Duration = 0
-	spawn.Size = Vector3.new(8, 1, 8)
-	spawn.CFrame = CFrame.new(0, 1.05, 24)
-	spawn.Material = Enum.Material.Slate
-	spawn.Color = Color3.fromRGB(80, 76, 94)
-	spawn.TopSurface = Enum.SurfaceType.Smooth
-	spawn.Parent = hub
-
-	hub.Parent = parent
-end
-
 local function buildPath(parent: Instance, angle: number, inner: number, outer: number)
 	local length = outer - inner
 	local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
@@ -161,8 +88,20 @@ local function buildPaths(parent: Instance)
 		local angle = (index - 1) / Config.Plots.Count * math.pi * 2
 		buildPath(parent, angle, inner, Config.Plots.RingRadius - Config.Plots.Size / 2)
 	end
-	local hunt = Config.HuntArea
-	buildPath(parent, math.rad(hunt.AngleDegrees), inner, hunt.Radius - hunt.Size / 2)
+	local gate = Config.World.DistrictRadius - Config.World.DistrictSize / 2
+	for _, district in Config.Districts do
+		buildPath(parent, math.rad(district.AngleDegrees), inner, gate)
+	end
+end
+
+local function countParts(folder: Instance): number
+	local count = 0
+	for _, descendant in folder:GetDescendants() do
+		if descendant:IsA("BasePart") then
+			count += 1
+		end
+	end
+	return count
 end
 
 function MapBuilder.Build(): Map
@@ -185,7 +124,7 @@ function MapBuilder.Build(): Map
 		Material = Enum.Material.Grass,
 		Color = Color3.fromRGB(58, 72, 54),
 	})
-	buildHub(folder)
+	HubBuilder.Build(folder)
 	buildPaths(folder)
 
 	local plotFolder = Instance.new("Folder")
@@ -200,10 +139,24 @@ function MapBuilder.Build(): Map
 		plots[index] = PlotBuilder.Build(index, cframe, plotFolder)
 	end
 
-	local huntArea = HuntAreaBuilder.Build(folder)
+	local districtFolder = Instance.new("Folder")
+	districtFolder.Name = "Districts"
+	districtFolder.Parent = folder
+	local districts = {}
+	for index, district in Config.Districts do
+		districts[index] = DistrictBuilder.Build(districtFolder, district, THEMES[district.Id])
+	end
+
+	-- Plot relic displays are added later per player; this measures the static map.
+	local partCount = countParts(folder)
+	if partCount > Config.World.PartBudget then
+		warn(`[Map] {partCount} parts is over the budget of {Config.World.PartBudget}; consider StreamingEnabled.`)
+	else
+		print(`[Map] Built with {partCount} parts (budget {Config.World.PartBudget}).`)
+	end
 
 	folder.Parent = workspace
-	return { Folder = folder, Plots = plots, HuntArea = huntArea }
+	return { Folder = folder, Plots = plots, Districts = districts, PartCount = partCount }
 end
 
 return MapBuilder

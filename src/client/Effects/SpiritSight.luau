@@ -81,8 +81,13 @@ function SpiritSight.SetSignals(signals: { [number]: Vector3 })
 		end
 	end
 	for id, position in signals do
-		if not orbs[id] then
+		local orb = orbs[id]
+		if not orb then
 			orbs[id] = { Part = makeOrb(position), Base = position, Phase = id * 1.7 }
+		elseif (orb.Base - position).Magnitude > 0.1 then
+			-- Signals follow the player into another district, keeping their ids.
+			orb.Base = position
+			orb.Part.CFrame = CFrame.new(position)
 		end
 	end
 end

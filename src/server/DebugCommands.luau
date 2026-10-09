@@ -3,7 +3,8 @@
 --   /roll <tier>       instant relic of that tier, e.g. /roll cosmic
 --   /scanspeed <sec>   change your scan interval; /scanspeed reset restores it
 --   /wipedata          reset your data to a fresh profile
---   /hunt              teleport to the hunting ground entrance
+--   /hunt [district]   teleport to the nearest district gate, or forest / village / ruins
+--   /mapstats          part counts of the map and each district vs the part budget
 --   /spawnsignal       spawn one of your signals right in front of you (ignores the cap)
 --   /regen             refill your signals to the maximum
 --   /bindtime <sec>    change your hold-to-bind time; /bindtime reset restores it
@@ -38,6 +39,7 @@ local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local Stats = require(ReplicatedStorage.Shared.Stats)
+local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local AfkService = require(script.Parent.Services.AfkService)
 local BindService = require(script.Parent.Services.BindService)
 local CodexService = require(script.Parent.Services.CodexService)
@@ -56,7 +58,16 @@ local Notify = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Notify") 
 
 local DebugCommands = {}
 
-type Map = { HuntArea: { Entrance: CFrame } }
+type Map = {
+	Districts: { { Id: string, Name: string, Model: Model, Entrance: CFrame } },
+	PartCount: number,
+}
+
+local DISTRICT_ALIASES = {
+	forest = "HauntedForest",
+	village = "AbandonedVillage",
+	ruins = "AncientRuins",
+}
 
 local function reply(player: Player, text: string)
 	Notify:FireClient(player, text, "Debug")
@@ -453,12 +464,61 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			reply(player, `Persistence tests: {passed}/{#results} passed (details in Output).`)
 		end,
 
-		hunt = function(player)
+		hunt = function(player, args)
 			local character = player.Character
-			if character then
-				character:PivotTo(map.HuntArea.Entrance)
-				reply(player, `Teleported to the {Config.HuntArea.Name}.`)
+			local root = rootOf(player)
+			if not character or not root then
+				return
 			end
+			local wanted = string.lower(args[1] or "")
+			local target = nil
+			if wanted ~= "" then
+				local id = DISTRICT_ALIASES[wanted]
+				for _, district in map.Districts do
+					if district.Id == id or string.lower(district.Id) == wanted then
+						target = district
+					end
+				end
+				if not target then
+					reply(player, "Usage: /hunt [forest|village|ruins]")
+					return
+				end
+			else
+				local nearest =
+					WorldLayout.nearestDistrict(Config.Districts, Config.World, root.Position.X, root.Position.Z)
+				for _, district in map.Districts do
+					if district.Id == nearest then
+						target = district
+					end
+				end
+			end
+			if target then
+				character:PivotTo(target.Entrance)
+				reply(player, `Teleported to the {target.Name} gate.`)
+			end
+		end,
+
+		mapstats = function(player)
+			local counts = {}
+			for _, district in map.Districts do
+				local parts = 0
+				for _, descendant in district.Model:GetDescendants() do
+					if descendant:IsA("BasePart") then
+						parts += 1
+					end
+				end
+				table.insert(counts, `{district.Name} {parts}`)
+			end
+			local workspaceParts = 0
+			for _, descendant in workspace:GetDescendants() do
+				if descendant:IsA("BasePart") then
+					workspaceParts += 1
+				end
+			end
+			local text = `Map {map.PartCount} parts at build (budget {Config.World.PartBudget}) | now in Workspace {workspaceParts}`
+				.. ` | {table.concat(counts, ", ")} | StreamingEnabled {workspace.StreamingEnabled}`
+			reply(player, text)
+			print(`[MapStats] {text}`)
 		end,
 
 		spawnsignal = function(player)

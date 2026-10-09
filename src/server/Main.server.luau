@@ -33,7 +33,7 @@ DataService.Init()
 SettingsService.Init()
 PlotService.Init(map.Plots)
 ScanService.Init()
-SignalService.Init(map.HuntArea.SpawnPoints)
+SignalService.Init(map.Districts)
 BindService.Init()
 DebugCommands.Init(map)
 

@@ -58,6 +58,7 @@ local queue = Presentation.newQueue(Config.Reveal.MaxQueued)
 local running = false
 local skipRequested = false
 local showingLarge = false
+local holdUntil = 0
 local model: BasePart? = nil
 local modelBase = CFrame.new()
 
@@ -371,6 +372,9 @@ local function runQueue()
 	running = true
 	task.spawn(function()
 		while true do
+			while os.clock() < holdUntil do
+				task.wait(0.1)
+			end
 			local entry, dropped = Presentation.pop(queue)
 			if not entry then
 				break
@@ -400,8 +404,9 @@ local function onResults(results: { any })
 		local index = tierIndex(result.Id)
 		local category = Presentation.applyMode(Presentation.category(index, MEDIUM_INDEX, LARGE_INDEX), mode)
 		if category == "Small" then
-			-- One projection per batch is enough (bind batches can hold dozens of finds).
-			if smallShown == 0 then
+			-- One projection per batch is enough (bind batches can hold dozens of finds). While a
+			-- capture plays, its own animation and summary are the presentation.
+			if smallShown == 0 and os.clock() >= holdUntil then
 				RelicProjection.Spawn(result.Id, result.Mutation, "Small", Config.Reveal.SmallSeconds, low)
 				Sounds.Play("RevealSmall")
 			end
@@ -416,6 +421,16 @@ local function onResults(results: { any })
 		end
 	end
 	runQueue()
+end
+
+-- Holds overlay reveals (they stay queued) for up to `seconds`, e.g. while a capture animation
+-- and its summary card are on screen. Release lets the queue continue right away.
+function RevealController.Hold(seconds: number)
+	holdUntil = math.max(holdUntil, os.clock() + seconds)
+end
+
+function RevealController.Release()
+	holdUntil = 0
 end
 
 function RevealController.Skip()

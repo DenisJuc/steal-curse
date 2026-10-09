@@ -74,6 +74,8 @@ Config.Sounds = {
 	RevealLarge = { Id = "rbxasset://sounds/impact_explosion_03.mp3", Volume = 0.45, Speed = 0.6 },
 	Mutation = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.6, Speed = 1.9 },
 	Click = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.25, Speed = 1.2 },
+	Seal = { Id = "rbxasset://sounds/impact_explosion_03.mp3", Volume = 0.3, Speed = 1.4 },
+	Collect = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.45, Speed = 2.2 },
 }
 
 Config.RemoteLimits = {
@@ -210,6 +212,12 @@ Config.Bind = {
 Config.Hunt = {
 	BonusFloor = 10,
 	BonusFactor = 0.35,
+	-- Capture summary card (GDD 4.3 step 6): how many notable bonus finds it lists, and how long
+	-- it stays up unless tapped.
+	SummaryNotable = 3,
+	SummarySeconds = 6,
+	-- Other players' binds and captures are drawn (cosmetic only) within this distance.
+	OthersVisibleRange = 200,
 }
 
 Config.SpiritSight = {
@@ -219,14 +227,25 @@ Config.SpiritSight = {
 	PulseCooldownSeconds = 3,
 }
 
--- Slice 1 greybox hunting ground. Angle is degrees around the hub; it sits between plots 1 and 2.
-Config.HuntArea = {
-	Name = "Haunted Grove",
-	AngleDegrees = 22.5,
-	Radius = 310,
-	Size = 170,
-	TreeCount = 34,
-	Seed = 7,
+-- World layout (GDD 4.1): one map with the hub, the plot ring and three short walkable hunting
+-- districts between plots. Each district is a square; its local -Z faces the hub (entrance side).
+-- Spawn points and big structures of each district live in DistrictLayouts (Lune-tested).
+Config.World = {
+	DistrictRadius = 310,
+	DistrictSize = 170,
+	-- The server warns at startup when the built map has more parts than this.
+	PartBudget = 6000,
+	-- Default Roblox walk speed (studs/s), used by the travel-time tests.
+	WalkSpeed = 16,
+	-- How often the server checks which district each player is in (signals follow the player).
+	DistrictCheckSeconds = 1,
+}
+
+-- AngleDegrees: around the hub, between two plots (plots sit at multiples of 45 degrees).
+Config.Districts = {
+	{ Id = "HauntedForest", Name = "Haunted Forest", AngleDegrees = 22.5, Seed = 7 },
+	{ Id = "AbandonedVillage", Name = "Abandoned Village", AngleDegrees = 157.5, Seed = 11 },
+	{ Id = "AncientRuins", Name = "Ancient Ruins", AngleDegrees = 292.5, Seed = 13 },
 }
 
 -- Plot local space: -Z faces the hub (entrance side). Offsets are {x, z} in studs.
@@ -253,6 +272,14 @@ Config.Hub = {
 	PlazaRadius = 46,
 	GroundSize = 900,
 	LanternCount = 8,
+	-- Hub kiosks open a menu through a proximity prompt. Angle in degrees, Radius from the center.
+	KioskRadius = 31,
+	Kiosks = {
+		{ Menu = "Codex", Label = "Codex Archive", AngleDegrees = 30 },
+		{ Menu = "Luck", Label = "Fortune Shrine", AngleDegrees = 150 },
+		{ Menu = "Relics", Label = "Relic Keeper", AngleDegrees = 210 },
+		{ Menu = "Journal", Label = "Journal Board", AngleDegrees = 330 },
+	},
 }
 
 return Config

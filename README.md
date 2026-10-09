@@ -1,6 +1,6 @@
 # Supernatural Relic Collector (Roblox)
 
-An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 5 - Reveals, Journal, Settings, AFK, devices**.
+An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 6 - Districts, capture presentation, others' chains, capture summary**.
 
 Design sources (outside this repo): `Supernatural_Relic_Collector_GDD_FINAL.md`, `CURSOR_RELIC_GAME_BLUEPRINT.md`, `ROBLOX_GAME_PLAYBOOK.md`.
 
@@ -72,7 +72,8 @@ Type these in the chat box during Play. They do not exist outside Studio.
 | `/roll <tier>` | Gives one relic of that tier, e.g. `/roll cosmic` |
 | `/scanspeed <seconds>` | Changes your scan interval, e.g. `/scanspeed 0.5`; `/scanspeed reset` restores 4 s |
 | `/wipedata` | Resets your data |
-| `/hunt` | Teleports you to the Haunted Grove entrance |
+| `/hunt [forest, village or ruins]` | Teleports you to that district's gate; with no word, to the nearest district |
+| `/mapstats` | Part counts of the whole map and of each district, compared with the part budget (also printed in Output) |
 | `/spawnsignal` | Spawns one of your signals right in front of you (ignores the 5-signal cap) |
 | `/regen` | Refills your signals to the maximum (5) |
 | `/bindtime <seconds>` | Changes your hold time, e.g. `/bindtime 1`; `/bindtime reset` restores 6 s |
@@ -141,6 +142,10 @@ src/shared/            ReplicatedStorage.Shared - config and pure math used by s
   SessionReport.luau     session report counting (Journal)
   AfkSummary.luau        Welcome Back AFK summary: when it shows and the "Unlocked" list
   RelicShapes.luau       placeholder relic shapes (pedestals, projections, reveal model)
+  WorldLayout.luau       map math: district centers, local/world conversion, which district a point is in
+  DistrictLayouts.luau   each district's signal spawn points and big structures (tested by Lune)
+  CaptureFamilies.luau   the 5 shared capture animation families and their lengths
+  CaptureSummary.luau    the captured-plus-bonus summary built after a capture
   Format.luau            number / odds formatting (1.5K, 1 in 1.32Qd)
 src/server/            ServerScriptService.Server
   Main.server.luau       builds the map, then starts services in order
@@ -149,15 +154,17 @@ src/server/            ServerScriptService.Server
   Data/                  saved data template + migrations (pure, tested by Lune)
   Services/              one module per system (Data, Economy, Pedestal, Sell, AutoSell, Inventory, Codex, Journal, Afk, Multiplier, Roll, Settings, Plot, Scan, Signal, Bind, RemoteGuard, GameEvents)
   Tests/                 Studio persistence tests (/runtests)
-  World/                 code-built map (BuildUtil, MapBuilder, PlotBuilder, PedestalVisuals, HuntAreaBuilder)
+  World/                 code-built map (BuildUtil, MapBuilder, HubBuilder, PlotBuilder, PedestalVisuals,
+                         DistrictBuilder, Districts/ themes: HauntedForest, AbandonedVillage, AncientRuins)
 src/client/            StarterPlayerScripts.Client
   Main.client.luau       builds the UI and hunt controls
   UI/                    UIKit, Icons, HUD, menus (Shrine, Focus, Inventory, AutoSell, Codex, Journal, Settings),
                          WelcomeBack, Onboarding, ReportCard, Odds, DiscoveryFeed, Toasts, Banner, HuntHUD
   Controllers/           RevealController (reveal queue and overlay), GamepadController (menu navigation),
-                         AfkController (idle reports, anti-AFK hop)
+                         AfkController (idle reports, anti-AFK hop), KioskController (hub kiosks open menus)
   Hunt/HuntController    Spirit Sight / pulse / hold-to-bind input and state
-  Effects/               SpiritSight, BindEffects, MutationVFX (tint, outline, particles), RelicProjection
+  Effects/               SpiritSight, BindEffects, ChainRig (arm gesture + chains), CaptureAnimation (5 families),
+                         OtherBinds (other players' chains and captures), MutationVFX, RelicProjection
   Settings / Sounds / Session / Announcements   client settings, sounds, discovery reports, chat announcements
   StudioCommands.luau    Studio-only /help, /forgecomplete, /afkhop, /hints
 tests/                 Lune headless tests (lune run tests/run)
@@ -197,10 +204,15 @@ tests/                 Lune headless tests (lune run tests/run)
 - **Sounds.** Placeholder sounds from Roblox's built-in library (Config.Sounds) until Slice 8 adds real audio.
 - **Plots.** 8 shrine plots surround the hub. Each player gets the first free plot, their name appears on the gate sign, and they spawn there. **Set Max Players to 8 or fewer** when publishing.
 - **UI.** Top-left column, one under the other: the Spirit Resonator box (scan progress, interval, scans, relics held, signals sealed), your Cursed Energy number, a **pedestal** icon (Shrine menu: buy, upgrade and lock pedestals, CE/min), a **cursed lucky flower** (Luck menu: Rarity Focus, Signal Frequency, live odds), a **chest** (Relics menu: your relics, Equip Best, equip, sell, lock, favorite, Auto-Sell Rules), a **book** (Codex menu: milestones, titles, relic cards), a **scroll** (Journal) and a **gear** (Settings). Menus open in the screen center, fit phone screens and scroll when they don't fit. The top-middle feed shows each discovery with its tier (or mutation) color and base odds; "NEW!" marks first discoveries. Server messages (errors, debug replies) appear at the bottom center. Icons are frame-drawn placeholders (`UI/Icons.luau`) until real art arrives.
-- **Haunted Grove.** A greybox hunting ground between plots 1 and 2, reached by its own path from the hub. Trees, rocks and ruined walls block line of sight. 15 hidden spawn points (tagged `SignalSpawn`) are where signals can appear.
-- **Personal signals.** `SignalService` gives each player 3 signals at start, adds 1 every 2 minutes up to 5, and sends positions only to that player. Other players never see or receive them. All signals look identical, and no rarity exists until a capture succeeds.
+- **Hub.** The plaza in the middle has the obelisk, the spawn, a signpost pointing at the three districts, and four kiosks: **Codex Archive** (Codex), **Fortune Shrine** (Luck), **Relic Keeper** (Relics) and **Journal Board** (Journal). Walk up to one and press the prompt (E / tap) to open that menu.
+- **Districts.** Three hunting districts sit between plots, each reached by a cobblestone path from the hub and a named gate: **Haunted Forest** (between plots 1 and 2: dead trees, glowing fungus, ruined walls), **Abandoned Village** (between plots 4 and 5: empty houses, a well, crates, fences, street lamps) and **Ancient Ruins** (between plots 7 and 8: a stepped altar, temple walls, columns, braziers). Each has 15 hidden spawn points (tagged `SignalSpawn`) behind structures. Positions live in `DistrictLayouts`, and Lune checks that every spawn is inside its district, clear of structures, spread out, not in the entrance lane, and that every plot reaches a district gate within 20 s of walking.
+- **Part budget.** The server counts the map's parts at start and prints `[Map] Built with N parts (budget 6000)` in Output (a warning if over). `StreamingEnabled` stays off unless that number or phone testing shows it is needed; `/mapstats` shows the current counts.
+- **Personal signals.** `SignalService` gives each player 3 signals at start, adds 1 every 2 minutes up to 5, and sends positions only to that player. Other players never see or receive them. All signals look identical, and no rarity exists until a capture succeeds. Your signals start in the district nearest your plot and **follow you**: walk into another district and they move there (same count, new hiding spots; one you are binding stays put). The hunt line above the buttons shows where they are, e.g. "Ancient Ruins: signals 3/5".
 - **Spirit Sight.** A client view mode: it hides the resonator panel, tints the screen, shows your signal orbs within 90 studs, and a pulse draws trails to all of them. Passive scanning keeps running.
-- **Hold to Bind.** Within 12 studs you hold the bind input. The server checks the signal is yours, you are close, you aren't already binding and not on cooldown, then starts its own timer. After 6 seconds (server-measured) the client asks to complete; the server re-checks time, distance and that you're alive, consumes the signal, then rolls **1 captured relic + bonus relics** (11 at a 4 s scan interval: `max(10, ceil(0.35 x 120 / interval))`). Releasing early, moving away, dying or leaving cancels with no reward and keeps the signal (1.5 s cooldown).
+- **Hold to Bind.** Within 12 studs you hold the bind input. The server checks the signal is yours, you are close, you aren't already binding and not on cooldown, then starts its own timer. After 6 seconds (server-measured) the client asks to complete; the server re-checks time, distance and that you're alive, consumes the signal, then rolls **1 captured relic + bonus relics** (11 at a 4 s scan interval: `max(10, ceil(0.35 x 120 / interval))`). Releasing early, moving away, dying or leaving cancels with no reward and keeps the signal (1.5 s cooldown). While binding, your character raises its arm and spectral chains run from the hand into the signal.
+- **Capture presentation.** After a successful capture the relic appears where the signal was and plays its family's animation (about 1.5 s), then flies into you: **Weapons** spin up and cut a slash arc, **Books/Scrolls** fan pages around them, **Masks/Vessels** turn to stare at you inside a ghostly aura, **Crystals/Fragments** pull orbiting shards together, **Special/Legendary** artifacts rise in orbiting sparks and burst with light. Five shared animations cover every relic. Low effects keeps only the relic's motion.
+- **Capture summary.** Then a card shows the captured relic (spinning model, name, rarity, base odds, mutation, NEW!), "+N bonus discoveries", the 3 most notable bonus finds, and how many were new or auto-sold. Tap it or wait 6 s. Big reveal cards for rare finds (Epic and up) wait until the card closes, so nothing overlaps.
+- **Other players' hunts.** Other players within 200 studs see your arm raised and chains into a plain spirit while you bind (never your signals or anything about rarity), and the seal flash plus the captured relic's animation flying into you. This is cosmetic and drawn on each viewer's screen from attributes the server sets.
 
 ## 10. Publishing (needed from Slice 2 for saving)
 

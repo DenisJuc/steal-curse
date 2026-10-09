@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local CaptureSummary = require(ReplicatedStorage.Shared.CaptureSummary)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Formulas = require(ReplicatedStorage.Shared.Formulas)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
@@ -67,10 +68,13 @@ local function reply(player: Player, payload: { [string]: any })
 	BindResult:FireClient(player, payload)
 end
 
+-- BindTarget lets other clients draw cosmetic chains to a neutral spirit (the signal itself and
+-- any rarity stay private); SealAt/SealPosition/SealRelic replay the capture for onlookers.
 local function setBindAttributes(player: Player, bind: Bind?, startedAt: number?)
 	player:SetAttribute("BindSignalId", if bind then bind.SignalId else nil)
 	player:SetAttribute("BindStartedAt", startedAt)
 	player:SetAttribute("BindHoldSeconds", if bind then bind.Hold else nil)
+	player:SetAttribute("BindTarget", if bind then bind.Position else nil)
 end
 
 local function cancel(player: Player, reason: string)
@@ -132,11 +136,15 @@ local function onCancel(player: Player, signalId: any)
 	end
 end
 
+local function tierIndex(relicId: string): number
+	local relic = RelicConfig.ById[relicId]
+	return if relic then RarityConfig.IndexById[relic.Tier] or 0 else 0
+end
+
 local function bestRelic(relicIds: { string }): string?
 	local best, bestIndex = nil, 0
 	for _, relicId in relicIds do
-		local relic = RelicConfig.ById[relicId]
-		local index = if relic then RarityConfig.IndexById[relic.Tier] or 0 else 0
+		local index = tierIndex(relicId)
 		if index > bestIndex then
 			best, bestIndex = relicId, index
 		end
@@ -182,7 +190,7 @@ local function onComplete(player: Player, signalId: any)
 		table.insert(bonusIds, rolls[index].Id)
 		table.insert(entries, { Id = rolls[index].Id, Mutation = rolls[index].Mutation, Source = "Bonus" })
 	end
-	DiscoveryPipeline.GrantBatch(player, entries)
+	local results = DiscoveryPipeline.GrantBatch(player, entries)
 	DataService.Increment(player, "TotalCaptures", 1)
 
 	local entry = statsFor(player)
@@ -191,12 +199,17 @@ local function onComplete(player: Player, signalId: any)
 	entry.FirstCaptureAt = entry.FirstCaptureAt or now
 	entry.LastCaptureAt = now
 
+	player:SetAttribute("SealPosition", bind.Position)
+	player:SetAttribute("SealRelic", `{captured.Id}|{captured.Mutation or ""}`)
+	player:SetAttribute("SealAt", workspace:GetServerTimeNow())
+
 	reply(player, {
 		Ok = true,
 		CapturedId = captured.Id,
 		CapturedMutation = captured.Mutation,
 		BonusCount = bonusCount,
 		BestBonusId = bestRelic(bonusIds),
+		Summary = CaptureSummary.build(results, tierIndex, Config.Hunt.SummaryNotable),
 	})
 end
 
