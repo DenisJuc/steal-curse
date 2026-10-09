@@ -1,0 +1,59 @@
+{
+  "name": "RelicCollector",
+  "tree": {
+    "$className": "DataModel",
+
+    "ReplicatedStorage": {
+      "Shared": {
+        "$path": "src/shared"
+      },
+      "Remotes": {
+        "$className": "Folder",
+        "DiscoveryResult": {
+          "$className": "RemoteEvent"
+        },
+        "Notify": {
+          "$className": "RemoteEvent"
+        }
+      }
+    },
+
+    "ServerScriptService": {
+      "Server": {
+        "$path": "src/server"
+      }
+    },
+
+    "ServerStorage": {
+      "ServerPackages": {
+        "$path": "ServerPackages"
+      }
+    },
+
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "Client": {
+          "$path": "src/client"
+        }
+      }
+    },
+
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": false
+      }
+    },
+
+    "Lighting": {
+      "$properties": {
+        "LightingStyle": "Realistic"
+      }
+    },
+
+    "TextChatService": {
+      "$properties": {
+        "ChatVersion": "TextChatService"
+      }
+    }
+  }
+}
