@@ -1,6 +1,6 @@
 # Supernatural Relic Collector (Roblox)
 
-An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 2 - Persistence and probability core**.
+An AFK-friendly supernatural relic collector. The game is built in small tested **slices**; this repo is currently at **Slice 3 - Shrine economy**.
 
 Design sources (outside this repo): `Supernatural_Relic_Collector_GDD_FINAL.md`, `CURSOR_RELIC_GAME_BLUEPRINT.md`, `ROBLOX_GAME_PLAYBOOK.md`.
 
@@ -85,6 +85,9 @@ Type these in the chat box during Play. They do not exist outside Studio.
 | `/mutrank <0-5>` | Sets your Mutation Resonance rank |
 | `/savestatus` | Save mode (real or mock), time since the last save, relic and Codex counts |
 | `/runtests` | Runs the persistence tests on ProfileStore's mock store (never touches real data) |
+| `/ce <amount>` | Adds Cursed Energy (negative removes), e.g. `/ce 20000`; `/ce set 0` |
+| `/offline <seconds>` | Pays offline earnings as if you had been away that long, e.g. `/offline 3600` |
+| `/pedlevel <slot> <level>` | Sets a pedestal's level directly, e.g. `/pedlevel 1 10` |
 
 ## 7. Automated checks (run before every commit)
 
@@ -102,6 +105,12 @@ Rare-find waiting times under max boosts (mean, median, 90th percentile) can be 
 lune run tests/rareWaitReport
 ```
 
+AFK shrine pacing (when pedestals 4, 5 and 6 get bought at base luck) can be printed with:
+
+```
+lune run tests/economyReport
+```
+
 ## 8. Project layout
 
 ```
@@ -115,18 +124,19 @@ src/shared/            ReplicatedStorage.Shared - config and pure math used by s
   RollRules.luau         RollMath rules assembled from config (shared by server rolls and UI odds)
   Stats.luau             chi-square and waiting-time helpers
   Formulas.luau          gameplay formulas (Core Luck, hunt bonus rolls)
+  Economy.luau           shrine economy formulas (pedestal costs/levels, income, selling, offline, Auto-Display)
   Format.luau            number / odds formatting (1.5K, 1 in 1.32Qd)
 src/server/            ServerScriptService.Server
   Main.server.luau       builds the map, then starts services in order
   DiscoveryPipeline.luau the single path every relic grant goes through
   DebugCommands.luau     Studio-only chat commands
   Data/                  saved data template + migrations (pure, tested by Lune)
-  Services/              one module per system (Data, Multiplier, Roll, Settings, Plot, Scan, Signal, Bind, RemoteGuard, GameEvents)
+  Services/              one module per system (Data, Economy, Pedestal, Sell, Multiplier, Roll, Settings, Plot, Scan, Signal, Bind, RemoteGuard, GameEvents)
   Tests/                 Studio persistence tests (/runtests)
-  World/                 code-built map (BuildUtil, MapBuilder, PlotBuilder, HuntAreaBuilder)
+  World/                 code-built map (BuildUtil, MapBuilder, PlotBuilder, PedestalVisuals, HuntAreaBuilder)
 src/client/            StarterPlayerScripts.Client
   Main.client.luau       builds the UI and hunt controls
-  UI/                    UIKit, HUD, FocusPanel, Odds, DiscoveryFeed, Toasts, HuntHUD
+  UI/                    UIKit, Icons, HUD, ShrinePanel, FocusPanel, Odds, DiscoveryFeed, Toasts, HuntHUD
   Hunt/HuntController    Spirit Sight / pulse / hold-to-bind input and state
   Effects/               SpiritSight (orbs, trails, tint), BindEffects (chains, camera, seal flash)
   StudioCommands.luau    Studio-only /help and /forgecomplete
@@ -144,8 +154,13 @@ tests/                 Lune headless tests (lune run tests/run)
 - **Mutations.** Mutation Resonance rank 0 = none. Each rank unlocks one more (Golden, Corrupted, Bloodmoon, Divine, Abyssal) and raises the total chance (10% ... 50%). Weights 30/22/18/15/15 split that chance among unlocked mutations. A mutated relic counts as the same Codex entry as the normal one.
 - **Discovery pipeline.** Every grant goes through `DiscoveryPipeline.GrantBatch`: store the relic, record a first Codex discovery (by base relic id), add Epic+ finds (and mutated Legendary+) to the rare history (last 50), request a priority save for rare finds, then tell the owner's client.
 - **Saving.** ProfileStore autosaves every 5 minutes and saves when you leave and when the server shuts down. A first discovery, any Mythic+ or any mutated Legendary+ requests an extra save, merged to at most one save every 7 seconds. Limit: if a Roblox server crashes hard, finds made after the last completed save can be lost; priority saves keep that window to about 7 seconds for rare finds.
+- **Cursed Energy (CE).** The only currency. Every second, each relic displayed on a pedestal pays its tier's CE/min (Common 10 ... Cosmic 20,000) x its mutation multiplier (Golden 1.5x ... Abyssal 4x) x the pedestal's level multiplier (x1 at level 1 up to x2 at level 10). Global income bonuses (Codex, Showcases, skills; none yet) add together into one multiplier applied once.
+- **Pedestals.** Pedestals 1-3 are free. Pedestals 4, 5 and 6 cost 500, 15,000 and 250,000 CE. Each pedestal has its own level 1-10; level 1 to 2 costs 500 CE and each next level costs double (255,500 CE for a full pedestal). "Max" buys as many levels as you can afford. Levels stay with the pedestal when relics move.
+- **Auto-Display.** ON by default. Each new find goes on the pedestal where it raises CE/min the most, and only if it strictly improves income. A replaced relic goes back to your relics (and may move to another pedestal if that helps). Locked pedestals are never changed automatically. Displayed relics stay in your inventory and can't be sold.
+- **Selling.** Manual for now (auto-sell rules come with the inventory slice). A sale pays 1% of one minute of that relic's income, so Commons sell for 0.1 CE: a small top-up, not the main income.
+- **Offline earnings.** Scanning stops when you leave. Your CE/min at the moment you left pays 25% for up to 2 hours of absence, once, when you return (nothing for absences under a minute).
 - **Plots.** 8 shrine plots surround the hub. Each player gets the first free plot, their name appears on the gate sign, and they spawn there. **Set Max Players to 8 or fewer** when publishing.
-- **UI.** The top-left panel shows the scan progress bar, interval, total scans, relics held, signals sealed and a luck/focus button that opens the Rarity Focus & Odds panel (read from player attributes). The right-side feed shows each discovery with its tier (or mutation) color and base odds; "NEW!" marks first discoveries.
+- **UI.** Top-left column, one under the other: the Spirit Resonator box (scan progress, interval, scans, relics held, signals sealed), your Cursed Energy number, a **pedestal** icon that opens the Shrine menu (pedestals, upgrades, locks, relic list with selling, CE/min) and a **cursed lucky flower** icon that opens the Luck menu (Rarity Focus, Signal Frequency, live odds). Menus open in the screen center, fit phone screens and scroll when they don't fit. The top-middle feed shows each discovery with its tier (or mutation) color and base odds; "NEW!" marks first discoveries. Server messages (offline earnings, errors) appear at the bottom center. Icons are frame-drawn placeholders (`UI/Icons.luau`) until real art arrives.
 - **Haunted Grove.** A greybox hunting ground between plots 1 and 2, reached by its own path from the hub. Trees, rocks and ruined walls block line of sight. 15 hidden spawn points (tagged `SignalSpawn`) are where signals can appear.
 - **Personal signals.** `SignalService` gives each player 3 signals at start, adds 1 every 2 minutes up to 5, and sends positions only to that player. Other players never see or receive them. All signals look identical, and no rarity exists until a capture succeeds.
 - **Spirit Sight.** A client view mode: it hides the resonator panel, tints the screen, shows your signal orbs within 90 studs, and a pulse draws trails to all of them. Passive scanning keeps running.

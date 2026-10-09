@@ -47,6 +47,7 @@ function RollService.Init()
 		error("[RollService] Invalid relic config:\n" .. table.concat(problems, "\n"))
 	end
 
+	MultiplierService.DefineKind("Luck", "Product")
 	MultiplierService.Register("Luck", "CoreLuck", function(player)
 		local data = DataService.Get(player)
 		return Formulas.coreLuck(if data then data.Skills.CoreLuck else 0)

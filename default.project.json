@@ -35,6 +35,18 @@
         },
         "SetFrequency": {
           "$className": "RemoteEvent"
+        },
+        "ShrineAction": {
+          "$className": "RemoteEvent"
+        },
+        "ShrineState": {
+          "$className": "RemoteEvent"
+        },
+        "GetRelicGroups": {
+          "$className": "RemoteFunction"
+        },
+        "SellRelics": {
+          "$className": "RemoteFunction"
         }
       }
     },

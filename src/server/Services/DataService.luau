@@ -15,6 +15,7 @@ local ServerStorage = game:GetService("ServerStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local ProfileStore = require(ServerStorage:WaitForChild("ServerPackages"):WaitForChild("ProfileStore"))
 local DataTemplate = require(script.Parent.Parent.Data.DataTemplate)
+local GameEvents = require(script.Parent.GameEvents)
 local Migrations = require(script.Parent.Parent.Data.Migrations)
 
 local DataService = {}
@@ -199,6 +200,7 @@ function DataService.Wipe(player: Player)
 	profile.Data = DataTemplate.fresh()
 	DataService.MirrorAttributes(player)
 	DataService.RequestSave(player)
+	GameEvents.Fire("DataReset", player)
 end
 
 return DataService

@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local BuildUtil = require(script.Parent.BuildUtil)
+local PedestalVisuals = require(script.Parent.PedestalVisuals)
 
 local PlotBuilder = {}
 
@@ -28,7 +29,7 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 		Material = Enum.Material.Marble,
 		Color = MARBLE,
 	})
-	BuildUtil.cylinder(model, at(x, FLOOR_TOP + 3.2, z), 0.4, 7, {
+	local top = BuildUtil.cylinder(model, at(x, FLOOR_TOP + 3.2, z), 0.4, 7, {
 		Name = "Top",
 		Material = Enum.Material.Slate,
 		Color = STONE,
@@ -39,6 +40,10 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 		Color = SPIRIT,
 		Transparency = 0.45,
 	}))
+	local info = BuildUtil.billboard(top, "", 9, 2.4, 6.5, Color3.fromRGB(245, 240, 255))
+	local gui = info.Parent :: BillboardGui
+	gui.Name = "Info"
+	gui.MaxDistance = 70
 	model.Parent = parent
 end
 
@@ -197,9 +202,10 @@ function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Mod
 	local pedestals = Instance.new("Folder")
 	pedestals.Name = "Pedestals"
 	pedestals.Parent = model
-	for slot = 1, Config.Plots.StartingPedestals do
+	for slot = 1, Config.Plots.MaxPedestals do
 		buildPedestal(pedestals, at, slot)
 	end
+	PedestalVisuals.Reset(model)
 
 	local spawnOffset = Config.Plots.SpawnOffset
 	BuildUtil.decor(BuildUtil.part(model, {

@@ -15,7 +15,7 @@ Config.Scan = {
 }
 
 Config.Feed = {
-	MaxLines = 6,
+	MaxLines = 4,
 	LineLifetimeSeconds = 8,
 	-- Feed lines at or above this tier get a highlighted border.
 	HighlightTier = "Epic",
@@ -25,6 +25,7 @@ Config.RemoteLimits = {
 	Default = { Rate = 10, Burst = 20 },
 	Bind = { Rate = 8, Burst = 12 },
 	Settings = { Rate = 4, Burst = 8 },
+	Shrine = { Rate = 8, Burst = 16 },
 }
 
 Config.Debug = {
@@ -59,6 +60,42 @@ Config.Focus = {
 Config.Frequency = {
 	Default = "All",
 	MultiplierByRank = { [0] = 1.5, [1] = 1.8, [2] = 2.1, [3] = 2.4, [4] = 2.7, [5] = 3.0 },
+}
+
+-- Shrine economy (GDD 6). Cursed Energy (CE) is the only currency; displayed relics are the main income.
+--   CE/min = IncomeMultiplier x sum(TierIncome x MutationIncomeMultiplier x PedestalMultiplier)
+--   IncomeMultiplier = 1 + (sum of global income bonuses: Codex, Showcase, Energy Conduction...)
+Config.Economy = {
+	TickSeconds = 1,
+	-- A server hitch longer than this pays at most this much time in one tick.
+	MaxTickSeconds = 5,
+	TierIncomePerMin = {
+		Common = 10,
+		Uncommon = 25,
+		Rare = 75,
+		Epic = 200,
+		Legendary = 600,
+		Mythic = 2000,
+		Celestial = 6000,
+		Cosmic = 20000,
+	},
+	-- Price of pedestal slots 4, 5 and 6 (slots 1..Plots.StartingPedestals are free).
+	SlotPrices = { [4] = 500, [5] = 15000, [6] = 250000 },
+	PedestalMaxLevel = 10,
+	-- Level 1 -> 2 costs this; every next level costs UpgradeCostGrowth times more.
+	FirstUpgradeCost = 500,
+	UpgradeCostGrowth = 2,
+	-- Selling pays this fraction of one minute of the relic's base income (mutation included).
+	SellFraction = 0.01,
+	AutoDisplayDefault = true,
+}
+
+-- Offline earnings (GDD 2.2): no scans offline; displayed relics pay a reduced, capped amount.
+Config.Offline = {
+	Rate = 0.25,
+	CapSeconds = 2 * 3600,
+	-- Shorter absences pay nothing (avoids a payout on every quick rejoin).
+	MinSeconds = 60,
 }
 
 -- Endgame luck stack reference values (GDD 5.2 / 5.3), used by balance reports and tests.

@@ -1,33 +1,73 @@
--- Top-left Spirit Resonator panel: scan progress bar, interval, total scans and relics held.
--- Reads player attributes only; never asks the server for data.
+-- Top-left column: the Spirit Resonator box (scan progress and totals), then Cursed Energy,
+-- then the Shrine (pedestal) and Luck (cursed lucky flower) buttons, one under the other.
+-- Reads player attributes only; one UIScale keeps the whole column readable on phones.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local Format = require(ReplicatedStorage.Shared.Format)
+local Icons = require(script.Parent.Icons)
 local UIKit = require(script.Parent.UIKit)
 
 local HUD = {}
 
-function HUD.Start(screen: ScreenGui, onOpenFocus: () -> ()): { SetVisible: (boolean) -> () }
+local ICON_BUTTON_SIZE = 72
+
+local function iconButton(parent: Instance, name: string, order: number, caption: string): (TextButton, TextLabel)
+	local button = UIKit.create("TextButton", {
+		Name = name,
+		LayoutOrder = order,
+		Text = "",
+		AutoButtonColor = true,
+		BackgroundColor3 = UIKit.Colors.Panel,
+		BackgroundTransparency = 0.1,
+		Size = UDim2.fromOffset(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE),
+		Parent = parent,
+	}, { UIKit.corner(14), UIKit.stroke(UIKit.Colors.Accent, 2, 0.35) })
+	local label = UIKit.label({
+		Name = "Caption",
+		Text = caption,
+		TextSize = 12,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -2),
+		Size = UDim2.new(1, -4, 0, 14),
+		Parent = button,
+	})
+	return button, label
+end
+
+function HUD.Start(screen: ScreenGui, onOpenShrine: () -> (), onOpenLuck: () -> ()): { SetVisible: (boolean) -> () }
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 
+	local column = UIKit.create("Frame", {
+		Name = "LeftColumn",
+		Position = UDim2.fromOffset(12, 12),
+		Size = UDim2.fromOffset(280, 400),
+		BackgroundTransparency = 1,
+		Parent = screen,
+	}, {
+		UIKit.create("UIListLayout", {
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 8),
+		}),
+	})
+	UIKit.scaler(column)
+
 	local panel = UIKit.create("Frame", {
 		Name = "ResonatorPanel",
-		AnchorPoint = Vector2.new(0, 0),
-		Position = UDim2.fromOffset(12, 12),
-		Size = UDim2.fromOffset(280, 170),
+		LayoutOrder = 1,
+		Size = UDim2.fromOffset(280, 134),
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.1,
-		Parent = screen,
+		Parent = column,
 	}, {
 		UIKit.corner(12),
 		UIKit.stroke(colors.Accent, 2, 0.35),
 		UIKit.padding(12),
 	})
-	UIKit.scaler(panel)
 
 	UIKit.label({
 		Name = "Title",
@@ -67,7 +107,6 @@ function HUD.Start(screen: ScreenGui, onOpenFocus: () -> ()): { SetVisible: (boo
 		TextSize = 16,
 		Parent = panel,
 	})
-
 	local capturesLabel = UIKit.label({
 		Name = "Captures",
 		Position = UDim2.fromOffset(0, 90),
@@ -77,27 +116,33 @@ function HUD.Start(screen: ScreenGui, onOpenFocus: () -> ()): { SetVisible: (boo
 		Parent = panel,
 	})
 
-	local focusButton = UIKit.create("TextButton", {
-		Name = "FocusButton",
-		Font = UIKit.Font,
-		TextSize = 14,
-		TextColor3 = colors.Text,
-		BackgroundColor3 = colors.Card,
-		Position = UDim2.fromOffset(0, 116),
-		Size = UDim2.new(1, 0, 0, 28),
-		Parent = panel,
-	}, { UIKit.corner(8), UIKit.stroke(colors.Accent, 1, 0.5) })
-	focusButton.Activated:Connect(onOpenFocus)
-
-	local function refreshFocus()
-		local luck = player:GetAttribute("EffectiveLuck") or 1
-		local focus = player:GetAttribute("RarityFocus") or "MaxLuck"
-		local focusText = if focus == "MaxLuck" then "Max Luck" else focus
-		focusButton.Text = `Luck {Format.number(luck)}x  |  Focus: {focusText}`
+	local ceLabel = UIKit.label({
+		Name = "CursedEnergy",
+		LayoutOrder = 2,
+		Size = UDim2.fromOffset(200, 30),
+		TextColor3 = colors.Gold,
+		TextSize = 26,
+		TextStrokeTransparency = 0.4,
+		Parent = column,
+	})
+	local function refreshCE()
+		ceLabel.Text = `{Format.ce(player:GetAttribute("CE") or 0)} CE`
 	end
-	player:GetAttributeChangedSignal("EffectiveLuck"):Connect(refreshFocus)
-	player:GetAttributeChangedSignal("RarityFocus"):Connect(refreshFocus)
-	refreshFocus()
+	player:GetAttributeChangedSignal("CE"):Connect(refreshCE)
+	refreshCE()
+
+	local shrineButton = iconButton(column, "ShrineButton", 3, "Shrine")
+	Icons.pedestal(shrineButton)
+	shrineButton.Activated:Connect(onOpenShrine)
+
+	local luckButton, luckCaption = iconButton(column, "LuckButton", 4, "Luck")
+	Icons.cursedFlower(luckButton)
+	luckButton.Activated:Connect(onOpenLuck)
+	local function refreshLuck()
+		luckCaption.Text = `Luck {Format.number(player:GetAttribute("EffectiveLuck") or 1)}x`
+	end
+	player:GetAttributeChangedSignal("EffectiveLuck"):Connect(refreshLuck)
+	refreshLuck()
 
 	local function refreshStats()
 		local scans = player:GetAttribute("TotalScans") or 0
@@ -126,7 +171,7 @@ function HUD.Start(screen: ScreenGui, onOpenFocus: () -> ()): { SetVisible: (boo
 	return {
 		-- Spirit Sight hides management UI; scanning itself never stops.
 		SetVisible = function(visible: boolean)
-			panel.Visible = visible
+			column.Visible = visible
 		end,
 	}
 end

@@ -143,8 +143,8 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 
 	local signalInfo = UIKit.label({
 		Name = "SignalInfo",
-		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, 12),
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -186),
 		Size = UDim2.fromOffset(360, 28),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextSize = 18,
@@ -158,7 +158,7 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 	local card = UIKit.create("Frame", {
 		Name = "CaptureCard",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.38),
+		Position = UDim2.fromScale(0.5, 0.46),
 		Size = UDim2.fromOffset(380, 132),
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.05,

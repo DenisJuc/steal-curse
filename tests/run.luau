@@ -10,6 +10,7 @@ local suites = {
 	{ Name = "distribution", Tests = require("./specs/distribution_spec") },
 	{ Name = "data", Tests = require("./specs/data_spec") },
 	{ Name = "rarewait", Tests = require("./specs/rarewait_spec") },
+	{ Name = "economy", Tests = require("./specs/economy_spec") },
 }
 
 local passed, failed = 0, 0

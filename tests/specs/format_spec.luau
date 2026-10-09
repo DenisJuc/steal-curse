@@ -35,4 +35,17 @@ return {
 			expect.equal(Format.seconds(2.26), "2.3s")
 		end,
 	},
+	{
+		Name = "durations and whole CE",
+		Run = function()
+			expect.equal(Format.duration(45), "45s")
+			expect.equal(Format.duration(600), "10m")
+			expect.equal(Format.duration(7200), "2h")
+			expect.equal(Format.duration(7500), "2h 5m")
+			expect.equal(Format.duration(-3), "0s")
+			expect.equal(Format.ce(499.999), "499")
+			expect.equal(Format.ce(0.9999999999), "1")
+			expect.equal(Format.ce(1500.7), "1.5K")
+		end,
+	},
 }

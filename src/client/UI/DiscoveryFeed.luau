@@ -1,4 +1,4 @@
--- Right-side feed of recent discoveries. Lines fade out on their own and never block anything.
+-- Top-middle feed of recent discoveries, newest on top. Lines fade out on their own and never block anything.
 -- Base odds come from RollMath (via Odds), the same math the server rolls with.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,7 +13,7 @@ local DiscoveryResult = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("
 
 local DiscoveryFeed = {}
 
-type Result = { Uid: number, Id: string, Mutation: string?, Source: string, First: boolean? }
+type Result = { Uid: number, Id: string, Mutation: string?, Source: string, First: boolean?, Displayed: boolean? }
 
 local LINE_HEIGHT = 44
 local order = 0
@@ -109,7 +109,11 @@ local function showRelic(list: Frame, result: Result)
 		title = "NEW! " .. title
 	end
 	local color = if result.Mutation then UIKit.mutationColor(result.Mutation) else UIKit.tierColor(relic.Tier)
-	makeLine(list, title, Odds.describe(relic.Id, result.Mutation), color, highlight)
+	local subtitle = Odds.describe(relic.Id, result.Mutation)
+	if result.Displayed then
+		subtitle ..= "  |  on pedestal"
+	end
+	makeLine(list, title, subtitle, color, highlight)
 end
 
 -- Sort key: tier first, mutated above plain within a tier.
@@ -120,14 +124,15 @@ end
 function DiscoveryFeed.Start(screen: ScreenGui)
 	local list = UIKit.create("Frame", {
 		Name = "DiscoveryFeed",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -12, 0, 12),
-		Size = UDim2.fromOffset(300, (LINE_HEIGHT + 6) * Config.Feed.MaxLines),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 8),
+		Size = UDim2.fromOffset(340, (LINE_HEIGHT + 6) * Config.Feed.MaxLines),
 		BackgroundTransparency = 1,
 		Parent = screen,
 	}, {
 		UIKit.create("UIListLayout", {
 			SortOrder = Enum.SortOrder.LayoutOrder,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
 			Padding = UDim.new(0, 6),
 		}),
 	})

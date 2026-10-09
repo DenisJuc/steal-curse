@@ -1,6 +1,7 @@
 -- The single path every relic grant goes through (passive scans, captures, bonus rolls, debug).
--- Stages (GDD 9.3 order; later slices insert auto-display and auto-sell):
---   store item -> Codex discovery (base relic id) -> rare history -> priority save -> notify owner.
+-- Stages (GDD 9.3 order; auto-sell arrives with the inventory slice):
+--   store item -> Codex discovery (base relic id) -> rare history -> auto-display
+--   -> priority save -> notify owner.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -9,6 +10,7 @@ local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local DataService = require(script.Parent.Services.DataService)
 local GameEvents = require(script.Parent.Services.GameEvents)
+local PedestalService = require(script.Parent.Services.PedestalService)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local DiscoveryResult = Remotes:WaitForChild("DiscoveryResult") :: RemoteEvent
@@ -27,6 +29,7 @@ export type Result = {
 	Mutation: string?,
 	Source: string,
 	First: boolean,
+	Displayed: boolean,
 }
 
 local PRIORITY_INDEX = RarityConfig.IndexById[Config.Save.PriorityTier]
@@ -83,18 +86,26 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 
 	local now = os.time()
 	local results = {}
+	local items = {}
 	local needsSave = false
 	for _, entry in entries do
 		local item, first, priority = DiscoveryPipeline.ApplyEntry(data, entry, now)
 		needsSave = needsSave or priority
+		table.insert(items, item)
 		table.insert(results, {
 			Uid = item.Uid,
 			Id = item.Id,
 			Mutation = item.Mutation,
 			Source = item.Source,
 			First = first,
+			Displayed = false,
 		})
 		GameEvents.Fire("Discovery", player, item, first)
+	end
+
+	local shown = PedestalService.AutoDisplayNew(player, items)
+	for _, result in results do
+		result.Displayed = shown[result.Uid] == true
 	end
 
 	DataService.MirrorAttributes(player)

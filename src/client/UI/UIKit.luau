@@ -103,6 +103,75 @@ function UIKit.mutationColor(mutationId: string): Color3
 	return if mutation then Color3.fromHex(mutation.Color) else UIKit.Colors.Text
 end
 
+-- Centered menu window. It fills most of a small screen (phones) and stops growing at maxSize on
+-- big screens, so text never shrinks; content that doesn't fit goes in scrolling frames.
+-- Returns the window and the content area below the title bar.
+function UIKit.modal(screen: ScreenGui, name: string, title: string, accent: Color3, maxSize: Vector2): (Frame, Frame)
+	local window = UIKit.create("Frame", {
+		Name = name,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.94, 0.9),
+		BackgroundColor3 = UIKit.Colors.Panel,
+		BackgroundTransparency = 0.03,
+		Visible = false,
+		ZIndex = 10,
+		Parent = screen,
+	}, {
+		UIKit.create("UISizeConstraint", { MaxSize = maxSize }),
+		UIKit.corner(14),
+		UIKit.stroke(accent, 2, 0.3),
+		UIKit.padding(10),
+	})
+	UIKit.label({
+		Name = "Title",
+		Text = title,
+		TextColor3 = accent,
+		TextSize = 18,
+		Size = UDim2.new(1, -44, 0, 32),
+		Parent = window,
+	})
+	local close = UIKit.create("TextButton", {
+		Name = "Close",
+		Text = "X",
+		Font = UIKit.Font,
+		TextSize = 18,
+		TextColor3 = UIKit.Colors.Text,
+		BackgroundColor3 = UIKit.Colors.Card,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.fromOffset(36, 32),
+		Parent = window,
+	}, { UIKit.corner(8) })
+	close.Activated:Connect(function()
+		window.Visible = false
+	end)
+	local content = UIKit.create("Frame", {
+		Name = "Content",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 40),
+		Size = UDim2.new(1, 0, 1, -40),
+		Parent = window,
+	})
+	return window, content
+end
+
+-- Vertical scrolling list that grows its canvas with its children.
+function UIKit.scrollList(parent: Instance, padding: number): ScrollingFrame
+	return UIKit.create("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		ScrollBarThickness = 6,
+		Parent = parent,
+	}, {
+		UIKit.create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, padding) }),
+	})
+end
+
 -- Keeps a panel readable on phones and not oversized on big monitors. Scales around the panel's AnchorPoint.
 function UIKit.scaler(panel: GuiObject): UIScale
 	local scale = UIKit.create("UIScale", { Parent = panel })

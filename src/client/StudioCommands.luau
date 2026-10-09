@@ -36,6 +36,9 @@ local HELP = {
 	"/mutrank &lt;0-5&gt; - set Mutation Resonance rank",
 	"/savestatus - save mode, last save time, relic counts",
 	"/runtests - run the persistence tests (mock store)",
+	"/ce &lt;amount&gt; - add CE; /ce set &lt;amount&gt;",
+	"/offline &lt;seconds&gt; - pay offline earnings as if you were away",
+	"/pedlevel &lt;slot&gt; &lt;level&gt; - set a pedestal level",
 }
 
 local function say(text: string)

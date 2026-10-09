@@ -52,4 +52,22 @@ function Format.seconds(seconds: number): string
 	return trimZeros(string.format("%.1f", seconds)) .. "s"
 end
 
+-- Whole-unit duration for longer spans: "2h 5m", "45m", "30s".
+function Format.duration(seconds: number): string
+	local total = math.max(0, math.floor(seconds))
+	local hours = total // 3600
+	local minutes = (total % 3600) // 60
+	if hours > 0 then
+		return if minutes > 0 then `{hours}h {minutes}m` else `{hours}h`
+	elseif minutes > 0 then
+		return `{minutes}m`
+	end
+	return `{total}s`
+end
+
+-- CE is fractional internally; players see whole CE.
+function Format.ce(amount: number): string
+	return Format.number(math.floor(amount + 1e-9))
+end
+
 return Format

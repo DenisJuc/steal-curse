@@ -21,18 +21,36 @@ export type RareFind = {
 	Source: string,
 }
 
+-- An owned pedestal. Uid = the displayed inventory item (nil = empty); the item stays in Inventory.
+export type Pedestal = {
+	Uid: number?,
+	Level: number,
+	Locked: boolean,
+}
+
 export type Data = {
 	DataVersion: number,
 	TotalScans: number,
 	TotalCaptures: number,
 	NextUid: number,
+	-- Cursed Energy, fractional internally (the UI rounds down).
+	CE: number,
+	LifetimeCE: number,
 	Inventory: { Item },
+	-- One entry per OWNED pedestal, in slot order.
+	Pedestals: { Pedestal },
+	-- Income snapshot refreshed every economy tick; pays offline earnings on the next join.
+	Offline: {
+		IncomePerMin: number,
+		At: number,
+	},
 	-- Codex discovery keyed by BASE relic id (mutations never create separate entries).
 	Discovered: { [string]: number },
 	RareHistory: { RareFind },
 	Settings: {
 		RarityFocus: string,
 		Frequency: string,
+		AutoDisplay: boolean,
 	},
 	Skills: {
 		CoreLuck: number,
@@ -46,12 +64,24 @@ DataTemplate.Template = {
 	TotalScans = 0,
 	TotalCaptures = 0,
 	NextUid = 1,
+	CE = 0,
+	LifetimeCE = 0,
 	Inventory = {},
+	Pedestals = {
+		{ Level = 1, Locked = false },
+		{ Level = 1, Locked = false },
+		{ Level = 1, Locked = false },
+	},
+	Offline = {
+		IncomePerMin = 0,
+		At = 0,
+	},
 	Discovered = {},
 	RareHistory = {},
 	Settings = {
 		RarityFocus = "MaxLuck",
 		Frequency = "All",
+		AutoDisplay = true,
 	},
 	Skills = {
 		CoreLuck = 0,

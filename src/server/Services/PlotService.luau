@@ -2,6 +2,9 @@
 
 local Players = game:GetService("Players")
 
+local PedestalVisuals = require(script.Parent.Parent.World.PedestalVisuals)
+local GameEvents = require(script.Parent.GameEvents)
+
 local PlotService = {}
 
 local plots: { Model } = {}
@@ -36,6 +39,7 @@ local function assign(player: Player)
 			plot:SetAttribute("OwnerUserId", player.UserId)
 			player:SetAttribute("PlotIndex", index)
 			setSignText(plot, `{player.DisplayName}'s Shrine`)
+			GameEvents.Fire("PlotAssigned", player, plot)
 			break
 		end
 	end
@@ -57,6 +61,7 @@ local function release(player: Player)
 			owners[index] = nil
 			plots[index]:SetAttribute("OwnerUserId", nil)
 			setSignText(plots[index], "Unclaimed Shrine")
+			PedestalVisuals.Reset(plots[index])
 		end
 	end
 end

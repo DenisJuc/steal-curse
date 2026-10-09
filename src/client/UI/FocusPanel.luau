@@ -48,11 +48,11 @@ local function chipGrid(parent: Instance, y: number, rows: number): Frame
 	return UIKit.create("Frame", {
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(0, y),
-		Size = UDim2.new(1, 0, 0, rows * 26 + (rows - 1) * 6),
+		Size = UDim2.new(1, 0, 0, rows * 32 + (rows - 1) * 6),
 		Parent = parent,
 	}, {
 		UIKit.create("UIGridLayout", {
-			CellSize = UDim2.fromOffset(100, 26),
+			CellSize = UDim2.fromOffset(104, 32),
 			CellPadding = UDim2.fromOffset(6, 6),
 			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
@@ -91,79 +91,52 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 
-	local panel = UIKit.create("Frame", {
-		Name = "FocusPanel",
-		Position = UDim2.fromOffset(304, 12),
-		Size = UDim2.fromOffset(340, 500),
-		BackgroundColor3 = colors.Panel,
-		BackgroundTransparency = 0.05,
-		Visible = false,
-		Parent = screen,
-	}, {
-		UIKit.corner(12),
-		UIKit.stroke(colors.Accent, 2, 0.35),
-		UIKit.padding(12),
+	local panel, content = UIKit.modal(screen, "LuckMenu", "LUCK, FOCUS & ODDS", colors.Accent, Vector2.new(380, 600))
+	local body = UIKit.create("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		CanvasSize = UDim2.fromOffset(0, 520),
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		ScrollBarThickness = 6,
+		Parent = content,
 	})
-	UIKit.scaler(panel)
-
-	UIKit.label({
-		Text = "RARITY FOCUS & ODDS",
-		TextColor3 = colors.Accent,
-		TextSize = 16,
-		Size = UDim2.new(1, -30, 0, 20),
-		Parent = panel,
-	})
-	local close = UIKit.create("TextButton", {
-		Text = "X",
-		Font = UIKit.Font,
-		TextSize = 16,
-		TextColor3 = colors.Text,
-		BackgroundColor3 = colors.Card,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.fromOffset(24, 22),
-		Parent = panel,
-	}, { UIKit.corner(6) })
-	close.Activated:Connect(function()
-		panel.Visible = false
-	end)
 
 	local luckLabel = UIKit.label({
 		TextSize = 14,
 		TextColor3 = colors.SubText,
-		Position = UDim2.fromOffset(0, 28),
-		Size = UDim2.new(1, 0, 0, 18),
-		Parent = panel,
+		Size = UDim2.new(1, -8, 0, 18),
+		Parent = body,
 	})
 
-	sectionLabel(panel, "Rarity Focus (caps luck so that tier keeps appearing)", 52)
-	local focusChips = makeChips(chipGrid(panel, 72, 3), FOCUS_OPTIONS, function(id)
+	sectionLabel(body, "Rarity Focus (caps luck so that tier keeps appearing)", 26)
+	local focusChips = makeChips(chipGrid(body, 46, 3), FOCUS_OPTIONS, function(id)
 		SetRarityFocus:FireServer(id)
 	end)
 
-	sectionLabel(panel, "Signal Frequency (favors a family inside each tier)", 170)
-	local frequencyChips = makeChips(chipGrid(panel, 190, 2), FREQUENCY_OPTIONS, function(id)
+	sectionLabel(body, "Signal Frequency (favors a family inside each tier)", 164)
+	local frequencyChips = makeChips(chipGrid(body, 184, 2), FREQUENCY_OPTIONS, function(id)
 		SetFrequency:FireServer(id)
 	end)
 
-	sectionLabel(panel, "Your chance per discovery", 256)
+	sectionLabel(body, "Your chance per discovery", 272)
 	local tierRows: { [string]: TextLabel } = {}
 	for index, tier in RarityConfig.Tiers do
-		local y = 276 + (index - 1) * 20
+		local y = 292 + (index - 1) * 22
 		UIKit.label({
 			Text = tier.Name,
 			TextSize = 15,
 			TextColor3 = UIKit.tierColor(tier.Id),
 			Position = UDim2.fromOffset(0, y),
-			Size = UDim2.new(0.45, 0, 0, 20),
-			Parent = panel,
+			Size = UDim2.new(0.45, 0, 0, 22),
+			Parent = body,
 		})
 		tierRows[tier.Id] = UIKit.label({
 			TextSize = 15,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			Position = UDim2.new(0.45, 0, 0, y),
-			Size = UDim2.new(0.55, 0, 0, 20),
-			Parent = panel,
+			Size = UDim2.new(0.55, -12, 0, 22),
+			Parent = body,
 		})
 	end
 
@@ -172,9 +145,9 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextColor3 = colors.SubText,
-		Position = UDim2.fromOffset(0, 440),
-		Size = UDim2.new(1, 0, 0, 36),
-		Parent = panel,
+		Position = UDim2.fromOffset(0, 474),
+		Size = UDim2.new(1, -12, 0, 40),
+		Parent = body,
 	})
 
 	local function refresh()

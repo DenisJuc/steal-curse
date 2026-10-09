@@ -50,6 +50,9 @@ return {
 			expect.equal(template.DataVersion, DataTemplate.Version, "template version")
 			expect.equal(template.Settings.RarityFocus, Config.Focus.Default, "focus default")
 			expect.equal(template.Settings.Frequency, Config.Frequency.Default, "frequency default")
+			expect.equal(template.Settings.AutoDisplay, Config.Economy.AutoDisplayDefault, "auto-display default")
+			expect.equal(#template.Pedestals, Config.Plots.StartingPedestals, "free starting pedestals")
+			expect.equal(template.CE, 0, "starting CE")
 			isSaveSafe(template, "Data")
 		end,
 	},

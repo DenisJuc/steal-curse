@@ -17,6 +17,9 @@
 --   /mutrank <n>       set Mutation Resonance rank 0..5
 --   /savestatus        save mode, last save time and counts
 --   /runtests          run the persistence tests on the ProfileStore mock
+--   /ce <amount>       add CE (negative removes); /ce set <amount>
+--   /offline <seconds> pretend you were away that long and pay offline earnings now
+--   /pedlevel <slot> <level>   set a pedestal level directly
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -32,7 +35,9 @@ local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local Stats = require(ReplicatedStorage.Shared.Stats)
 local BindService = require(script.Parent.Services.BindService)
 local DataService = require(script.Parent.Services.DataService)
+local EconomyService = require(script.Parent.Services.EconomyService)
 local MultiplierService = require(script.Parent.Services.MultiplierService)
+local PedestalService = require(script.Parent.Services.PedestalService)
 local RollService = require(script.Parent.Services.RollService)
 local ScanService = require(script.Parent.Services.ScanService)
 local SettingsService = require(script.Parent.Services.SettingsService)
@@ -301,6 +306,49 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			local text = `Save: {mode} | Last save {ago} | Pending {pending} | Relics {#data.Inventory} | Codex {discovered} | Rare history {#data.RareHistory}`
 			reply(player, text)
 			print(`[SaveStatus] {player.Name}: {text}`)
+		end,
+
+		ce = function(player, args)
+			local data = DataService.Get(player)
+			if not data then
+				return
+			end
+			local setMode = args[1] == "set"
+			local amount = tonumber(if setMode then args[2] else args[1])
+			if not amount then
+				reply(player, "Usage: /ce <amount> or /ce set <amount>")
+				return
+			end
+			data.CE = math.max(0, if setMode then amount else data.CE + amount)
+			EconomyService.Mirror(player)
+			reply(player, `You now have {Format.ce(data.CE)} CE.`)
+		end,
+
+		offline = function(player, args)
+			local data = DataService.Get(player)
+			local seconds = tonumber(args[1])
+			if not data or not seconds or seconds < 0 then
+				reply(player, "Usage: /offline <seconds>, e.g. /offline 3600")
+				return
+			end
+			data.Offline.IncomePerMin = EconomyService.GetIncomePerMin(player)
+			data.Offline.At = os.time() - math.floor(seconds)
+			local paid = EconomyService.PayOffline(player)
+			if paid <= 0 then
+				local why = if data.Offline.IncomePerMin <= 0
+					then "nothing is displayed"
+					else `under {Config.Offline.MinSeconds}s pays nothing`
+				reply(player, `No offline earnings ({why}).`)
+			end
+		end,
+
+		pedlevel = function(player, args)
+			local slot, level = tonumber(args[1]), tonumber(args[2])
+			if not slot or not level or not PedestalService.SetLevel(player, slot, level) then
+				reply(player, "Usage: /pedlevel <owned slot> <level 1-10>")
+				return
+			end
+			reply(player, `Pedestal {slot} is now level {math.clamp(math.floor(level), 1, Config.Economy.PedestalMaxLevel)}.`)
 		end,
 
 		runtests = function(player)

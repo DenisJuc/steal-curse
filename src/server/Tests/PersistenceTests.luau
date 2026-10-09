@@ -129,6 +129,29 @@ local TESTS: { { Name: string, Run: () -> () } } = {
 		end,
 	},
 	{
+		Name = "CE, bought pedestals, levels, locks and offline snapshot survive reload",
+		Run = function()
+			local key = newKey()
+			local profile = open(key)
+			local data = profile.Data
+			local item = DiscoveryPipeline.ApplyEntry(data, { Id = firstRelicOfTier("Epic"), Source = "Scan" }, os.time())
+			data.CE = 1234.56
+			table.insert(data.Pedestals, { Level = 7, Locked = true, Uid = item.Uid })
+			data.Settings.AutoDisplay = false
+			data.Offline.IncomePerMin = 321
+			data.Offline.At = 1700000000
+			local reloaded = endAndReopen(profile, key)
+			local after = reloaded.Data
+			check(math.abs(after.CE - 1234.56) < 1e-9, `CE lost fractions: {after.CE}`)
+			check(#after.Pedestals == 4, `expected 4 pedestals, got {#after.Pedestals}`)
+			local fourth = after.Pedestals[4]
+			check(fourth.Level == 7 and fourth.Locked == true and fourth.Uid == item.Uid, "pedestal 4 not restored")
+			check(after.Settings.AutoDisplay == false, "Auto-Display setting lost")
+			check(after.Offline.IncomePerMin == 321 and after.Offline.At == 1700000000, "offline snapshot lost")
+			reloaded:EndSession()
+		end,
+	},
+	{
 		Name = "save priority rules (first find, Mythic+, mutated Legendary+)",
 		Run = function()
 			local data = DataTemplate.fresh()
