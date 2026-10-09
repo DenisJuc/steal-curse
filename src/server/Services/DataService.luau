@@ -15,12 +15,14 @@ export type Item = {
 
 export type Data = {
 	TotalScans: number,
+	TotalCaptures: number,
 	NextUid: number,
 	Inventory: { Item },
 }
 
 local TEMPLATE: Data = {
 	TotalScans = 0,
+	TotalCaptures = 0,
 	NextUid = 1,
 	Inventory = {},
 }
@@ -83,6 +85,7 @@ function DataService.MirrorAttributes(player: Player)
 		return
 	end
 	player:SetAttribute("TotalScans", data.TotalScans)
+	player:SetAttribute("TotalCaptures", data.TotalCaptures)
 	player:SetAttribute("InventoryCount", #data.Inventory)
 end
 

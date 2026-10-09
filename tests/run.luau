@@ -6,6 +6,7 @@ local suites = {
 	{ Name = "config", Tests = require("./specs/config_spec") },
 	{ Name = "rollmath", Tests = require("./specs/rollmath_spec") },
 	{ Name = "format", Tests = require("./specs/format_spec") },
+	{ Name = "hunt", Tests = require("./specs/hunt_spec") },
 }
 
 local passed, failed = 0, 0

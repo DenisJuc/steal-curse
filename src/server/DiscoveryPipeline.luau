@@ -12,35 +12,49 @@ local DiscoveryResult = Remotes:WaitForChild("DiscoveryResult") :: RemoteEvent
 
 local DiscoveryPipeline = {}
 
+export type Entry = {
+	Id: string,
+	Source: string,
+}
+
 export type Result = {
 	Uid: number,
 	Id: string,
 	Source: string,
 }
 
-function DiscoveryPipeline.Grant(player: Player, relicIds: { string }, source: string): { Result }
+-- Grants every entry as one batch: one data update and one client message.
+function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Result }
 	local data = DataService.Get(player)
-	if not data or #relicIds == 0 then
+	if not data or #entries == 0 then
 		return {}
 	end
 
 	local results = {}
-	for _, relicId in relicIds do
+	for _, entry in entries do
 		local item = {
 			Uid = data.NextUid,
-			Id = relicId,
+			Id = entry.Id,
 			At = os.time(),
-			Source = source,
+			Source = entry.Source,
 		}
 		data.NextUid += 1
 		table.insert(data.Inventory, item)
-		table.insert(results, { Uid = item.Uid, Id = relicId, Source = source })
+		table.insert(results, { Uid = item.Uid, Id = item.Id, Source = item.Source })
 		GameEvents.Fire("Discovery", player, item)
 	end
 
 	DataService.MirrorAttributes(player)
 	DiscoveryResult:FireClient(player, results)
 	return results
+end
+
+function DiscoveryPipeline.Grant(player: Player, relicIds: { string }, source: string): { Result }
+	local entries = table.create(#relicIds)
+	for index, relicId in relicIds do
+		entries[index] = { Id = relicId, Source = source }
+	end
+	return DiscoveryPipeline.GrantBatch(player, entries)
 end
 
 return DiscoveryPipeline

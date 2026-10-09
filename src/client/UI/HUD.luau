@@ -10,7 +10,7 @@ local UIKit = require(script.Parent.UIKit)
 
 local HUD = {}
 
-function HUD.Start(screen: ScreenGui)
+function HUD.Start(screen: ScreenGui): { SetVisible: (boolean) -> () }
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 
@@ -18,7 +18,7 @@ function HUD.Start(screen: ScreenGui)
 		Name = "ResonatorPanel",
 		AnchorPoint = Vector2.new(0, 0),
 		Position = UDim2.fromOffset(12, 12),
-		Size = UDim2.fromOffset(280, 112),
+		Size = UDim2.fromOffset(280, 134),
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.1,
 		Parent = screen,
@@ -68,13 +68,25 @@ function HUD.Start(screen: ScreenGui)
 		Parent = panel,
 	})
 
+	local capturesLabel = UIKit.label({
+		Name = "Captures",
+		Position = UDim2.fromOffset(0, 90),
+		Size = UDim2.new(1, 0, 0, 20),
+		TextColor3 = Color3.fromRGB(170, 230, 255),
+		TextSize = 16,
+		Parent = panel,
+	})
+
 	local function refreshStats()
 		local scans = player:GetAttribute("TotalScans") or 0
 		local held = player:GetAttribute("InventoryCount") or 0
+		local captures = player:GetAttribute("TotalCaptures") or 0
 		statsLabel.Text = `Scans {Format.number(scans)}   |   Relics {Format.number(held)}`
+		capturesLabel.Text = `Signals sealed {Format.number(captures)}`
 	end
 	player:GetAttributeChangedSignal("TotalScans"):Connect(refreshStats)
 	player:GetAttributeChangedSignal("InventoryCount"):Connect(refreshStats)
+	player:GetAttributeChangedSignal("TotalCaptures"):Connect(refreshStats)
 	refreshStats()
 
 	RunService.RenderStepped:Connect(function()
@@ -88,6 +100,13 @@ function HUD.Start(screen: ScreenGui)
 		fill.Size = UDim2.fromScale(math.clamp(1 - remaining / interval, 0, 1), 1)
 		timerLabel.Text = `Next scan {Format.seconds(remaining)}   (every {Format.seconds(interval)})`
 	end)
+
+	return {
+		-- Spirit Sight hides management UI; scanning itself never stops.
+		SetVisible = function(visible: boolean)
+			panel.Visible = visible
+		end,
+	}
 end
 
 return HUD

@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local BuildUtil = require(script.Parent.BuildUtil)
+local HuntAreaBuilder = require(script.Parent.HuntAreaBuilder)
 local PlotBuilder = require(script.Parent.PlotBuilder)
 
 local MapBuilder = {}
@@ -12,6 +13,7 @@ local MapBuilder = {}
 export type Map = {
 	Folder: Folder,
 	Plots: { Model },
+	HuntArea: HuntAreaBuilder.HuntArea,
 }
 
 local SPIRIT = Color3.fromRGB(170, 110, 255)
@@ -140,22 +142,27 @@ local function buildHub(parent: Instance)
 	hub.Parent = parent
 end
 
+local function buildPath(parent: Instance, angle: number, inner: number, outer: number)
+	local length = outer - inner
+	local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+	local center = direction * (inner + length / 2) + Vector3.new(0, 0.2, 0)
+	BuildUtil.part(parent, {
+		Name = "Path",
+		Size = Vector3.new(10, 0.4, length),
+		CFrame = CFrame.lookAt(center, center + direction),
+		Material = Enum.Material.Cobblestone,
+		Color = Color3.fromRGB(112, 106, 100),
+	})
+end
+
 local function buildPaths(parent: Instance)
 	local inner = Config.Hub.PlazaRadius
-	local outer = Config.Plots.RingRadius - Config.Plots.Size / 2
-	local length = outer - inner
 	for index = 1, Config.Plots.Count do
 		local angle = (index - 1) / Config.Plots.Count * math.pi * 2
-		local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		local center = direction * (inner + length / 2) + Vector3.new(0, 0.2, 0)
-		BuildUtil.part(parent, {
-			Name = "Path",
-			Size = Vector3.new(10, 0.4, length),
-			CFrame = CFrame.lookAt(center, center + direction),
-			Material = Enum.Material.Cobblestone,
-			Color = Color3.fromRGB(112, 106, 100),
-		})
+		buildPath(parent, angle, inner, Config.Plots.RingRadius - Config.Plots.Size / 2)
 	end
+	local hunt = Config.HuntArea
+	buildPath(parent, math.rad(hunt.AngleDegrees), inner, hunt.Radius - hunt.Size / 2)
 end
 
 function MapBuilder.Build(): Map
@@ -193,8 +200,10 @@ function MapBuilder.Build(): Map
 		plots[index] = PlotBuilder.Build(index, cframe, plotFolder)
 	end
 
+	local huntArea = HuntAreaBuilder.Build(folder)
+
 	folder.Parent = workspace
-	return { Folder = folder, Plots = plots }
+	return { Folder = folder, Plots = plots, HuntArea = huntArea }
 end
 
 return MapBuilder

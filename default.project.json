@@ -14,6 +14,21 @@
         },
         "Notify": {
           "$className": "RemoteEvent"
+        },
+        "SignalsUpdated": {
+          "$className": "RemoteEvent"
+        },
+        "BeginBind": {
+          "$className": "RemoteEvent"
+        },
+        "CancelBind": {
+          "$className": "RemoteEvent"
+        },
+        "CompleteBind": {
+          "$className": "RemoteEvent"
+        },
+        "BindResult": {
+          "$className": "RemoteEvent"
         }
       }
     },
