@@ -1,28 +1,22 @@
--- Builds the whole map from code at server start (GDD 4.1): lighting, ground, the hub, the plot
--- ring, the three hunting districts and the paths between them, then checks the part budget.
+-- Builds the whole map from code at server start (GDD 4.1, Slice 11): lighting, the shrine town
+-- (hub plaza and plot ring) and the wild ring around it (WildBuilder: terrain, paths, stream,
+-- landmarks, props, signal spawn grid), then checks the part budget.
 
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local BuildUtil = require(script.Parent.BuildUtil)
-local DistrictBuilder = require(script.Parent.DistrictBuilder)
 local HubBuilder = require(script.Parent.HubBuilder)
 local PlotBuilder = require(script.Parent.PlotBuilder)
+local WildBuilder = require(script.Parent.WildBuilder)
 
 local MapBuilder = {}
 
 export type Map = {
 	Folder: Folder,
 	Plots: { Model },
-	Districts: { DistrictBuilder.District },
+	Wild: WildBuilder.Wild,
 	PartCount: number,
-}
-
-local THEMES = {
-	HauntedForest = require(script.Parent.Districts.HauntedForest),
-	AbandonedVillage = require(script.Parent.Districts.AbandonedVillage),
-	AncientRuins = require(script.Parent.Districts.AncientRuins),
 }
 
 local function setupLighting()
@@ -69,31 +63,6 @@ local function setupLighting()
 	rays.Parent = Lighting
 end
 
-local function buildPath(parent: Instance, angle: number, inner: number, outer: number)
-	local length = outer - inner
-	local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
-	local center = direction * (inner + length / 2) + Vector3.new(0, 0.2, 0)
-	BuildUtil.part(parent, {
-		Name = "Path",
-		Size = Vector3.new(10, 0.4, length),
-		CFrame = CFrame.lookAt(center, center + direction),
-		Material = Enum.Material.Cobblestone,
-		Color = Color3.fromRGB(112, 106, 100),
-	})
-end
-
-local function buildPaths(parent: Instance)
-	local inner = Config.Hub.PlazaRadius
-	for index = 1, Config.Plots.Count do
-		local angle = (index - 1) / Config.Plots.Count * math.pi * 2
-		buildPath(parent, angle, inner, Config.Plots.RingRadius - Config.Plots.Size / 2)
-	end
-	local gate = Config.World.DistrictRadius - Config.World.DistrictSize / 2
-	for _, district in Config.Districts do
-		buildPath(parent, math.rad(district.AngleDegrees), inner, gate)
-	end
-end
-
 local function countParts(folder: Instance): number
 	local count = 0
 	for _, descendant in folder:GetDescendants() do
@@ -117,15 +86,7 @@ function MapBuilder.Build(): Map
 	local folder = Instance.new("Folder")
 	folder.Name = "Map"
 
-	BuildUtil.part(folder, {
-		Name = "Ground",
-		Size = Vector3.new(Config.Hub.GroundSize, 4, Config.Hub.GroundSize),
-		CFrame = CFrame.new(0, -2, 0),
-		Material = Enum.Material.Grass,
-		Color = Color3.fromRGB(58, 72, 54),
-	})
 	HubBuilder.Build(folder)
-	buildPaths(folder)
 
 	local plotFolder = Instance.new("Folder")
 	plotFolder.Name = "Plots"
@@ -139,24 +100,21 @@ function MapBuilder.Build(): Map
 		plots[index] = PlotBuilder.Build(index, cframe, plotFolder)
 	end
 
-	local districtFolder = Instance.new("Folder")
-	districtFolder.Name = "Districts"
-	districtFolder.Parent = folder
-	local districts = {}
-	for index, district in Config.Districts do
-		districts[index] = DistrictBuilder.Build(districtFolder, district, THEMES[district.Id])
-	end
+	local started = os.clock()
+	local wild = WildBuilder.Build(folder)
 
 	-- Plot relic displays are added later per player; this measures the static map.
 	local partCount = countParts(folder)
+	local summary = `{partCount} parts, {wild.PropCount} wild props, {#wild.SpawnPoints} signal spots,`
+		.. ` wild built in {string.format("%.1f", os.clock() - started)} s`
 	if partCount > Config.World.PartBudget then
-		warn(`[Map] {partCount} parts is over the budget of {Config.World.PartBudget}; consider StreamingEnabled.`)
+		warn(`[Map] {summary}: over the budget of {Config.World.PartBudget}; consider StreamingEnabled.`)
 	else
-		print(`[Map] Built with {partCount} parts (budget {Config.World.PartBudget}).`)
+		print(`[Map] Built: {summary} (budget {Config.World.PartBudget}).`)
 	end
 
 	folder.Parent = workspace
-	return { Folder = folder, Plots = plots, Districts = districts, PartCount = partCount }
+	return { Folder = folder, Plots = plots, Wild = wild, PartCount = partCount }
 end
 
 return MapBuilder

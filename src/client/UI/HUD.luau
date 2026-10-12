@@ -1,16 +1,19 @@
--- Top-left column: the Spirit Resonator box (scan progress and totals), then Cursed Energy,
--- then the Shrine (pedestal), Luck (cursed lucky flower), Relics (chest), Skills (rune tree),
--- Codex (book), Journal (scroll) and Settings (gear) buttons, one under the other. On small (phone) screens
--- the buttons wrap into rows of three. Reads player attributes only; one UIScale keeps the
--- whole column readable on phones.
+-- Top-left column: the Spirit Resonator box (totals; the charge lives on the ROLL button), then
+-- the Cursed Energy coin counter, then the Shrine (pedestal), Luck (cursed lucky flower), Codex
+-- (book), Journal (scroll) and Settings (gear) buttons, one under the other. Backpack and Upgrades
+-- sit in the bottom RollBar. On small (phone) screens the buttons wrap into rows of three. Reads
+-- player attributes only; one UIScale keeps the whole column readable on phones.
+-- CE rolls up instead of jumping; a windfall (more than a few seconds of passive income at once,
+-- e.g. a sale) also bursts coins into the counter, from the button that earned it (Sell) or the
+-- screen center.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Icons = require(script.Parent.Icons)
+local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
 
 local HUD = {}
@@ -18,8 +21,6 @@ local HUD = {}
 export type Callbacks = {
 	OnShrine: () -> (),
 	OnLuck: () -> (),
-	OnRelics: () -> (),
-	OnSkills: () -> (),
 	OnCodex: () -> (),
 	OnJournal: () -> (),
 	OnSettings: () -> (),
@@ -28,26 +29,31 @@ export type Callbacks = {
 local ICON_BUTTON_SIZE = 64
 local ICON_GAP = 6
 local COMPACT_PER_ROW = 3
+local CE_HEIGHT = 44
+-- A CE gain bigger than this many seconds of passive income counts as a windfall.
+local WINDFALL_SECONDS = 5
 
 local function iconButton(parent: Instance, name: string, order: number, caption: string): (TextButton, TextLabel)
+	local slot = UIKit.slot(parent, name .. "Slot", UDim2.fromOffset(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE), order)
 	local button = UIKit.create("TextButton", {
 		Name = name,
-		LayoutOrder = order,
 		Text = "",
-		AutoButtonColor = true,
-		BackgroundColor3 = UIKit.Colors.Panel,
-		BackgroundTransparency = 0.1,
-		Size = UDim2.fromOffset(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE),
-		Parent = parent,
-	}, { UIKit.corner(14), UIKit.stroke(UIKit.Colors.Accent, 2, 0.35) })
+		AutoButtonColor = false,
+		Parent = slot,
+	}, { UIKit.corner(14) })
+	UIKit.fill(button)
+	UIKit.skinPanel(button)
+	Motion.button(button)
 	local label = UIKit.label({
 		Name = "Caption",
 		Text = caption,
 		TextSize = 12,
+		TextStrokeTransparency = 0.5,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -2),
 		Size = UDim2.new(1, -4, 0, 14),
+		ZIndex = 2,
 		Parent = button,
 	})
 	return button, label
@@ -75,77 +81,95 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local panel = UIKit.create("Frame", {
 		Name = "ResonatorPanel",
 		LayoutOrder = 1,
-		Size = UDim2.fromOffset(280, 134),
-		BackgroundColor3 = colors.Panel,
-		BackgroundTransparency = 0.1,
+		Size = UDim2.fromOffset(280, 92),
 		Parent = column,
 	}, {
 		UIKit.corner(12),
-		UIKit.stroke(colors.Accent, 2, 0.35),
 		UIKit.padding(12),
 	})
+	UIKit.skinPanel(panel)
 
-	UIKit.label({
+	local titleLabel = UIKit.label({
 		Name = "Title",
 		Text = "SPIRIT RESONATOR",
-		TextColor3 = colors.Accent,
+		FontFace = UIKit.TitleFont,
+		TextColor3 = colors.Gold,
 		TextSize = 15,
 		Size = UDim2.new(1, 0, 0, 18),
 		Parent = panel,
 	})
 
-	local track = UIKit.create("Frame", {
-		Name = "Track",
-		Position = UDim2.fromOffset(0, 26),
-		Size = UDim2.new(1, 0, 0, 14),
-		BackgroundColor3 = colors.Track,
-		Parent = panel,
-	}, { UIKit.corner(7) })
-	local fill = UIKit.create("Frame", {
-		Name = "Fill",
-		Size = UDim2.fromScale(0, 1),
-		BackgroundColor3 = colors.Accent,
-		Parent = track,
-	}, { UIKit.corner(7) })
-
-	local timerLabel = UIKit.label({
-		Name = "Timer",
-		Position = UDim2.fromOffset(0, 46),
-		Size = UDim2.new(1, 0, 0, 18),
-		TextColor3 = colors.SubText,
-		TextSize = 14,
-		Parent = panel,
-	})
 	local statsLabel = UIKit.label({
 		Name = "Stats",
-		Position = UDim2.fromOffset(0, 68),
+		Position = UDim2.fromOffset(0, 24),
 		Size = UDim2.new(1, 0, 0, 20),
 		TextSize = 16,
 		Parent = panel,
 	})
 	local capturesLabel = UIKit.label({
 		Name = "Captures",
-		Position = UDim2.fromOffset(0, 90),
+		Position = UDim2.fromOffset(0, 46),
 		Size = UDim2.new(1, 0, 0, 20),
-		TextColor3 = Color3.fromRGB(170, 230, 255),
+		TextColor3 = colors.Cyan,
 		TextSize = 16,
 		Parent = panel,
 	})
 
-	local ceLabel = UIKit.label({
+	-- Cursed Energy: a coin pill in a fixed slot so its bounce never moves the buttons below.
+	local ceSlot = UIKit.slot(column, "CursedEnergySlot", UDim2.fromOffset(220, CE_HEIGHT), 2)
+	local cePill = UIKit.create("Frame", {
 		Name = "CursedEnergy",
-		LayoutOrder = 2,
-		Size = UDim2.fromOffset(200, 30),
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromScale(0, 0.5),
+		Size = UDim2.fromScale(1, 1),
+		Parent = ceSlot,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	UIKit.skinPanel(cePill, colors.Gold)
+	local coinIcon = UIKit.coin(30)
+	coinIcon.AnchorPoint = Vector2.new(0, 0.5)
+	coinIcon.Position = UDim2.new(0, 7, 0.5, 0)
+	coinIcon.Parent = cePill
+	local ceLabel = UIKit.label({
+		Name = "Amount",
 		TextColor3 = colors.Gold,
-		TextSize = 26,
+		TextSize = 24,
 		TextStrokeTransparency = 0.4,
-		Parent = column,
+		Position = UDim2.fromOffset(44, 0),
+		Size = UDim2.new(1, -54, 1, 0),
+		Parent = cePill,
 	})
-	local function refreshCE()
-		ceLabel.Text = `{Format.ce(player:GetAttribute("CE") or 0)} CE`
+	local setCE = Motion.counter(ceLabel, function(value: number): string
+		return `{Format.ce(value)} CE`
+	end)
+
+	Motion.setCoinTarget(coinIcon, cePill, function()
+		return UIKit.coin(24)
+	end)
+	local shownCE = player:GetAttribute("CE")
+	setCE(shownCE or 0, true)
+	local function windfall(gain: number, target: number)
+		local count = math.clamp(math.floor(3 + math.log10(gain + 1) * 1.5), 4, 12)
+		Motion.floatText(cePill, `+{Format.ce(gain)}`, colors.Gold, UDim2.new(1, 8, 0.5, 0))
+		Motion.payout(screen, Motion.coinSource(screen), count, function()
+			setCE(target)
+		end)
 	end
-	player:GetAttributeChangedSignal("CE"):Connect(refreshCE)
-	refreshCE()
+	player:GetAttributeChangedSignal("CE"):Connect(function()
+		local ce = player:GetAttribute("CE") or 0
+		local before = shownCE
+		shownCE = ce
+		if before == nil then
+			setCE(ce, true)
+			return
+		end
+		local gain = ce - before
+		local perSecond = (player:GetAttribute("IncomePerMin") or 0) / 60
+		if gain > math.max(1, perSecond * WINDFALL_SECONDS) then
+			windfall(gain, ce)
+		else
+			setCE(ce)
+		end
+	end)
 
 	local buttons = UIKit.create("Frame", {
 		Name = "Buttons",
@@ -162,11 +186,11 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	})
 
 	local shrineButton = iconButton(buttons, "ShrineButton", 3, "Shrine")
-	Icons.pedestal(shrineButton)
+	Icons.draw(shrineButton, "Shrine")
 	shrineButton.Activated:Connect(callbacks.OnShrine)
 
 	local luckButton, luckCaption = iconButton(buttons, "LuckButton", 4, "Luck")
-	Icons.cursedFlower(luckButton)
+	Icons.draw(luckButton, "Luck")
 	luckButton.Activated:Connect(callbacks.OnLuck)
 	local function refreshLuck()
 		luckCaption.Text = `Luck {Format.number(player:GetAttribute("EffectiveLuck") or 1)}x`
@@ -174,27 +198,19 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	player:GetAttributeChangedSignal("EffectiveLuck"):Connect(refreshLuck)
 	refreshLuck()
 
-	local relicsButton = iconButton(buttons, "RelicsButton", 5, "Relics")
-	Icons.chest(relicsButton)
-	relicsButton.Activated:Connect(callbacks.OnRelics)
-
-	local skillsButton = iconButton(buttons, "SkillsButton", 6, "Skills")
-	Icons.runeTree(skillsButton)
-	skillsButton.Activated:Connect(callbacks.OnSkills)
-
 	local codexButton, codexCaption = iconButton(buttons, "CodexButton", 7, "Codex")
-	Icons.book(codexButton)
+	Icons.draw(codexButton, "Codex")
 	codexButton.Activated:Connect(callbacks.OnCodex)
 
 	local journalButton = iconButton(buttons, "JournalButton", 8, "Journal")
-	Icons.scroll(journalButton)
+	Icons.draw(journalButton, "Journal")
 	journalButton.Activated:Connect(callbacks.OnJournal)
 
 	local settingsButton = iconButton(buttons, "SettingsButton", 9, "Settings")
-	Icons.gear(settingsButton)
+	Icons.draw(settingsButton, "Settings")
 	settingsButton.Activated:Connect(callbacks.OnSettings)
 
-	local buttonCount = 7
+	local buttonCount = 5
 	UIKit.watchCompact(function(compact: boolean)
 		local perRow = if compact then COMPACT_PER_ROW else 1
 		local rows = math.ceil(buttonCount / perRow)
@@ -210,7 +226,7 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	player:GetAttributeChangedSignal("DiscoveredCount"):Connect(refreshCodex)
 	refreshCodex()
 
-	-- "!" badge while Codex milestones are waiting to be claimed.
+	-- "!" badge while Codex milestones are waiting to be claimed; it breathes and the button shines.
 	local badge = UIKit.label({
 		Name = "ClaimBadge",
 		Text = "!",
@@ -221,19 +237,28 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(1, -4, 0, 4),
 		Size = UDim2.fromOffset(24, 24),
-		ZIndex = 2,
+		ZIndex = 10,
 		Visible = false,
 		Parent = codexButton,
 	})
 	UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = badge })
 	UIKit.stroke(colors.Text, 2, 0).Parent = badge
+	Motion.badge(badge)
 	local codexStroke = codexButton:FindFirstChildOfClass("UIStroke")
+	local claimable = false
+	Motion.shineLoop(codexButton, 2.6, function()
+		return claimable
+	end)
 	local function refreshBadge()
-		local claimable = (player:GetAttribute("CodexClaimable") or 0) > 0
-		badge.Visible = claimable
+		local now = (player:GetAttribute("CodexClaimable") or 0) > 0
+		if now and not claimable then
+			Motion.pop(badge, 0, 0.2)
+		end
+		claimable = now
+		badge.Visible = now
 		if codexStroke then
-			codexStroke.Color = if claimable then colors.Gold else colors.Accent
-			codexStroke.Transparency = if claimable then 0 else 0.35
+			codexStroke.Color = if now then colors.Gold else colors.Trim
+			codexStroke.Thickness = if now then 3 else 2
 		end
 	end
 	player:GetAttributeChangedSignal("CodexClaimable"):Connect(refreshBadge)
@@ -252,38 +277,21 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	refreshStats()
 
 	local panelStroke = panel:FindFirstChildOfClass("UIStroke")
-	local relicsStroke = relicsButton:FindFirstChildOfClass("UIStroke")
+	local wasPaused = false
 	local function refreshPaused()
 		local paused = player:GetAttribute("ScanPaused") == true
-		local color = if paused then colors.Red else colors.Accent
-		fill.BackgroundColor3 = color
-		timerLabel.TextColor3 = if paused then colors.Red else colors.SubText
-		for _, stroke in { panelStroke, relicsStroke } do
-			if stroke then
-				stroke.Color = color
-				stroke.Transparency = if paused then 0 else 0.35
-			end
+		titleLabel.Text = if paused then "INVENTORY FULL - PAUSED" else "SPIRIT RESONATOR"
+		titleLabel.TextColor3 = if paused then colors.Red else colors.Gold
+		if panelStroke then
+			panelStroke.Color = if paused then colors.Red else colors.Trim
 		end
+		if paused and not wasPaused then
+			Motion.shake(panel, 120)
+		end
+		wasPaused = paused
 	end
 	player:GetAttributeChangedSignal("ScanPaused"):Connect(refreshPaused)
 	refreshPaused()
-
-	RunService.RenderStepped:Connect(function()
-		if player:GetAttribute("ScanPaused") == true then
-			fill.Size = UDim2.fromScale(1, 1)
-			timerLabel.Text = "[INVENTORY FULL] Scanning paused"
-			return
-		end
-		local nextAt = player:GetAttribute("NextScanAt")
-		local interval = player:GetAttribute("ScanInterval")
-		if type(nextAt) ~= "number" or type(interval) ~= "number" or interval <= 0 then
-			timerLabel.Text = "Resonator warming up..."
-			return
-		end
-		local remaining = math.max(0, nextAt - workspace:GetServerTimeNow())
-		fill.Size = UDim2.fromScale(math.clamp(1 - remaining / interval, 0, 1), 1)
-		timerLabel.Text = `Next scan {Format.seconds(remaining)}   (every {Format.seconds(interval)})`
-	end)
 
 	return {
 		-- Spirit Sight hides management UI; scanning itself only stops when the inventory is full.

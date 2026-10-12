@@ -1,5 +1,8 @@
--- Placeholder icons drawn from plain frames (no image assets needed). Each draws into a 48x48 box.
+-- Interface icons. Icons.draw / Icons.inline use the uploaded image from IconAssets when there is
+-- one (tinted gold with a soft shadow); otherwise Icons.draw falls back to the placeholders below,
+-- drawn from plain frames into a 48x48 box.
 
+local IconAssets = require(script.Parent.IconAssets)
 local UIKit = require(script.Parent.UIKit)
 
 local Icons = {}
@@ -191,6 +194,87 @@ function Icons.gear(parent: Instance): Frame
 		BorderSizePixel = 0,
 		Parent = ring,
 	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	return icon
+end
+
+local DRAWN: { [string]: (Instance) -> Frame } = {
+	Shrine = Icons.pedestal,
+	Luck = Icons.cursedFlower,
+	Codex = Icons.book,
+	Journal = Icons.scroll,
+	Settings = Icons.gear,
+	Backpack = Icons.chest,
+	Upgrades = Icons.runeTree,
+}
+
+local function imageId(key: string): string?
+	local id = IconAssets[key]
+	return if id and id ~= "" then id else nil
+end
+
+-- Gold image with a dark drop shadow, filling `parent`.
+local function tintedImage(parent: GuiObject, id: string)
+	UIKit.create("ImageLabel", {
+		Name = "Shadow",
+		Image = id,
+		ImageColor3 = Color3.new(0, 0, 0),
+		ImageTransparency = 0.45,
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(2, 2),
+		Size = UDim2.fromScale(1, 1),
+		Parent = parent,
+	})
+	UIKit.create("ImageLabel", {
+		Name = "Image",
+		Image = id,
+		ImageColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Parent = parent,
+	}, {
+		UIKit.create("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.fromRGB(255, 240, 200), Color3.fromRGB(215, 160, 75)),
+		}),
+	})
+end
+
+function Icons.has(key: string): boolean
+	return imageId(key) ~= nil
+end
+
+-- The icon of a square button (top part; the caption sits below it).
+function Icons.draw(parent: Instance, key: string): Frame?
+	local id = imageId(key)
+	if id then
+		local icon = box(parent)
+		tintedImage(icon, id)
+		return icon
+	end
+	local drawn = DRAWN[key]
+	return if drawn then drawn(parent) else nil
+end
+
+-- A small icon left of a text button's label (only when an image is set).
+function Icons.inline(button: TextButton, key: string, size: number?): Frame?
+	local id = imageId(key)
+	if not id then
+		return nil
+	end
+	local pixels = size or 26
+	local padding = button:FindFirstChildOfClass("UIPadding")
+		or UIKit.create("UIPadding", { Parent = button }) :: UIPadding
+	local left = pixels + 14
+	padding.PaddingLeft = UDim.new(0, left)
+	local icon = UIKit.create("Frame", {
+		Name = "InlineIcon",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 8 - left, 0.5, 0),
+		Size = UDim2.fromOffset(pixels, pixels),
+		Parent = button,
+	})
+	tintedImage(icon, id)
 	return icon
 end
 

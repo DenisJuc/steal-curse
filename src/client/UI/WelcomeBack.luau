@@ -9,6 +9,7 @@ local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
 
@@ -47,10 +48,15 @@ function WelcomeBackPanel.Start(screen: ScreenGui): { SetVisible: (boolean) -> (
 	local headline = UIKit.label({
 		TextSize = 30,
 		TextColor3 = colors.Gold,
+		TextStrokeTransparency = 0.5,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Size = UDim2.new(1, 0, 0, HEADLINE_HEIGHT),
 		Parent = content,
 	})
+	local setHeadline = Motion.counter(headline, function(value: number): string
+		return `+{Format.ce(value)} CE`
+	end)
+	local collectedTotal = 0
 	local summary = UIKit.label({
 		TextSize = 14,
 		TextWrapped = true,
@@ -61,10 +67,9 @@ function WelcomeBackPanel.Start(screen: ScreenGui): { SetVisible: (boolean) -> (
 		Parent = content,
 	})
 	local listTop = HEADLINE_HEIGHT + 4 + SUMMARY_HEIGHT + 4
-	local header = UIKit.label({
+	local header = UIKit.heading({
 		Text = "UNLOCKED WHILE YOU WERE AFK",
 		TextSize = 13,
-		TextColor3 = colors.SubText,
 		Position = UDim2.fromOffset(0, listTop),
 		Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
 		Parent = content,
@@ -77,18 +82,24 @@ function WelcomeBackPanel.Start(screen: ScreenGui): { SetVisible: (boolean) -> (
 		Parent = content,
 	}, { UIKit.corner(10), UIKit.padding(6) })
 	local list = UIKit.scrollList(holder, 4)
-	UIKit.button({
+	local collect: TextButton
+	collect = UIKit.button({
 		Text = "Collect",
 		TextSize = 18,
-		BackgroundColor3 = colors.Gold,
-		TextColor3 = colors.Panel,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.fromScale(0.5, 1),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 1, -BUTTON_HEIGHT / 2),
 		Size = UDim2.fromOffset(180, BUTTON_HEIGHT),
 		Parent = content,
 	}, function()
+		if collectedTotal > 0 then
+			local count = math.clamp(math.floor(4 + math.log10(collectedTotal + 1) * 1.5), 5, 14)
+			Motion.payout(screen, collect.AbsolutePosition + collect.AbsoluteSize / 2, count)
+			collectedTotal = 0
+		end
 		panel.Visible = false
 	end)
+	UIKit.skinButton(collect, "Gold")
+	Motion.shineLoop(collect, 2.4)
 
 	local function addRow(order: number, title: string, subtitle: string, color: Color3)
 		local row = UIKit.create("Frame", {
@@ -97,6 +108,7 @@ function WelcomeBackPanel.Start(screen: ScreenGui): { SetVisible: (boolean) -> (
 			BackgroundColor3 = colors.Card,
 			Parent = list,
 		}, { UIKit.corner(8) })
+		UIKit.skinCard(row)
 		UIKit.create("Frame", {
 			BackgroundColor3 = color,
 			BorderSizePixel = 0,
@@ -173,7 +185,11 @@ function WelcomeBackPanel.Start(screen: ScreenGui): { SetVisible: (boolean) -> (
 		else
 			table.insert(lines, "No relics are found while you're offline. Your Spirit Resonator is scanning again.")
 		end
-		headline.Text = `+{Format.ce(total)} CE`
+		collectedTotal = total
+		setHeadline(0, true)
+		task.delay(0.35, function()
+			setHeadline(total)
+		end)
 		summary.Text = table.concat(lines, "\n")
 
 		header.Visible = afk ~= nil
@@ -188,7 +204,7 @@ function WelcomeBackPanel.Start(screen: ScreenGui): { SetVisible: (boolean) -> (
 				addRow(#afk.Unlocks + 1, `...and {afk.MoreUnlocks} more`, "See the Codex and the Journal for everything.", colors.SubText)
 			end
 		end
-		panel.Visible = true
+		UIKit.show(panel)
 	end
 
 	WelcomeBack.OnClientEvent:Connect(function(payload)

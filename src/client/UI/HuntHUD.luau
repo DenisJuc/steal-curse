@@ -9,8 +9,10 @@ local CaptureSummary = require(ReplicatedStorage.Shared.CaptureSummary)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RelicShapes = require(ReplicatedStorage.Shared.RelicShapes)
+local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local MutationVFX = require(script.Parent.Parent.Effects.MutationVFX)
+local Icons = require(script.Parent.Icons)
+local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
 
@@ -40,21 +42,30 @@ local function keyHint(key: string): string
 	return ""
 end
 
-local function makeButton(parent: Instance, name: string, text: string, size: Vector2, color: Color3): TextButton
-	return UIKit.create("TextButton", {
+-- A juiced button in its own layout slot (hide the slot, not the button).
+local function makeButton(
+	parent: Instance,
+	name: string,
+	text: string,
+	size: Vector2,
+	kind: string,
+	order: number
+): (TextButton, Frame)
+	local slot = UIKit.slot(parent, name .. "Slot", UDim2.fromOffset(size.X, size.Y), order)
+	local button = UIKit.button({
 		Name = name,
 		Text = text,
-		Font = UIKit.Font,
 		TextSize = 18,
-		TextColor3 = UIKit.Colors.Text,
-		AutoButtonColor = true,
-		BackgroundColor3 = color,
-		Size = UDim2.fromOffset(size.X, size.Y),
-		Parent = parent,
-	}, {
-		UIKit.corner(12),
-		UIKit.stroke(Color3.new(1, 1, 1), 2, 0.6),
+		Parent = slot,
 	})
+	UIKit.fill(button)
+	local corner = button:FindFirstChildOfClass("UICorner")
+	if corner then
+		corner.CornerRadius = UDim.new(0, 12)
+	end
+	UIKit.skinButton(button, kind)
+	Icons.inline(button, name, 26)
+	return button, slot
 end
 
 local function isPress(input: InputObject): boolean
@@ -81,18 +92,23 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 	})
 	UIKit.scaler(buttons)
 
-	local bindButton = makeButton(buttons, "Bind", "Hold to Bind" .. keyHint("E"), Vector2.new(200, 64), colors.Accent)
-	bindButton.LayoutOrder = 1
+	local iconRoom = if Icons.has("Bind") then 30 else 0
+	local bindButton, bindSlot =
+		makeButton(buttons, "Bind", "Hold to Bind" .. keyHint("E"), Vector2.new(200 + iconRoom, 64), "Primary", 1)
 	bindButton.TextSize = 20
-	bindButton.Visible = false
-	local pulseButton = makeButton(buttons, "Pulse", "Pulse" .. keyHint("Q"), Vector2.new(150, 46), colors.Card)
-	pulseButton.LayoutOrder = 2
-	pulseButton.Visible = false
-	local sightButton = makeButton(buttons, "SpiritSight", "Spirit Sight" .. keyHint("F"), Vector2.new(170, 50), colors.Card)
-	sightButton.LayoutOrder = 3
+	bindSlot.Visible = false
+	local pulseButton, pulseSlot =
+		makeButton(buttons, "Pulse", "Pulse" .. keyHint("Q"), Vector2.new(150 + iconRoom, 46), "Dark", 2)
+	pulseSlot.Visible = false
+	local sightButton =
+		makeButton(buttons, "SpiritSight", "Spirit Sight" .. keyHint("F"), Vector2.new(170 + iconRoom, 50), "Dark", 3)
 
 	sightButton.Activated:Connect(callbacks.OnToggleSight)
-	pulseButton.Activated:Connect(callbacks.OnPulse)
+	pulseButton.Activated:Connect(function()
+		if pulseButton:GetAttribute("Disabled") ~= true then
+			callbacks.OnPulse()
+		end
+	end)
 
 	local holdingBy: Enum.UserInputType? = nil
 	bindButton.InputBegan:Connect(function(input)
@@ -109,14 +125,21 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		end
 	end)
 
+	-- Bind bar and hint get their own ScreenGui: it stays up while the main UI is hidden for a seal.
+	local statusScreen = Instance.new("ScreenGui")
+	statusScreen.Name = "HuntStatusUI"
+	statusScreen.ResetOnSpawn = false
+	statusScreen.DisplayOrder = screen.DisplayOrder + 1
+	statusScreen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	statusScreen.Parent = screen.Parent
 	local bottom = UIKit.create("Frame", {
 		Name = "HuntStatus",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -110),
+		Position = UDim2.new(0.5, 0, 1, -165),
 		Size = UDim2.fromOffset(420, 70),
 		BackgroundTransparency = 1,
 		Visible = false,
-		Parent = screen,
+		Parent = statusScreen,
 	})
 	UIKit.scaler(bottom)
 
@@ -128,13 +151,20 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		BackgroundColor3 = colors.Track,
 		Visible = false,
 		Parent = bottom,
-	}, { UIKit.corner(9), UIKit.stroke(colors.Accent, 2, 0.2) })
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	UIKit.skinPanel(track, colors.Trim)
+	track.BackgroundColor3 = colors.Track
 	local fill = UIKit.create("Frame", {
 		Name = "Fill",
 		Size = UDim2.fromScale(0, 1),
-		BackgroundColor3 = colors.Accent,
+		BackgroundColor3 = Color3.new(1, 1, 1),
 		Parent = track,
-	}, { UIKit.corner(9) })
+	}, {
+		UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		UIKit.create("UIGradient", {
+			Color = ColorSequence.new(colors.Accent, colors.Gold),
+		}),
+	})
 
 	local hint = UIKit.label({
 		Name = "Hint",
@@ -150,7 +180,7 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 	local signalInfo = UIKit.label({
 		Name = "SignalInfo",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -186),
+		Position = UDim2.new(0.5, 0, 1, -240),
 		Size = UDim2.fromOffset(460, 28),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextSize = 18,
@@ -162,22 +192,28 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 	UIKit.scaler(signalInfo)
 
 	-- Capture summary (GDD 4.3 step 6): model, name, base odds, mutation, bonus count, notable finds.
-	local card = UIKit.create("TextButton", {
+	local cardHolder = UIKit.create("Frame", {
 		Name = "CaptureSummary",
-		Text = "",
-		AutoButtonColor = false,
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.42),
 		Size = UDim2.fromOffset(440, 236),
-		BackgroundColor3 = colors.Panel,
-		BackgroundTransparency = 0.05,
+		BackgroundTransparency = 1,
 		Visible = false,
 		ZIndex = 20,
 		Parent = screen,
-	}, { UIKit.corner(14), UIKit.padding(12) })
-	UIKit.scaler(card)
-	local cardStroke = UIKit.stroke(colors.Accent, 3, 0)
-	cardStroke.Parent = card
+	})
+	UIKit.scaler(cardHolder)
+	local card = UIKit.create("TextButton", {
+		Name = "Card",
+		Text = "",
+		AutoButtonColor = false,
+		ZIndex = 20,
+		Parent = cardHolder,
+	}, { UIKit.corner(14), UIKit.padding(12), UIKit.create("UIScale", { Name = "Juice" }) })
+	UIKit.fill(card)
+	UIKit.skinPanel(card, colors.Trim)
+	local cardStroke = card:FindFirstChildOfClass("UIStroke") :: UIStroke
+	cardStroke.Thickness = 3
 	local function cardLabel(props: { [string]: any }): TextLabel
 		props.ZIndex = 21
 		props.Parent = card
@@ -186,8 +222,9 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 	cardLabel({
 		Name = "Header",
 		Text = "SEALED",
+		FontFace = UIKit.TitleFont,
 		TextSize = 15,
-		TextColor3 = colors.SubText,
+		TextColor3 = colors.Trim,
 		Position = UDim2.fromOffset(122, 0),
 		Size = UDim2.new(1, -122, 0, 18),
 	})
@@ -255,7 +292,7 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 
 	local function closeCard()
 		cardToken += 1
-		card.Visible = false
+		cardHolder.Visible = false
 		if cardModel then
 			cardModel:Destroy()
 			cardModel = nil
@@ -268,7 +305,7 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 	end
 	card.Activated:Connect(closeCard)
 	RunService.RenderStepped:Connect(function(dt)
-		if cardModel and card.Visible then
+		if cardModel and cardHolder.Visible then
 			cardModel.CFrame = CFrame.Angles(0, dt * 1.4, 0) * cardModel.CFrame
 		end
 	end)
@@ -283,39 +320,58 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 
 	local hud = {}
 
+	local function showSlot(slot: Frame, button: GuiObject, visible: boolean)
+		if visible and not slot.Visible then
+			Motion.pop(button, 0, 0.4)
+		end
+		slot.Visible = visible
+	end
+
 	function hud.SetSightMode(on: boolean)
+		if on ~= sightOn then
+			Motion.punch(sightButton, 1.5)
+		end
 		sightOn = on
-		sightButton.BackgroundColor3 = if on then colors.Accent else colors.Card
+		UIKit.skinButton(sightButton, if on then "Primary" else "Dark")
 		sightButton.Text = (if on then "Leave Sight" else "Spirit Sight") .. keyHint("F")
-		pulseButton.Visible = on
+		showSlot(pulseSlot, pulseButton, on)
 		bottom.Visible = on
 		signalInfo.Visible = on
 		if not on then
-			bindButton.Visible = false
+			bindSlot.Visible = false
 		end
 	end
 
 	function hud.SetBindAvailable(available: boolean)
-		bindButton.Visible = sightOn and available
+		showSlot(bindSlot, bindButton, sightOn and available)
 	end
 
+	local pulseReady = true
 	function hud.SetPulseCooldown(remaining: number)
-		if remaining > 0 then
-			pulseButton.Text = `Pulse ({math.ceil(remaining)})`
-			pulseButton.AutoButtonColor = false
-			pulseButton.BackgroundTransparency = 0.4
-		else
-			pulseButton.Text = "Pulse" .. keyHint("Q")
-			pulseButton.AutoButtonColor = true
-			pulseButton.BackgroundTransparency = 0
+		local ready = remaining <= 0
+		pulseButton.Text = if ready then "Pulse" .. keyHint("Q") else `Pulse ({math.ceil(remaining)})`
+		if ready == pulseReady then
+			return
+		end
+		pulseReady = ready
+		Motion.setDisabled(pulseButton, not ready)
+		pulseButton.TextTransparency = if ready then 0 else 0.45
+		if ready and pulseSlot.Visible then
+			Motion.shine(pulseButton, 0.5)
 		end
 	end
 
+	local bindFull = false
 	function hud.SetProgress(progress: number?)
 		track.Visible = progress ~= nil
+		local full = progress ~= nil and progress >= 1
 		if progress then
 			fill.Size = UDim2.fromScale(math.clamp(progress, 0, 1), 1)
 		end
+		if full and not bindFull then
+			Motion.flash(track, colors.Gold, 0.2)
+		end
+		bindFull = full
 	end
 
 	function hud.SetSignalInfo(text: string)
@@ -372,25 +428,26 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		table.insert(footer, "Tap to close")
 		cardFooter.Text = table.concat(footer, "   |   ")
 
-		local props = RelicShapes.props(relic.ObjectType, CFrame.new(), 1.15)
-		local part = Instance.new("Part")
-		part.Anchored = true
-		part.Material = Enum.Material.SmoothPlastic
-		part.Color = UIKit.tierColor(relic.Tier)
-		part.Shape = props.Shape or Enum.PartType.Block
-		part.Size = props.Size
-		part.CFrame = props.CFrame
-		if mutation then
-			MutationVFX.Apply(part, mutation, { Highlight = false, Particles = false })
+		local part = RelicModels.build(relic.Id, CFrame.new(), 1.15)
+		if part then
+			if mutation then
+				MutationVFX.Apply(part, mutation, { Highlight = false, Particles = false })
+			end
+			part.Parent = viewport
+			cardModel = part
 		end
-		part.Parent = viewport
-		cardModel = part
 
 		onCardClosed = onClosed
 		local token = cardToken
-		card.Visible = true
+		cardHolder.Visible = true
+		Motion.pop(card, 0, 0.5)
+		task.delay(0.2, function()
+			if cardToken == token then
+				Motion.shine(card, 0.8)
+			end
+		end)
 		task.delay(Config.Hunt.SummarySeconds, function()
-			if cardToken == token and card.Visible then
+			if cardToken == token and cardHolder.Visible then
 				closeCard()
 			end
 		end)

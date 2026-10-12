@@ -4,7 +4,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local MapPropConfig = require(ReplicatedStorage.Shared.MapPropConfig)
 local BuildUtil = require(script.Parent.BuildUtil)
+local MapProps = require(script.Parent.MapProps)
 local PedestalVisuals = require(script.Parent.PedestalVisuals)
 
 local PlotBuilder = {}
@@ -24,22 +26,36 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 	model.Name = "Pedestal" .. slot
 	model:SetAttribute("Slot", slot)
 
-	BuildUtil.cylinder(model, at(x, FLOOR_TOP + 1.5, z), 3, 6, {
+	-- The primitive base and top match the RelicPedestal size, so an imported look lines up with
+	-- the glow disc and the relic display above it.
+	local width, height = MapPropConfig.size("RelicPedestal")
+	local imported = MapProps.has("RelicPedestal")
+	BuildUtil.cylinder(model, at(x, FLOOR_TOP + (height - 0.4) / 2, z), height - 0.4, width * 0.85, {
 		Name = "Base",
 		Material = Enum.Material.Marble,
 		Color = MARBLE,
 	})
-	local top = BuildUtil.cylinder(model, at(x, FLOOR_TOP + 3.2, z), 0.4, 7, {
+	local top = BuildUtil.cylinder(model, at(x, FLOOR_TOP + height - 0.2, z), 0.4, width, {
 		Name = "Top",
 		Material = Enum.Material.Slate,
 		Color = STONE,
 	})
-	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + 3.45, z), 0.1, 6.4, {
+	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + height + 0.05, z), 0.1, width * (if imported then 0.75 else 0.9), {
 		Name = "Glow",
 		Material = Enum.Material.Neon,
 		Color = SPIRIT,
 		Transparency = 0.45,
 	}))
+	if imported then
+		local look = MapProps.build(model, "RelicPedestal", at(x, FLOOR_TOP, z))
+		if look then
+			look.Name = "Look"
+			local collider = look:FindFirstChild("Collider")
+			if collider then
+				collider:Destroy()
+			end
+		end
+	end
 	local info = BuildUtil.billboard(top, "", 9, 2.4, 6.5, Color3.fromRGB(245, 240, 255))
 	local gui = info.Parent :: BillboardGui
 	gui.Name = "Info"
@@ -52,6 +68,11 @@ local function buildResonator(parent: Instance, at: (number, number, number) -> 
 	local x, z = offset[1], offset[2]
 	local model = Instance.new("Model")
 	model.Name = "SpiritResonator"
+	if MapProps.has("SpiritResonator") then
+		MapProps.build(model, "SpiritResonator", at(x, FLOOR_TOP, z))
+		model.Parent = parent
+		return
+	end
 
 	BuildUtil.part(model, {
 		Name = "Base",
@@ -110,6 +131,22 @@ local function buildGate(parent: Instance, at: (number, number, number) -> CFram
 	local z = -half + 0.7
 	local model = Instance.new("Model")
 	model.Name = "Gate"
+
+	if MapProps.has("ShrineGate") then
+		MapProps.build(model, "ShrineGate", at(0, FLOOR_TOP, z))
+		local _, height, depth = MapPropConfig.size("ShrineGate")
+		-- The owner sign hangs on the hub side, just under the top beam.
+		local sign = BuildUtil.part(model, {
+			Name = "OwnerSign",
+			Size = Vector3.new(10, 1.6, 0.4),
+			CFrame = at(0, FLOOR_TOP + height * 0.7, z - depth / 2 - 0.4),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(30, 24, 26),
+		})
+		BuildUtil.surfaceText(sign, Enum.NormalId.Front, "Unclaimed Shrine", Color3.fromRGB(255, 220, 170))
+		model.Parent = parent
+		return
+	end
 
 	for _, side in { -1, 1 } do
 		BuildUtil.part(model, {

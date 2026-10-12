@@ -1,4 +1,5 @@
 -- Top-middle feed of recent discoveries, newest on top. Lines fade out on their own and never block anything.
+-- Batches arrive through RollReel, after the roll reel has landed.
 -- Base odds come from RollMath (via Odds), the same math the server rolls with.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -9,9 +10,9 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local Odds = require(script.Parent.Odds)
+local RollReel = require(script.Parent.RollReel)
+local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
-
-local DiscoveryResult = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DiscoveryResult") :: RemoteEvent
 
 local DiscoveryFeed = {}
 
@@ -93,6 +94,11 @@ local function makeLine(list: Frame, title: string, subtitle: string, color: Col
 		Size = UDim2.new(1, -24, 0, 16),
 		Parent = line,
 	})
+	UIKit.skinCard(line)
+	if highlight then
+		Motion.flash(line, color, 0.3)
+		Motion.shine(line, 0.6)
+	end
 
 	local lines = {}
 	for _, child in list:GetChildren() do
@@ -157,7 +163,7 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 		list.Size = UDim2.fromOffset(340, (LINE_HEIGHT + 6) * maxLines)
 	end)
 
-	DiscoveryResult.OnClientEvent:Connect(function(results: { Result })
+	RollReel.OnResults(function(results: { Result })
 		if type(results) ~= "table" then
 			return
 		end

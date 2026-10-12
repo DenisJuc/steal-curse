@@ -57,7 +57,7 @@ end
 local function openModals(screen: ScreenGui): { GuiObject }
 	local result = {}
 	for _, child in screen:GetChildren() do
-		if child:IsA("GuiObject") and child:GetAttribute("Modal") and child.Visible then
+		if child:IsA("GuiObject") and child:GetAttribute("Modal") and child.Visible and not child:GetAttribute("Closing") then
 			table.insert(result, child)
 		end
 	end
@@ -82,9 +82,10 @@ function GamepadController.Start(screen: ScreenGui, hudButtons: () -> Instance?)
 			return
 		end
 		child:GetPropertyChangedSignal("Visible"):Connect(function()
-			if child.Visible and usingGamepad() then
+			local closing = child:GetAttribute("Closing") == true
+			if child.Visible and not closing and usingGamepad() then
 				task.defer(focus)
-			elseif not child.Visible then
+			elseif closing or not child.Visible then
 				local selected = GuiService.SelectedObject
 				if selected and selected:IsDescendantOf(child) then
 					GuiService.SelectedObject = nil

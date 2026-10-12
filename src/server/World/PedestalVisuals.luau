@@ -1,16 +1,14 @@
 -- Server-side look of a plot's six pedestals, so visitors see the same shrine as the owner.
--- Owned: solid stand, glow brightens with level, placeholder relic shape + info billboard.
+-- Owned: solid stand, glow brightens with level, the relic's model (RelicModels) + info billboard.
 -- Next buyable slot: ghost stand with its price. Later slots: hidden ghost.
--- Placeholder shapes by object type (RelicShapes) until Slice 8 imports real models.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
-local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RelicShapes = require(ReplicatedStorage.Shared.RelicShapes)
+local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local BuildUtil = require(script.Parent.BuildUtil)
 
 local PedestalVisuals = {}
@@ -27,22 +25,13 @@ export type SlotState = {
 	IsNext: boolean?,
 }
 
-local NEON_FROM_TIER = RarityConfig.IndexById.Epic
-
 local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mutationId: string?)
-	local relic = RelicConfig.ById[relicId]
-	if not relic then
+	local part = RelicModels.build(relicId, CFrame.new(top.Position + Vector3.new(0, 2.4, 0)))
+	if not part then
 		return
 	end
-	local tier = RarityConfig.Get(relic.Tier)
-	local color = if tier then Color3.fromHex(tier.Color) else Color3.new(1, 1, 1)
-	local props = RelicShapes.props(relic.ObjectType, CFrame.new(top.Position + Vector3.new(0, 2.4, 0)))
-	props.Name = "RelicDisplay"
-	props.Color = color
-	props.Material = if (RarityConfig.IndexById[relic.Tier] or 1) >= NEON_FROM_TIER
-		then Enum.Material.Neon
-		else Enum.Material.SmoothPlastic
-	local part = BuildUtil.decor(BuildUtil.part(pedestal, props))
+	part.Name = "RelicDisplay"
+	part.Parent = pedestal
 
 	local mutation = mutationId and MutationConfig.ById[mutationId]
 	if mutation then
@@ -84,8 +73,18 @@ function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 		local visible = state.Owned or state.IsNext == true
 		local ghost = not state.Owned
 		local standTransparency = if not visible then 1 elseif ghost then 0.75 else 0
-		base.Transparency = standTransparency
-		top.Transparency = standTransparency
+		-- An imported RelicPedestal model ("Look") replaces the primitive base and top, which stay
+		-- as invisible colliders and display anchors.
+		local look = pedestal:FindFirstChild("Look")
+		if look then
+			for _, part in look:GetDescendants() do
+				if part:IsA("BasePart") and part.Name ~= "Collider" and part.Name ~= "LightAnchor" then
+					part.Transparency = standTransparency
+				end
+			end
+		end
+		base.Transparency = if look then 1 else standTransparency
+		top.Transparency = if look then 1 else standTransparency
 		base.CanCollide = state.Owned
 		top.CanCollide = state.Owned
 		local level = state.Level or 1

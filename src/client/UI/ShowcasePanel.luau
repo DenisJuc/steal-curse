@@ -12,6 +12,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local ShowcaseConfig = require(ReplicatedStorage.Shared.ShowcaseConfig)
 local Showcases = require(ReplicatedStorage.Shared.Showcases)
+local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -79,14 +80,14 @@ function ShowcasePanel.Start(
 		Size = UDim2.new(1, -130, 0, 32),
 		Parent = content,
 	})
-	UIKit.button({
+	local back = UIKit.button({
 		Text = "< Pedestals",
-		BackgroundColor3 = colors.Card,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.fromScale(1, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -60, 0, 16),
 		Size = UDim2.fromOffset(120, 32),
 		Parent = content,
 	}, onBack)
+	UIKit.skinButton(back, "Dark")
 	local infoLabel = UIKit.label({
 		TextSize = 13,
 		TextColor3 = colors.SubText,
@@ -115,11 +116,11 @@ function ShowcasePanel.Start(
 	local function refreshAffordability()
 		local ce = player:GetAttribute("CE") or 0
 		for _, entry in costButtons do
-			local affordable = ce + 1e-9 >= entry.Cost
-			entry.Button.BackgroundColor3 = if affordable then colors.Accent else colors.Card
-			entry.Button.TextColor3 = if affordable then colors.Text else colors.SubText
+			UIKit.setAffordable(entry.Button, ce + 1e-9 >= entry.Cost, entry.Cost)
 		end
 	end
+
+	local rowsById: { [string]: Frame } = {}
 
 	local function send(action: string, argument: any?)
 		task.spawn(function()
@@ -127,27 +128,41 @@ function ShowcasePanel.Start(
 				return ShowcaseAction:InvokeServer(action, argument)
 			end)
 			if ok and type(result) == "table" and type(result.State) == "table" then
+				local before = if state then table.clone(state.Owned) else {}
+				local activeBefore = state and state.Active
 				state = result.State
 				if result.Message then
 					infoLabel.Text = result.Message
 				end
 				render()
+				local current = state :: State
+				for id, level in current.Owned do
+					local row = rowsById[id]
+					if row and level > (before[id] or 0) then
+						Motion.purchased(row)
+					elseif row and id == current.Active and id ~= activeBefore then
+						Motion.punch(row, 0.8)
+					end
+				end
 			end
 		end)
 	end
 
 	local function rowButton(row: Instance, text: string, width: number, x: number, onClick: () -> ()): TextButton
-		return UIKit.button({
+		local button = UIKit.button({
 			Text = text,
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, x, 0, 8),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(1, x - width / 2, 0, 23),
 			Size = UDim2.fromOffset(width, 30),
 			Parent = row,
 		}, onClick)
+		UIKit.skinButton(button, "Primary")
+		return button
 	end
 
 	function render()
 		costButtons = {}
+		rowsById = {}
 		for _, child in list:GetChildren() do
 			if child:IsA("GuiObject") then
 				child:Destroy()
@@ -167,13 +182,17 @@ function ShowcasePanel.Start(
 			local level = current.Owned[showcase.Id]
 			local isActive = current.Active == showcase.Id and level ~= nil
 			local accent = STYLE_COLORS[showcase.Style] or colors.Text
+			local holder = UIKit.slot(list, showcase.Id, UDim2.new(1, -10, 0, ROW_HEIGHT), index)
 			local row = UIKit.create("Frame", {
-				LayoutOrder = index,
-				Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
+				Name = "Card",
 				BackgroundColor3 = colors.Card,
 				BackgroundTransparency = if level then 0 else 0.35,
-				Parent = list,
-			}, { UIKit.corner(10), UIKit.stroke(colors.Gold, 2, if isActive then 0 else 1) })
+				Parent = holder,
+			}, { UIKit.corner(10) })
+			UIKit.fill(row)
+			UIKit.skinCard(row, if isActive then colors.Gold else nil)
+			row:SetAttribute("PopIn", true)
+			rowsById[showcase.Id] = row
 			UIKit.label({
 				Text = if level then `{showcase.Name}  Lv {level}/{ShowcaseConfig.MaxLevel}` else showcase.Name,
 				TextSize = 17,
@@ -219,9 +238,7 @@ function ShowcasePanel.Start(
 					end
 				end)
 				if isActive then
-					activeButton.BackgroundColor3 = colors.Gold
-					activeButton.TextColor3 = colors.Panel
-					activeButton.AutoButtonColor = false
+					UIKit.skinButton(activeButton, "Gold")
 				end
 				local cost = Showcases.upgradeCost(ShowcaseConfig.Levels, level)
 				if cost then
@@ -249,18 +266,16 @@ function ShowcasePanel.Start(
 				local toggle = UIKit.button({
 					Text = text,
 					TextSize = 12,
-					BackgroundColor3 = if on then colors.Accent else colors.Panel,
-					TextColor3 = if unlocked then colors.Text else colors.SubText,
-					AutoButtonColor = unlocked,
 					Position = UDim2.fromOffset(10, 90 + (accessoryIndex - 1) * 34),
 					Size = UDim2.new(1, -20, 0, 30),
 					Parent = row,
 				}, function()
-					if unlocked then
-						send("ToggleAccessory", accessory.Id)
-					end
+					send("ToggleAccessory", accessory.Id)
 				end)
+				UIKit.skinButton(toggle, if on then "Primary" else "Dark")
+				toggle.TextColor3 = if unlocked then colors.Text else colors.SubText
 				toggle.TextTruncate = Enum.TextTruncate.AtEnd
+				Motion.setDisabled(toggle, not unlocked)
 			end
 		end
 		refreshAffordability()
@@ -270,7 +285,7 @@ function ShowcasePanel.Start(
 
 	return {
 		Open = function()
-			panel.Visible = true
+			UIKit.show(panel)
 			infoLabel.Text = "Unlock, upgrade and pick the Showcase on your plot's podium."
 			send("Get")
 		end,

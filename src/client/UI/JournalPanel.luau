@@ -30,11 +30,10 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 	local list = UIKit.scrollList(content, 4)
 
 	local function heading(text: string, order: number)
-		UIKit.label({
+		UIKit.heading({
 			LayoutOrder = order,
 			Text = text,
 			TextSize = 16,
-			TextColor3 = colors.Accent,
 			Size = UDim2.new(1, -10, 0, 26),
 			Parent = list,
 		})
@@ -76,6 +75,7 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 				BackgroundColor3 = colors.Card,
 				Parent = list,
 			}, { UIKit.corner(8), UIKit.stroke(color, 1, 0.5) })
+			UIKit.skinCard(row)
 			UIKit.create("Frame", {
 				Size = UDim2.new(0, 5, 1, -12),
 				Position = UDim2.fromOffset(6, 6),
@@ -130,16 +130,14 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 	end)
 
 	local function open()
-		panel.Visible = true
+		UIKit.show(panel)
 		load()
 	end
 
 	return {
 		Toggle = function()
-			if panel.Visible then
-				panel.Visible = false
-			else
-				open()
+			if UIKit.toggle(panel) then
+				load()
 			end
 		end,
 		Open = open,

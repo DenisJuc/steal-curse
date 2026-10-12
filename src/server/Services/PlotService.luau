@@ -20,15 +20,10 @@ local function setSignText(plot: Model, text: string)
 end
 
 local function spawnAtPlot(player: Player, character: Model)
-	local plot = PlotService.GetPlot(player)
-	if not plot then
-		return
-	end
-	local pad = plot:FindFirstChild("SpawnPad")
+	local home = PlotService.HomeCFrame(player)
 	local root = character:WaitForChild("HumanoidRootPart", 10)
-	if pad and pad:IsA("BasePart") and root then
-		-- Face the shrine (away from the hub entrance).
-		character:PivotTo(pad.CFrame * CFrame.new(0, 4, 0) * CFrame.Angles(0, math.pi, 0))
+	if home and root then
+		character:PivotTo(home)
 	end
 end
 
@@ -82,6 +77,16 @@ function PlotService.GetPlot(player: Player): Model?
 		if owner == player then
 			return plots[index]
 		end
+	end
+	return nil
+end
+
+-- Standing on the plot's spawn pad, facing the shrine (away from the hub entrance).
+function PlotService.HomeCFrame(player: Player): CFrame?
+	local plot = PlotService.GetPlot(player)
+	local pad = plot and plot:FindFirstChild("SpawnPad")
+	if pad and pad:IsA("BasePart") then
+		return pad.CFrame * CFrame.new(0, 4, 0) * CFrame.Angles(0, math.pi, 0)
 	end
 	return nil
 end

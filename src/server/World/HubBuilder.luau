@@ -1,25 +1,28 @@
--- Hub plaza (GDD 4.1): obelisk, lanterns, the spawn, a signpost pointing at the three hunting
--- districts, and kiosks that open the Codex, Luck, Relics and Journal menus via proximity prompts
--- (the client opens the menu named by the prompt's OpensMenu attribute).
+-- Hub plaza (GDD 4.1): obelisk (or the imported HubTemple), stone lanterns, the spawn, a signpost
+-- pointing at the three wild areas, and kiosks that open the Codex, Skills, Luck, Relics and
+-- Journal menus via proximity prompts (the client opens the menu named by the prompt's OpensMenu
+-- attribute).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local BuildUtil = require(script.Parent.BuildUtil)
+local MapPropConfig = require(ReplicatedStorage.Shared.MapPropConfig)
+local MapProps = require(script.Parent.MapProps)
 
 local HubBuilder = {}
 
 local SPIRIT = Color3.fromRGB(170, 110, 255)
-local LANTERN = Color3.fromRGB(255, 176, 96)
 local WOOD = Color3.fromRGB(64, 48, 42)
 local KIOSK_COLORS = {
 	Codex = Color3.fromRGB(255, 205, 90),
+	Skills = Color3.fromRGB(150, 120, 255),
 	Luck = Color3.fromRGB(120, 235, 140),
 	Relics = Color3.fromRGB(190, 130, 255),
 	Journal = Color3.fromRGB(120, 190, 255),
 }
-local SIGNPOST_AT = Vector3.new(0, 0, 13)
+local SIGNPOST_AT = Vector3.new(0, 0, -12)
 
 local function buildCenter(hub: Model)
 	local radius = Config.Hub.PlazaRadius
@@ -34,24 +37,31 @@ local function buildCenter(hub: Model)
 		Color = SPIRIT,
 		Transparency = 0.35,
 	}))
-	BuildUtil.part(hub, {
-		Name = "ObeliskBase",
-		Size = Vector3.new(10, 3, 10),
-		CFrame = CFrame.new(0, 2.5, 0),
-		Material = Enum.Material.Slate,
-		Color = Color3.fromRGB(60, 56, 72),
-	})
-	BuildUtil.part(hub, {
-		Name = "Obelisk",
-		Size = Vector3.new(5, 22, 5),
-		CFrame = CFrame.new(0, 15, 0),
-		Material = Enum.Material.Basalt,
-		Color = Color3.fromRGB(36, 32, 48),
-	})
+	local crystalHeight = 30
+	if MapProps.has("HubTemple") then
+		MapProps.build(hub, "HubTemple", CFrame.new(0, 1, 0))
+		local _, templeHeight = MapPropConfig.size("HubTemple")
+		crystalHeight = templeHeight + 6
+	else
+		BuildUtil.part(hub, {
+			Name = "ObeliskBase",
+			Size = Vector3.new(10, 3, 10),
+			CFrame = CFrame.new(0, 2.5, 0),
+			Material = Enum.Material.Slate,
+			Color = Color3.fromRGB(60, 56, 72),
+		})
+		BuildUtil.part(hub, {
+			Name = "Obelisk",
+			Size = Vector3.new(5, 22, 5),
+			CFrame = CFrame.new(0, 15, 0),
+			Material = Enum.Material.Basalt,
+			Color = Color3.fromRGB(36, 32, 48),
+		})
+	end
 	local crystal = BuildUtil.part(hub, {
 		Name = "HubCrystal",
 		Size = Vector3.new(4, 6, 4),
-		CFrame = CFrame.new(0, 30, 0) * CFrame.Angles(0, math.rad(45), 0),
+		CFrame = CFrame.new(0, crystalHeight, 0) * CFrame.Angles(0, math.rad(45), 0),
 		Material = Enum.Material.Neon,
 		Color = SPIRIT,
 	})
@@ -62,23 +72,8 @@ local function buildCenter(hub: Model)
 
 	for index = 1, Config.Hub.LanternCount do
 		local angle = (index - 0.5) / Config.Hub.LanternCount * math.pi * 2
-		local position = Vector3.new(math.cos(angle) * (radius - 5), 0, math.sin(angle) * (radius - 5))
-		BuildUtil.part(hub, {
-			Name = "LanternPost",
-			Size = Vector3.new(1, 8, 1),
-			CFrame = CFrame.new(position + Vector3.new(0, 5, 0)),
-			Material = Enum.Material.Wood,
-			Color = Color3.fromRGB(50, 38, 34),
-		})
-		local lamp = BuildUtil.part(hub, {
-			Name = "Lantern",
-			Size = Vector3.new(2, 2, 2),
-			CFrame = CFrame.new(position + Vector3.new(0, 10, 0)),
-			Material = Enum.Material.Neon,
-			Color = LANTERN,
-		})
-		BuildUtil.decor(lamp)
-		BuildUtil.light(lamp, LANTERN, 16, 1.5)
+		local position = Vector3.new(math.cos(angle) * (radius - 5), 1, math.sin(angle) * (radius - 5))
+		MapProps.build(hub, "StoneLantern", CFrame.lookAt(position, Vector3.new(0, 1, 0)))
 	end
 
 	local spawn = Instance.new("SpawnLocation")
@@ -87,14 +82,14 @@ local function buildCenter(hub: Model)
 	spawn.Neutral = true
 	spawn.Duration = 0
 	spawn.Size = Vector3.new(8, 1, 8)
-	spawn.CFrame = CFrame.new(0, 1.05, 24)
+	spawn.CFrame = CFrame.new(0, 1.05, -22)
 	spawn.Material = Enum.Material.Slate
 	spawn.Color = Color3.fromRGB(80, 76, 94)
 	spawn.TopSurface = Enum.SurfaceType.Smooth
 	spawn.Parent = hub
 end
 
-local function buildKiosk(parent: Instance, kiosk: { Menu: string, Label: string, AngleDegrees: number })
+local function buildKiosk(parent: Instance, kiosk: { Menu: string, Label: string, AngleDegrees: number, Prop: string? })
 	local angle = math.rad(kiosk.AngleDegrees)
 	local position = Vector3.new(math.cos(angle), 0, math.sin(angle)) * Config.Hub.KioskRadius
 	-- Front (-Z) faces the obelisk, where players walk.
@@ -160,12 +155,15 @@ local function buildKiosk(parent: Instance, kiosk: { Menu: string, Label: string
 	prompt:SetAttribute("OpensMenu", kiosk.Menu)
 	prompt.Parent = counter
 
+	if kiosk.Prop then
+		MapProps.build(model, kiosk.Prop, base * CFrame.new(5.8, 0, -0.5))
+	end
 	model.Parent = parent
 end
 
 local function buildSignpost(parent: Instance)
 	local model = Instance.new("Model")
-	model.Name = "DistrictSignpost"
+	model.Name = "AreaSignpost"
 	BuildUtil.part(model, {
 		Name = "SignPole",
 		Size = Vector3.new(0.7, 11, 0.7),
@@ -173,8 +171,8 @@ local function buildSignpost(parent: Instance)
 		Material = Enum.Material.Wood,
 		Color = WOOD,
 	})
-	for index, district in Config.Districts do
-		local cx, cz = WorldLayout.districtCenter(district, Config.World)
+	for index, district in Config.Areas do
+		local cx, cz = WorldLayout.areaCenter(district, Config.World)
 		local direction = (Vector3.new(cx, 0, cz) - SIGNPOST_AT).Unit
 		local height = 10.4 - index * 1.6
 		local center = SIGNPOST_AT + direction * 3.6 + Vector3.new(0, height, 0)

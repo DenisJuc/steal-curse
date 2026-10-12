@@ -3,13 +3,17 @@
 -- are buttons that cycle to the next option; range settings (sound volume) are sliders that can be
 -- dragged, or moved with the -/+ buttons (gamepad).
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local ClientSettings = require(ReplicatedStorage.Shared.ClientSettings)
+local Motion = require(script.Parent.Motion)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
 local UIKit = require(script.Parent.UIKit)
+
+local player = Players.LocalPlayer
 
 local SettingsPanel = {}
 
@@ -29,6 +33,7 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 			BackgroundColor3 = colors.Card,
 			Parent = list,
 		}, { UIKit.corner(10), UIKit.padding(8) })
+		UIKit.skinCard(frame)
 		UIKit.label({
 			Text = label,
 			TextSize = 16,
@@ -51,8 +56,8 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 	local function cycleControl(frame: Frame, setting: ClientSettings.Setting)
 		local button = UIKit.button({
 			TextSize = 16,
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.fromScale(1, 0.5),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(1, -CYCLE_WIDTH / 2, 0.5, 0),
 			Size = UDim2.fromOffset(CYCLE_WIDTH, 38),
 			Parent = frame,
 		}, function()
@@ -61,9 +66,14 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 				Settings.Set(setting.Key, nextValue)
 			end
 		end)
-		Settings.Watch(setting.Key, function(value)
+		local function show(value: ClientSettings.Value)
 			button.Text = ClientSettings.display(setting.Key, value)
-			button.BackgroundColor3 = if value == setting.Default then colors.Accent else colors.Card
+			UIKit.skinButton(button, if value == setting.Default then "Primary" else "Dark")
+		end
+		show(Settings.Get(setting.Key))
+		player:GetAttributeChangedSignal(`Setting_{setting.Key}`):Connect(function()
+			show(Settings.Get(setting.Key))
+			Motion.punch(button, 1.5)
 		end)
 	end
 
@@ -77,21 +87,20 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 			Parent = frame,
 		})
 		local function nudgeButton(text: string, x: number, steps: number)
-			UIKit.button({
+			local nudge = UIKit.button({
 				Text = text,
 				TextSize = 18,
-				BackgroundColor3 = colors.Panel,
-				AnchorPoint = Vector2.new(0, 0.5),
-				Position = UDim2.new(0, x, 0.5, 0),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(0, x + 15, 0.5, 0),
 				Size = UDim2.fromOffset(30, 30),
 				Parent = holder,
 			}, function()
 				local value = ClientSettings.nudge(setting.Key, Settings.Get(setting.Key), steps * 2)
 				if value ~= nil then
 					Settings.Set(setting.Key, value)
-					Sounds.Play("Click")
 				end
 			end)
+			UIKit.skinButton(nudge, "Dark")
 		end
 		nudgeButton("-", 0, -1)
 		nudgeButton("+", SLIDER_WIDTH - 82, 1)
@@ -118,7 +127,7 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 			Parent = track,
 		}, { UIKit.corner(4) })
 		local knob = UIKit.create("Frame", {
-			BackgroundColor3 = colors.Text,
+			BackgroundColor3 = colors.Gold,
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(1, 0.5),
 			Size = UDim2.fromOffset(18, 18),
@@ -193,7 +202,7 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 
 	return {
 		Toggle = function()
-			panel.Visible = not panel.Visible
+			UIKit.toggle(panel)
 		end,
 		SetVisible = function(visible: boolean)
 			if not visible then

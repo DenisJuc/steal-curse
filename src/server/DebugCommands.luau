@@ -3,10 +3,13 @@
 --   /roll <tier>       instant relic of that tier, e.g. /roll cosmic
 --   /scanspeed <sec>   change your scan interval; /scanspeed reset restores it
 --   /wipedata          reset your data to a fresh profile
---   /hunt [district]   teleport to the nearest district gate, or forest / village / ruins
---   /mapstats          part counts of the map and each district vs the part budget
+--   /hunt [area]       teleport to the middle of the nearest wild area, or forest / village / ruins
+--   /mapstats          part count vs the budget, props per area, signal spots
+--   /modelcheck [all|clear]   gallery of imported relic models with warnings (all = include missing ones);
+--                      also lists which map props are imported, still primitives, or wrongly named
 --   /spawnsignal       spawn one of your signals right in front of you (ignores the cap)
 --   /regen             refill your signals to the maximum
+--   /relocate          move your signals near you now
 --   /bindtime <sec>    change your hold-to-bind time; /bindtime reset restores it
 --   /huntstats         captures, cancels and average time between captures this session
 --   /forceroll <tier|relicId> [mutation]   grant an exact relic, e.g. /forceroll cosmic abyssal
@@ -27,6 +30,8 @@
 --   /pedlevel <slot> <level>   set a pedestal level directly
 --   /give <relicId> [mutation|none] [count]   grant exact copies through the full pipeline (auto-sell included)
 --   /codexfill [n]     mark the first n relics (rarity order, default all) as discovered, without items
+--   /potion <luck|haste|fortune|all> [count]   give potions
+--   /clearbuffs        end every active potion buff
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -36,9 +41,13 @@ local TextChatService = game:GetService("TextChatService")
 local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local ItemConfig = require(ReplicatedStorage.Shared.ItemConfig)
+local MapPropConfig = require(ReplicatedStorage.Shared.MapPropConfig)
+local ModelCheck = require(ReplicatedStorage.Shared.ModelCheck)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local ShowcaseConfig = require(ReplicatedStorage.Shared.ShowcaseConfig)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
@@ -49,6 +58,7 @@ local BindService = require(script.Parent.Services.BindService)
 local CodexService = require(script.Parent.Services.CodexService)
 local DataService = require(script.Parent.Services.DataService)
 local EconomyService = require(script.Parent.Services.EconomyService)
+local ItemService = require(script.Parent.Services.ItemService)
 local MultiplierService = require(script.Parent.Services.MultiplierService)
 local PedestalService = require(script.Parent.Services.PedestalService)
 local RollService = require(script.Parent.Services.RollService)
@@ -59,17 +69,22 @@ local SignalService = require(script.Parent.Services.SignalService)
 local SkillService = require(script.Parent.Services.SkillService)
 local DiscoveryPipeline = require(script.Parent.DiscoveryPipeline)
 local PersistenceTests = require(script.Parent.Tests.PersistenceTests)
+local MapProps = require(script.Parent.World.MapProps)
 
 local Notify = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Notify") :: RemoteEvent
 
 local DebugCommands = {}
 
 type Map = {
-	Districts: { { Id: string, Name: string, Model: Model, Entrance: CFrame } },
+	Wild: { SpawnPoints: { { Position: Vector3, Area: string } }, PropCount: number, PropsByArea: { [string]: number } },
 	PartCount: number,
 }
 
-local DISTRICT_ALIASES = {
+local GALLERY_NAME = "ModelGallery"
+local GALLERY_COLUMNS = 8
+local GALLERY_SPACING = 9
+
+local AREA_ALIASES = {
 	forest = "HauntedForest",
 	village = "AbandonedVillage",
 	ruins = "AncientRuins",
@@ -503,6 +518,27 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			reply(player, `Codex: first {count} relics marked as discovered.`)
 		end,
 
+		potion = function(player, args)
+			local wanted = string.lower(args[1] or "")
+			local count = math.clamp(math.floor(tonumber(args[2]) or 1), 1, ItemConfig.MaxStack)
+			local rewards: { [string]: number } = {}
+			for _, item in ItemConfig.Items do
+				if wanted == "all" or string.lower(item.Id) == wanted or string.lower(item.Id) == wanted .. "potion" then
+					rewards[item.Id] = count
+				end
+			end
+			if next(rewards) == nil then
+				reply(player, "Usage: /potion <luck|haste|fortune|all> [count]")
+				return
+			end
+			ItemService.Grant(player, rewards, "debug")
+		end,
+
+		clearbuffs = function(player)
+			ItemService.ClearBuffs(player)
+			reply(player, "Every potion buff ended.")
+		end,
+
 		runtests = function(player)
 			reply(player, "Running persistence tests (mock store)...")
 			local results = PersistenceTests.Run()
@@ -527,10 +563,10 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			local wanted = string.lower(args[1] or "")
 			local target = nil
 			if wanted ~= "" then
-				local id = DISTRICT_ALIASES[wanted]
-				for _, district in map.Districts do
-					if district.Id == id or string.lower(district.Id) == wanted then
-						target = district
+				local id = AREA_ALIASES[wanted]
+				for _, area in Config.Areas do
+					if area.Id == id or string.lower(area.Id) == wanted then
+						target = area
 					end
 				end
 				if not target then
@@ -538,30 +574,31 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 					return
 				end
 			else
-				local nearest =
-					WorldLayout.nearestDistrict(Config.Districts, Config.World, root.Position.X, root.Position.Z)
-				for _, district in map.Districts do
-					if district.Id == nearest then
-						target = district
+				local nearest = WorldLayout.areaAt(Config.Areas, Config.World, root.Position.X, root.Position.Z)
+				for _, area in Config.Areas do
+					if area.Id == nearest then
+						target = area
 					end
 				end
 			end
 			if target then
-				character:PivotTo(target.Entrance)
-				reply(player, `Teleported to the {target.Name} gate.`)
+				local x, z = WorldLayout.areaCenter(target, Config.World)
+				local ray = workspace:Raycast(Vector3.new(x, 200, z), Vector3.new(0, -400, 0))
+				local y = if ray then ray.Position.Y + 4 else 10
+				character:PivotTo(CFrame.new(x, y, z))
+				reply(player, `Teleported to the middle of the {target.Name}.`)
 			end
+		end,
+
+		relocate = function(player)
+			SignalService.Relocate(player)
+			reply(player, "Signals moved near you.")
 		end,
 
 		mapstats = function(player)
 			local counts = {}
-			for _, district in map.Districts do
-				local parts = 0
-				for _, descendant in district.Model:GetDescendants() do
-					if descendant:IsA("BasePart") then
-						parts += 1
-					end
-				end
-				table.insert(counts, `{district.Name} {parts}`)
+			for _, area in Config.Areas do
+				table.insert(counts, `{area.Name} {map.Wild.PropsByArea[area.Id] or 0} props`)
 			end
 			local workspaceParts = 0
 			for _, descendant in workspace:GetDescendants() do
@@ -570,9 +607,116 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				end
 			end
 			local text = `Map {map.PartCount} parts at build (budget {Config.World.PartBudget}) | now in Workspace {workspaceParts}`
-				.. ` | {table.concat(counts, ", ")} | StreamingEnabled {workspace.StreamingEnabled}`
+				.. ` | {map.Wild.PropCount} wild props: {table.concat(counts, ", ")}`
+				.. ` | {#map.Wild.SpawnPoints} signal spots | StreamingEnabled {workspace.StreamingEnabled}`
 			reply(player, text)
 			print(`[MapStats] {text}`)
+		end,
+
+		modelcheck = function(player, args)
+			local old = workspace:FindFirstChild(GALLERY_NAME)
+			if old then
+				old:Destroy()
+			end
+			local mode = string.lower(args[1] or "")
+			if mode == "clear" then
+				reply(player, "Model gallery removed.")
+				return
+			end
+			local root = rootOf(player)
+			if not root then
+				return
+			end
+			local imported, warned, shown = 0, 0, {}
+			print("[ModelCheck] relic | model | warnings")
+			for _, relic in RelicConfig.Relics do
+				local asset = RelicModels.asset(relic.Id)
+				local issues = if asset then ModelCheck.issues(RelicModels.facts(asset)) else {}
+				if asset then
+					imported += 1
+					if #issues > 0 then
+						warned += 1
+					end
+				end
+				if asset or mode == "all" then
+					table.insert(shown, { Relic = relic, Asset = asset, Issues = issues })
+					local status = if asset then (if #issues > 0 then table.concat(issues, "; ") else "ok") else "MODEL NEEDED"
+					print(`  {relic.Id} ({relic.Tier}) | {status}`)
+				end
+			end
+			local unknown = RelicModels.unknownNames()
+			for _, name in unknown do
+				print(`  {name} | NOT A RELIC ID: rename the .rbxm file to a relic id`)
+			end
+
+			local propIds = {}
+			for id in MapPropConfig.Props do
+				table.insert(propIds, id)
+			end
+			table.sort(propIds)
+			local propsImported, missingProps = 0, {}
+			for _, id in propIds do
+				if MapProps.has(id) then
+					propsImported += 1
+				else
+					table.insert(missingProps, id)
+				end
+			end
+			local unknownProps = MapProps.unknownNames()
+			print(`[ModelCheck] map props imported {propsImported}/{#propIds}`)
+			print(`  still primitives (ModelNeeded): {table.concat(missingProps, ", ")}`)
+			for _, name in unknownProps do
+				print(`  {name} | NOT A MAP PROP ID: rename the .rbxm file in assets/MapProps`)
+			end
+
+			local gallery = Instance.new("Folder")
+			gallery.Name = GALLERY_NAME
+			local forward = root.CFrame.LookVector * Vector3.new(1, 0, 1)
+			forward = if forward.Magnitude > 0.01 then forward.Unit else Vector3.zAxis
+			local origin = CFrame.lookAt(root.Position, root.Position + forward)
+			for index, entry in shown do
+				local column = (index - 1) % GALLERY_COLUMNS
+				local row = (index - 1) // GALLERY_COLUMNS
+				local x = (column - (GALLERY_COLUMNS - 1) / 2) * GALLERY_SPACING
+				local spot = origin * CFrame.new(x, -2.5, -12 - row * GALLERY_SPACING)
+				local stand = Instance.new("Part")
+				stand.Anchored = true
+				stand.CanCollide = false
+				stand.Size = Vector3.new(4, 1, 4)
+				stand.CFrame = spot
+				stand.Color = Color3.fromRGB(40, 40, 52)
+				stand.Parent = gallery
+				local model = RelicModels.build(entry.Relic.Id, spot * CFrame.new(0, 3.4, 0) * CFrame.Angles(0, math.pi, 0))
+				if model then
+					model.Parent = gallery
+				end
+				local billboard = Instance.new("BillboardGui")
+				billboard.Size = UDim2.fromOffset(220, 70)
+				billboard.StudsOffset = Vector3.new(0, 6.5, 0)
+				billboard.MaxDistance = 60
+				billboard.Parent = stand
+				local label = Instance.new("TextLabel")
+				label.Size = UDim2.fromScale(1, 1)
+				label.BackgroundTransparency = 1
+				label.TextScaled = true
+				label.Font = Enum.Font.GothamBold
+				label.TextStrokeTransparency = 0.3
+				label.TextColor3 = if not entry.Asset
+					then Color3.fromRGB(160, 160, 170)
+					elseif #entry.Issues > 0 then Color3.fromRGB(255, 190, 80)
+					else Color3.fromRGB(120, 230, 140)
+				label.Text = `{entry.Relic.Name}\n`
+					.. (if not entry.Asset then "model needed" elseif #entry.Issues > 0 then entry.Issues[1] else "ok")
+				label.Parent = billboard
+			end
+			gallery.Parent = workspace
+
+			local text = `Models imported: {imported}/{#RelicConfig.Relics}, {warned} with warnings`
+				.. (if #unknown > 0 then `, {#unknown} file(s) with an unknown name` else "")
+				.. ` | map props {propsImported}/{#propIds}`
+				.. (if #unknownProps > 0 then ` ({#unknownProps} wrongly named)` else "")
+				.. ` | gallery of {#shown} in front of you (details in Output; /modelcheck clear removes it)`
+			reply(player, text)
 		end,
 
 		spawnsignal = function(player)

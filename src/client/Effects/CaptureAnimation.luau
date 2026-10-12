@@ -8,10 +8,9 @@ local RunService = game:GetService("RunService")
 
 local CaptureFamilies = require(ReplicatedStorage.Shared.CaptureFamilies)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RelicShapes = require(ReplicatedStorage.Shared.RelicShapes)
+local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local ChainRig = require(script.Parent.ChainRig)
 local MutationVFX = require(script.Parent.MutationVFX)
-local UIKit = require(script.Parent.Parent.UI.UIKit)
 local Sounds = require(script.Parent.Parent.Sounds)
 
 local CaptureAnimation = {}
@@ -24,7 +23,7 @@ export type Options = {
 }
 
 type Context = {
-	Relic: Part,
+	Relic: BasePart,
 	Size: Vector3,
 	Rotation: CFrame,
 	Origin: Vector3,
@@ -221,26 +220,15 @@ local FAMILIES: { [string]: Family } = {
 	},
 }
 
-type Made = { Part: Part, Size: Vector3, Rotation: CFrame, Color: Color3 }
+type Made = { Part: BasePart, Size: Vector3, Rotation: CFrame, Color: Color3 }
 
 local function makeRelic(parent: Instance, relicId: string, mutation: string?, low: boolean): Made?
-	local relic = RelicConfig.ById[relicId]
-	if not relic then
+	local part = RelicModels.build(relicId, CFrame.new(), SCALE, { Spectral = true })
+	if not part then
 		return nil
 	end
-	local props = RelicShapes.props(relic.ObjectType, CFrame.new(), SCALE)
-	local part = Instance.new("Part")
 	part.Name = "CapturedRelic"
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = false
-	part.CastShadow = false
-	part.Material = Enum.Material.Neon
 	part.Transparency = 0.1
-	part.Color = UIKit.tierColor(relic.Tier)
-	part.Shape = props.Shape or Enum.PartType.Block
-	part.Size = props.Size
 	part.Parent = parent
 	if mutation then
 		MutationVFX.Apply(part, mutation, { Highlight = true, Particles = not low })
@@ -252,7 +240,7 @@ local function makeRelic(parent: Instance, relicId: string, mutation: string?, l
 		light.Brightness = 1.5
 		light.Parent = part
 	end
-	return { Part = part, Size = props.Size, Rotation = props.CFrame.Rotation, Color = part.Color }
+	return { Part = part, Size = part.Size, Rotation = part.CFrame.Rotation, Color = part.Color }
 end
 
 -- Plays the family animation of `relicId` at `from`, then flies the relic into `target`.
@@ -288,9 +276,6 @@ function CaptureAnimation.Play(relicId: string, mutation: string?, from: Vector3
 	}
 	motion.Setup(ctx)
 	part.CFrame = motion.Step(ctx, 0)
-	if options.Sound then
-		Sounds.Play("Seal")
-	end
 
 	local total = CaptureFamilies.totalSeconds(family)
 	local start = os.clock()

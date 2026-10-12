@@ -32,7 +32,7 @@ return {
 			for id in DataTemplate.Template.Skills do
 				expect.truthy(nodes[id], `DataTemplate.Skills.{id} is not a skill node`)
 			end
-			expect.equal(count, 10, "GDD 6.6 node count")
+			expect.equal(count, 11, "GDD 6.6 nodes + Swift Step")
 		end,
 	},
 	{
@@ -76,6 +76,8 @@ return {
 			expect.equal(SkillConfig.incomeBonus(0), 0, "income bonus")
 			expect.equal(SkillConfig.sellBonus(0), 0, "sell bonus")
 			expect.equal(SkillConfig.harvestMultiplier(0), 1, "harvest")
+			expect.equal(SkillConfig.walkSpeed(0), Config.World.WalkSpeed, "walk speed")
+			expect.near(SkillConfig.walkSpeed(nodes.SwiftStep.MaxRank), 56, 1e-9, "Swift Step max")
 			expect.equal(nodes.MutationResonance.MaxRank, MutationConfig.MaxRank, "mutation ranks")
 			expect.equal(nodes.FrequencyFocus.MaxRank, #Config.Frequency.MultiplierByRank, "frequency ranks")
 			expect.near(SkillConfig.incomeBonus(nodes.EnergyConduction.MaxRank), 0.40, 1e-9, "Energy Conduction max")
@@ -91,6 +93,9 @@ return {
 			expect.truthy(SkillConfig.pulseCooldown(nodes.SpiritSight.MaxRank) > 0, "pulse cooldown stays positive")
 			expect.truthy(SkillConfig.holdSeconds(nodes.BindingEfficiency.MaxRank) >= Config.Bind.DebugMinHoldSeconds, "hold")
 			expect.truthy(SkillConfig.sightRange(nodes.SpiritSight.MaxRank) > SkillConfig.sightRange(0), "sight range")
+			for rank = 1, nodes.SwiftStep.MaxRank do
+				expect.truthy(SkillConfig.walkSpeed(rank) > SkillConfig.walkSpeed(rank - 1), `walk speed rank {rank}`)
+			end
 			-- Resonant Harvest raises bonus finds by whole relics (rounded up).
 			local base = Formulas.bonusRolls(Config.Scan.BaseIntervalSeconds, Config.Signals.RegenSeconds, Config.Hunt)
 			local boosted = math.ceil(base * SkillConfig.harvestMultiplier(nodes.ResonantHarvest.MaxRank) - 1e-9)

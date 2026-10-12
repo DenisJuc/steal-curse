@@ -1,7 +1,7 @@
 -- Other players' hunts, drawn cosmetically on this client (GDD 4.2: others may see the chains,
 -- never your signals). Driven by replicated attributes from BindService: BindTarget (a neutral
--- spirit with chains and the raised arm while they bind) and SealAt/SealPosition/SealRelic (the
--- seal flash and the captured relic's family animation flying into them). Within range only.
+-- spirit with chains and the seal pose while they bind) and SealAt/SealPosition/SealRelic (the
+-- jar seal and the captured relic's family animation flying into them). Within range only.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -10,6 +10,9 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local CaptureAnimation = require(script.Parent.CaptureAnimation)
 local ChainRig = require(script.Parent.ChainRig)
+local HuntFX = require(script.Parent.HuntFX)
+local SealBurst = require(script.Parent.SealBurst)
+local SealPose = require(script.Parent.SealPose)
 local Settings = require(script.Parent.Parent.Settings)
 
 local OtherBinds = {}
@@ -18,10 +21,15 @@ local SPIRIT_COLOR = Color3.fromRGB(200, 190, 230)
 local CHAIN_COLOR = Color3.fromRGB(190, 150, 255)
 -- Seals older than this (e.g. set before we joined) are not replayed.
 local SEAL_MAX_AGE = 3
+-- Others' binds show a steady mid-bind look (their progress is not replicated).
+local SHOWN_PROGRESS = 0.4
+local REACH_SECONDS = 0.2
 
 type Watched = {
-	Orb: Part?,
+	Spirit: HuntFX.Core?,
 	Rig: ChainRig.Rig?,
+	Pose: SealPose.Pose?,
+	Clock: number,
 	Connections: { RBXScriptConnection },
 }
 
@@ -43,31 +51,14 @@ local function clearBind(entry: Watched)
 		entry.Rig.Restore()
 		entry.Rig = nil
 	end
-	if entry.Orb then
-		entry.Orb:Destroy()
-		entry.Orb = nil
+	if entry.Pose then
+		entry.Pose.Restore()
+		entry.Pose = nil
 	end
-end
-
-local function makeSpirit(position: Vector3): Part
-	local orb = Instance.new("Part")
-	orb.Name = "OtherBindSpirit"
-	orb.Shape = Enum.PartType.Ball
-	orb.Size = Vector3.new(2.2, 2.2, 2.2)
-	orb.Material = Enum.Material.Neon
-	orb.Color = SPIRIT_COLOR
-	orb.Transparency = 0.35
-	orb.Anchored = true
-	orb.CanCollide = false
-	orb.CanTouch = false
-	orb.CanQuery = false
-	orb.CastShadow = false
-	orb.CFrame = CFrame.new(position)
-	local core = Instance.new("Attachment")
-	core.Name = "Core"
-	core.Parent = orb
-	orb.Parent = workspace
-	return orb
+	if entry.Spirit then
+		entry.Spirit.Part:Destroy()
+		entry.Spirit = nil
+	end
 end
 
 local function onBindTarget(player: Player, entry: Watched)
@@ -77,9 +68,16 @@ local function onBindTarget(player: Player, entry: Watched)
 	if typeof(target) ~= "Vector3" or not character or not inRange(target) then
 		return
 	end
-	local orb = makeSpirit(target)
-	entry.Orb = orb
-	entry.Rig = ChainRig.Attach(character, orb:FindFirstChild("Core") :: Attachment, CHAIN_COLOR, 2)
+	local low = Settings.LowEffects()
+	local spirit = HuntFX.core(2.2, SPIRIT_COLOR, low)
+	spirit.Part.Name = "OtherBindSpirit"
+	spirit.Part.CFrame = CFrame.new(target) * spirit.Turn
+	spirit.Part.Parent = workspace
+	entry.Spirit = spirit
+	entry.Clock = 0
+	local core = spirit.Part:FindFirstChild("Core") :: Attachment
+	entry.Rig = ChainRig.Attach(character, core, { Color = CHAIN_COLOR, Count = 2, Low = low })
+	entry.Pose = SealPose.Start(character)
 end
 
 local function onSeal(player: Player)
@@ -98,17 +96,25 @@ local function onSeal(player: Player)
 		return
 	end
 	local low = Settings.LowEffects()
-	if not low then
-		ChainRig.SealFlash(position)
-	end
-	CaptureAnimation.Play(relicId, if mutation ~= "" then mutation else nil, position, root, { Low = low, Sound = false })
+	SealBurst.Play(position, relicId, { Low = low, Personal = false })
+	task.delay(SealBurst.RevealAt, function()
+		if root.Parent then
+			CaptureAnimation.Play(
+				relicId,
+				if mutation ~= "" then mutation else nil,
+				position,
+				root,
+				{ Low = low, Sound = false }
+			)
+		end
+	end)
 end
 
 local function watch(player: Player)
 	if player == Players.LocalPlayer or watched[player] then
 		return
 	end
-	local entry: Watched = { Orb = nil, Rig = nil, Connections = {} }
+	local entry: Watched = { Spirit = nil, Rig = nil, Pose = nil, Clock = 0, Connections = {} }
 	watched[player] = entry
 	table.insert(entry.Connections, player:GetAttributeChangedSignal("BindTarget"):Connect(function()
 		onBindTarget(player, entry)
@@ -140,19 +146,25 @@ function OtherBinds.Start()
 		watch(player)
 	end
 
-	-- The spirit resists like the owner's view does, and chains writhe.
+	-- The spirit resists like the owner's view does, chains writhe and the pose trembles.
 	local clock = 0
 	RunService.RenderStepped:Connect(function(dt)
 		clock += dt
 		for player, entry in watched do
-			local orb = entry.Orb
+			local spirit = entry.Spirit
 			local target = player:GetAttribute("BindTarget")
-			if orb and typeof(target) == "Vector3" then
-				local shake = 0.25
-				orb.CFrame = CFrame.new(target + Vector3.new(math.sin(clock * 31) * shake, math.sin(clock * 23) * shake, 0))
+			if not spirit or typeof(target) ~= "Vector3" then
+				continue
 			end
+			entry.Clock += dt
+			local shake = 0.25
+			local jitter = Vector3.new(math.sin(clock * 31) * shake, math.sin(clock * 23) * shake, 0)
+			spirit.Part.CFrame = CFrame.new(target + jitter) * CFrame.Angles(0, clock * 3, 0) * spirit.Turn
 			if entry.Rig then
-				ChainRig.Update(entry.Rig, clock, 0.4)
+				ChainRig.Update(entry.Rig, entry.Clock, SHOWN_PROGRESS, math.min(1, entry.Clock / REACH_SECONDS))
+			end
+			if entry.Pose then
+				entry.Pose.Update(entry.Clock, SHOWN_PROGRESS, target)
 			end
 		end
 	end)

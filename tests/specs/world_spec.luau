@@ -1,15 +1,28 @@
--- World layout (GDD 4.1, 4.2) and capture presentation data (GDD 4.3, 4.4).
+-- World layout (GDD 4.1, 4.2; Slice 11 ring) and capture presentation data (GDD 4.3, 4.4).
 
 local CaptureFamilies = require("../../src/shared/CaptureFamilies")
 local CaptureSummary = require("../../src/shared/CaptureSummary")
 local Config = require("../../src/shared/Config")
-local DistrictLayouts = require("../../src/shared/DistrictLayouts")
+local MapPropConfig = require("../../src/shared/MapPropConfig")
 local RelicConfig = require("../../src/shared/RelicConfig")
+local WildLayout = require("../../src/shared/WildLayout")
 local WorldLayout = require("../../src/shared/WorldLayout")
 local expect = require("../lib/expect")
 
 local world = Config.World
-local half = world.DistrictSize / 2
+local areas = Config.Areas
+
+local function boxCorners(box: WorldLayout.Box): { { number } }
+	local radians = math.rad(box.Rot or 0)
+	local c, s = math.cos(radians), math.sin(radians)
+	local corners = { { box.X, box.Z } }
+	for _, signs in { { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } } do
+		local u, v = signs[1] * box.W / 2, signs[2] * box.D / 2
+		-- Inverse of distanceToBox's rotation.
+		table.insert(corners, { box.X + u * c + v * s, box.Z - u * s + v * c })
+	end
+	return corners
+end
 
 local function plotCorners(index: number): { { number } }
 	local px, pz = WorldLayout.plotPosition(Config.Plots, index)
@@ -22,120 +35,186 @@ local function plotCorners(index: number): { { number } }
 	for _, signs in { { 1, 1 }, { 1, -1 }, { -1, 1 }, { -1, -1 } } do
 		table.insert(corners, { px + (ux * signs[1] + vx * signs[2]) * h, pz + (uz * signs[1] + vz * signs[2]) * h })
 	end
-	table.insert(corners, { px, pz })
 	return corners
 end
 
+local props = MapPropConfig.Props
+local grid = WorldLayout.spawnGrid(areas, world, WildLayout.boxes(props))
+
 return {
 	{
-		Name = "district local/world conversion round-trips and matches CFrame.lookAt(center, hub)",
+		Name = "areas own their slice of the ring and blend near the borders",
 		Run = function()
-			for _, district in Config.Districts do
-				local wx, wz = WorldLayout.toWorld(district, world, 12, -30)
-				local lx, lz = WorldLayout.toLocal(district, world, wx, wz)
-				expect.near(lx, 12, 1e-9, "x round-trip")
-				expect.near(lz, -30, 1e-9, "z round-trip")
-				-- Local -Z points at the hub: moving toward the gate gets closer to the center.
-				local gx, gz = WorldLayout.toWorld(district, world, 0, -half)
-				local cx, cz = WorldLayout.districtCenter(district, world)
-				expect.truthy(gx * gx + gz * gz < cx * cx + cz * cz, `{district.Id} gate faces the hub`)
-				expect.equal(WorldLayout.districtAt(Config.Districts, world, cx, cz), district.Id, "center is inside")
+			for _, area in areas do
+				local x, z = WorldLayout.areaCenter(area, world)
+				local id, weight, other = WorldLayout.areaAt(areas, world, x, z)
+				expect.equal(id, area.Id, "center belongs to its area")
+				expect.equal(weight, 1, "no blend at the center")
+				expect.equal(other, nil, "no neighbour at the center")
 			end
-			-- Angle 0: CFrame.lookAt((R,0,0), origin) has RightVector (0,0,-1) and LookVector (-1,0,0).
-			local east = { Id = "East", Name = "East", AngleDegrees = 0, Seed = 1 }
-			local x, z = WorldLayout.toWorld(east, world, 1, 0)
-			expect.near(x, world.DistrictRadius, 1e-9, "right x")
-			expect.near(z, -1, 1e-9, "right is -Z")
-			x, z = WorldLayout.toWorld(east, world, 0, 1)
-			expect.near(x, world.DistrictRadius + 1, 1e-9, "back is away from the hub")
-			expect.near(z, 0, 1e-9, "back z")
+			-- Forest (22.5) / Village (157.5) border is at 90 degrees.
+			local bx, bz = WorldLayout.polar(90.001, 300)
+			local _, borderWeight, neighbour = WorldLayout.areaAt(areas, world, bx, bz)
+			expect.near(borderWeight, 0.5, 1e-3, "an even mix on the border")
+			expect.truthy(neighbour ~= nil, "the border mixes two areas")
+			local last = 0.5
+			for offset = 1, 20 do
+				local x, z = WorldLayout.polar(90 - offset, 300)
+				local id, weight = WorldLayout.areaAt(areas, world, x, z)
+				expect.equal(id, "HauntedForest", "forest side")
+				expect.truthy(weight >= last, "weight grows away from the border")
+				last = weight
+			end
+			expect.equal(last, 1, "past the blend zone the area is pure")
 		end,
 	},
 	{
-		Name = "districts fit on the ground and never overlap the hub, the plots or each other",
+		Name = "the town fits inside the ring: plaza and every plot stay out of the wild",
 		Run = function()
-			local groundHalf = Config.Hub.GroundSize / 2
-			for _, district in Config.Districts do
-				for _, corner in { { half, half }, { half, -half }, { -half, half }, { -half, -half } } do
-					local x, z = WorldLayout.toWorld(district, world, corner[1], corner[2])
-					expect.truthy(math.abs(x) <= groundHalf and math.abs(z) <= groundHalf, `{district.Id} corner on the ground`)
-					local hubDistance = math.sqrt(x * x + z * z)
-					expect.truthy(hubDistance > Config.Hub.PlazaRadius, `{district.Id} clear of the plaza`)
-					for _, other in Config.Districts do
-						if other ~= district then
-							local lx, lz = WorldLayout.toLocal(other, world, x, z)
-							expect.truthy(math.abs(lx) > half or math.abs(lz) > half, `{district.Id} overlaps {other.Id}`)
-						end
-					end
-				end
-				for index = 1, Config.Plots.Count do
-					for _, corner in plotCorners(index) do
-						expect.equal(
-							WorldLayout.districtAt({ district }, world, corner[1], corner[2], 2),
-							nil,
-							`plot {index} overlaps {district.Id}`
-						)
-					end
+			for index = 1, Config.Plots.Count do
+				for _, corner in plotCorners(index) do
+					local r = math.sqrt(corner[1] ^ 2 + corner[2] ^ 2)
+					expect.truthy(r < world.WildInner - 10, `plot {index} corner at {r}`)
 				end
 			end
+			expect.truthy(Config.Hub.PlazaRadius < Config.Plots.RingRadius - Config.Plots.Size, "plaza clear of plots")
 		end,
 	},
 	{
-		Name = "every district has 12+ spawn points inside it, clear of structures and spread out",
+		Name = "town paths run between the plots (path, glow stones and torii clear of every plot)",
 		Run = function()
-			local lane = DistrictLayouts.EntranceLane
-			for _, district in Config.Districts do
-				local layout = DistrictLayouts.ById[district.Id]
-				expect.truthy(layout ~= nil, `{district.Id} has a layout`)
-				expect.truthy(#layout.Spawns >= 12, `{district.Id} spawn count`)
-				for index, spawn in layout.Spawns do
-					local x, z = spawn[1], spawn[2]
-					local label = `{district.Id} spawn {index}`
-					expect.truthy(math.abs(x) <= half - 6 and math.abs(z) <= half - 6, `{label} inside the walls`)
-					expect.truthy(
-						not (math.abs(x) < lane.HalfWidth and z < -half + lane.Depth),
-						`{label} is in the entrance lane`
-					)
-					for _, structure in layout.Blockers do
-						local distance = WorldLayout.distanceToBox(x, z, structure)
-						expect.truthy(distance >= 4, `{label} is {distance} from a {structure.Kind}`)
+			-- WildBuilder paths are 12 wide with glow stones 1 stud outside; keep 3 more studs of air.
+			local clearance = 6 + 1 + 3
+			for _, area in areas do
+				for distance = Config.Hub.PlazaRadius, world.WildInner, 2 do
+					local x, z = WorldLayout.polar(area.AngleDegrees, distance)
+					for index = 1, Config.Plots.Count do
+						local px, pz = WorldLayout.plotPosition(Config.Plots, index)
+						local box = {
+							X = px,
+							Z = pz,
+							W = Config.Plots.Size,
+							D = Config.Plots.Size,
+							Rot = -(index - 1) / Config.Plots.Count * 360,
+						}
+						local gap = WorldLayout.distanceToBox(x, z, box)
+						expect.truthy(gap >= clearance, `{area.Id} path {gap} studs from plot {index} at r={distance}`)
 					end
-					for other = index + 1, #layout.Spawns do
-						local dx, dz = x - layout.Spawns[other][1], z - layout.Spawns[other][2]
-						expect.truthy(math.sqrt(dx * dx + dz * dz) >= 15, `{label} too close to spawn {other}`)
-					end
-				end
-				for _, structure in layout.Blockers do
-					local entrance = { X = 0, Z = -half + lane.Depth / 2, W = lane.HalfWidth * 2, D = lane.Depth }
-					local inLane = WorldLayout.distanceToBox(structure.X, structure.Z, entrance)
-						< math.max(structure.W, structure.D) / 2
-					expect.truthy(not inLane, `{district.Id} {structure.Kind} blocks the entrance`)
 				end
 			end
 		end,
 	},
 	{
-		Name = "travel stays short: every plot reaches a district gate within 20 s, signals within 10 s of the gate",
+		Name = "landmarks: known props, inside the ring, off the paths and the stream, apart from each other",
+		Run = function()
+			for index, structure in WildLayout.Structures do
+				local label = `{structure.Prop} #{index}`
+				expect.truthy(MapPropConfig.Props[structure.Prop] ~= nil, `{label} is a known prop`)
+				local box = WildLayout.box(structure, props)
+				for _, corner in boxCorners(box) do
+					local x, z = corner[1], corner[2]
+					expect.truthy(WorldLayout.inWild(world, x, z, 2), `{label} inside the ring`)
+					expect.truthy(not WorldLayout.inStream(world, x, z, 3), `{label} out of the stream`)
+					local path = WildLayout.pathDistance(areas, x, z)
+					expect.truthy(path > WildLayout.PathHalfWidth, `{label} blocks a path ({path})`)
+				end
+				for other = index + 1, #WildLayout.Structures do
+					local second = WildLayout.Structures[other]
+					local ox, oz = WildLayout.position(second)
+					local distance = math.sqrt((box.X - ox) ^ 2 + (box.Z - oz) ^ 2)
+					local needed = MapPropConfig.radius(structure.Prop) + MapPropConfig.radius(second.Prop)
+					expect.truthy(distance >= needed, `{label} overlaps {second.Prop} #{other}`)
+				end
+			end
+		end,
+	},
+	{
+		Name = "spawn grid covers every area, avoids landmarks and the stream",
+		Run = function()
+			local perArea: { [string]: number } = {}
+			local seen: { [string]: boolean } = {}
+			local boxes = WildLayout.boxes(props)
+			for _, point in grid do
+				perArea[point.Area] = (perArea[point.Area] or 0) + 1
+				expect.truthy(WorldLayout.inWild(world, point.X, point.Z, world.SpawnEdgeMargin), "inside the ring")
+				expect.truthy(not WorldLayout.inStream(world, point.X, point.Z, 0), "not in the stream")
+				for _, box in boxes do
+					expect.truthy(WorldLayout.distanceToBox(point.X, point.Z, box) >= world.SpawnClearance, "clear of landmarks")
+				end
+				local key = `{point.X},{point.Z}`
+				expect.truthy(not seen[key], "unique points")
+				seen[key] = true
+			end
+			for _, area in areas do
+				expect.truthy((perArea[area.Id] or 0) >= 200, `{area.Id} has {perArea[area.Id]} spawn points`)
+			end
+		end,
+	},
+	{
+		Name = "anywhere in the wild has signal spots 25-90 studs away",
+		Run = function()
+			math.randomseed(4)
+			local signals = Config.Signals
+			for _ = 1, 300 do
+				local angle = math.random() * 360
+				local radius = world.WildInner + math.random() * (world.WildOuter - world.WildInner)
+				local x, z = WorldLayout.polar(angle, radius)
+				local inBand = 0
+				for _, point in grid do
+					local distance = math.sqrt((point.X - x) ^ 2 + (point.Z - z) ^ 2)
+					if distance >= signals.NearMin and distance <= signals.NearMax then
+						inBand += 1
+					end
+				end
+				expect.truthy(inBand >= signals.MaxCount * 3, `only {inBand} spots near ({x}, {z})`)
+			end
+		end,
+	},
+	{
+		Name = "travel stays short: every plot and the hub reach the wild within the limit",
 		Run = function()
 			for index = 1, Config.Plots.Count do
 				local px, pz = WorldLayout.plotPosition(Config.Plots, index)
-				local nearest = WorldLayout.nearestDistrict(Config.Districts, world, px, pz)
-				for _, district in Config.Districts do
-					if district.Id == nearest then
-						local gx, gz = WorldLayout.toWorld(district, world, 0, -half)
-						local seconds = math.sqrt((gx - px) ^ 2 + (gz - pz) ^ 2) / world.WalkSpeed
-						expect.truthy(seconds <= 20, `plot {index} -> {district.Id}: {seconds} s`)
-					end
-				end
+				local wx, wz = WorldLayout.wildEntry(world, px, pz, 0)
+				local seconds = math.sqrt((wx - px) ^ 2 + (wz - pz) ^ 2) / world.WalkSpeed
+				expect.truthy(seconds <= world.MaxTravelSeconds, `plot {index} -> wild: {seconds} s`)
 			end
-			for _, district in Config.Districts do
-				local total = 0
-				local spawns = DistrictLayouts.ById[district.Id].Spawns
-				for _, spawn in spawns do
-					total += math.sqrt(spawn[1] ^ 2 + (spawn[2] + half) ^ 2)
+			expect.truthy(world.WildInner / world.WalkSpeed <= world.MaxTravelSeconds, "hub -> wild")
+			local x, z = WorldLayout.wildEntry(world, 0, 0, Config.Travel.WildDepth)
+			expect.near(x, world.WildInner + Config.Travel.WildDepth, 1e-9, "from the center: east")
+			expect.near(z, 0, 1e-9, "from the center: z")
+			x, z = WorldLayout.wildEntry(world, 0, -2000, 10)
+			expect.near(z, -(world.WildOuter - 10), 1e-9, "outside the map clamps back in")
+			expect.near(x, 0, 1e-9, "same direction")
+		end,
+	},
+	{
+		Name = "map props: 29 models, known fallbacks, sane sizes, scatter uses known props",
+		Run = function()
+			local count = 0
+			local kinds: { [string]: boolean } = {}
+			for _, kind in MapPropConfig.FallbackKinds do
+				kinds[kind] = true
+			end
+			for id, prop in MapPropConfig.Props do
+				count += 1
+				expect.truthy(kinds[prop.Fallback], `{id} fallback {prop.Fallback}`)
+				for _, value in prop.Size do
+					expect.truthy(value > 0 and value <= 80, `{id} size`)
 				end
-				local seconds = total / #spawns / world.WalkSpeed
-				expect.truthy(seconds <= 10, `{district.Id} mean gate -> signal walk {seconds} s`)
+				expect.truthy(prop.Collide == "Box" or prop.Collide == "None", `{id} collide mode`)
+			end
+			expect.equal(count, 29, "prop count (the Tripo list)")
+			for areaId, rules in WildLayout.Scatter do
+				local known = false
+				for _, area in areas do
+					known = known or area.Id == areaId
+				end
+				expect.truthy(known, `{areaId} is an area`)
+				for _, rule in rules do
+					expect.truthy(MapPropConfig.Props[rule.Prop] ~= nil, `{areaId} scatters {rule.Prop}`)
+					expect.truthy(rule.Density > 0, `{rule.Prop} density`)
+				end
 			end
 		end,
 	},

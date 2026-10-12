@@ -35,10 +35,8 @@ local WATCHED_ATTRIBUTES =
 	{ "FullLuck", "EffectiveLuck", "RarityFocus", "Frequency", "FrequencyRank", "MutationRank", "FrequenciesUnlocked" }
 
 local function sectionLabel(parent: Instance, text: string, y: number)
-	UIKit.label({
+	UIKit.heading({
 		Text = text,
-		TextSize = 14,
-		TextColor3 = UIKit.Colors.Accent,
 		Position = UDim2.fromOffset(0, y),
 		Size = UDim2.new(1, 0, 0, 18),
 		Parent = parent,
@@ -63,20 +61,15 @@ end
 local function makeChips(grid: Frame, options: { Option }, onPick: (string) -> ()): { [string]: TextButton }
 	local chips = {}
 	for index, option in options do
-		local chip = UIKit.create("TextButton", {
+		local chip = UIKit.button({
 			Name = option.Id,
 			LayoutOrder = index,
 			Text = option.Label,
-			Font = UIKit.Font,
-			TextSize = 14,
-			TextColor3 = UIKit.Colors.Text,
-			BackgroundColor3 = UIKit.Colors.Card,
-			AutoButtonColor = true,
 			Parent = grid,
-		}, { UIKit.corner(8) })
-		chip.Activated:Connect(function()
+		}, function()
 			onPick(option.Id)
 		end)
+		UIKit.skinButton(chip, "Dark")
 		chips[option.Id] = chip
 	end
 	return chips
@@ -84,7 +77,7 @@ end
 
 local function highlight(chips: { [string]: TextButton }, selected: string)
 	for id, chip in chips do
-		chip.BackgroundColor3 = if id == selected then UIKit.Colors.Accent else UIKit.Colors.Card
+		UIKit.skinButton(chip, if id == selected then "Primary" else "Dark")
 	end
 end
 
@@ -199,8 +192,7 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 
 	return {
 		Toggle = function()
-			panel.Visible = not panel.Visible
-			if panel.Visible then
+			if UIKit.toggle(panel) then
 				refresh()
 			end
 		end,

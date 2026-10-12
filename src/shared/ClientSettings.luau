@@ -41,6 +41,20 @@ ClientSettings.Schema = {
 		Default = "Full",
 	},
 	{
+		Key = "RollAnimation",
+		Label = "Roll animation",
+		Help = "The roll above the bottom bar. Fast rolls briefly; Off shows results right away.",
+		Options = { "Full", "Fast", "Off" },
+		Default = "Full",
+	},
+	{
+		Key = "RollStyle",
+		Label = "Roll style",
+		Help = "Omikuji draws a fortune slip and flickers relics on it until one is stamped; Flicker cycles relics on a plate; Flame climbs through rarity colors.",
+		Options = { "Omikuji", "Flicker", "Flame" },
+		Default = "Omikuji",
+	},
+	{
 		Key = "Camera",
 		Label = "Camera effects",
 		Help = "Reduced removes camera zoom and shake during big reveals.",

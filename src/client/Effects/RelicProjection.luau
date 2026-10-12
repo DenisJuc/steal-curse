@@ -7,10 +7,9 @@ local TweenService = game:GetService("TweenService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RelicShapes = require(ReplicatedStorage.Shared.RelicShapes)
+local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local Presentation = require(ReplicatedStorage.Shared.Presentation)
 local MutationVFX = require(script.Parent.MutationVFX)
-local UIKit = require(script.Parent.Parent.UI.UIKit)
 
 local RelicProjection = {}
 
@@ -42,21 +41,18 @@ function RelicProjection.Spawn(
 		end
 	end
 
-	local start = CFrame.new(root.Position + Vector3.new(0, HEIGHT, 0))
-	local props = RelicShapes.props(relic.ObjectType, start, SCALE[category])
-	local part = Instance.new("Part")
+	local part = RelicModels.build(
+		relicId,
+		CFrame.new(root.Position + Vector3.new(0, HEIGHT, 0)),
+		SCALE[category],
+		{ Spectral = true }
+	)
+	if not part then
+		return
+	end
 	part.Name = "RelicProjection"
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Material = Enum.Material.Neon
 	part.Transparency = 0.35
-	part.Color = UIKit.tierColor(relic.Tier)
-	part.Shape = props.Shape or Enum.PartType.Block
-	part.Size = props.Size
-	part.CFrame = props.CFrame
+	local startFrame = part.CFrame
 	if mutation then
 		MutationVFX.Apply(part, mutation, { Highlight = true, Particles = not lowEffects })
 	end
@@ -65,7 +61,7 @@ function RelicProjection.Spawn(
 
 	local life = math.max(seconds, 0.3)
 	TweenService:Create(part, TweenInfo.new(life, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {
-		CFrame = props.CFrame * CFrame.new(0, 1.5, 0) * CFrame.Angles(0, math.rad(160), 0),
+		CFrame = startFrame * CFrame.new(0, 1.5, 0) * CFrame.Angles(0, math.rad(160), 0),
 	}):Play()
 	TweenService:Create(part, TweenInfo.new(life * 0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In, 0, false, life * 0.6), {
 		Transparency = 1,

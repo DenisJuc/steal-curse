@@ -6,11 +6,12 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Settings = require(script.Parent.Parent.Settings)
+local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
 
 local Onboarding = {}
 
-type Side = "Right" | "Below" | "Left"
+type Side = "Right" | "Below" | "Above" | "Left"
 type Step = { Target: string, Side: Side, Text: string }
 
 local STEP_SECONDS = 9
@@ -18,9 +19,9 @@ local GAP = 12
 
 local STEPS: { Step } = {
 	{
-		Target = "ResonatorPanel",
-		Side = "Right",
-		Text = "Your Spirit Resonator scans for relics on its own, every few seconds. No clicking needed!",
+		Target = "AutoRoll",
+		Side = "Above",
+		Text = "You roll a relic every few seconds. Auto Roll does it for you; tap here to turn it off and press ROLL yourself.",
 	},
 	{
 		Target = "DiscoveryFeed",
@@ -33,9 +34,9 @@ local STEPS: { Step } = {
 		Text = "Relics on your shrine pedestals earn Cursed Energy (CE). Buy and upgrade pedestals here.",
 	},
 	{
-		Target = "RelicsButton",
-		Side = "Right",
-		Text = "Open Relics and press Equip Best to put your best finds on the pedestals. Sell, lock and Auto-Sell live here too.",
+		Target = "BackpackButton",
+		Side = "Above",
+		Text = "Open your Backpack and press Equip Best to put your best finds on the pedestals. Sell, lock and Auto-Sell live here too.",
 	},
 	{
 		Target = "CodexButton",
@@ -52,6 +53,7 @@ local STEPS: { Step } = {
 local ANCHORS: { [Side]: Vector2 } = {
 	Right = Vector2.new(0, 0.5),
 	Below = Vector2.new(0.5, 0),
+	Above = Vector2.new(0.5, 1),
 	Left = Vector2.new(1, 0.5),
 }
 
@@ -68,6 +70,7 @@ function Onboarding.Start(screen: ScreenGui)
 		ZIndex = 25,
 		Parent = screen,
 	}, { UIKit.corner(12), UIKit.padding(10), UIKit.stroke(colors.Gold, 2, 0) })
+	UIKit.skinPanel(bubble, colors.Gold)
 	UIKit.scaler(bubble)
 	local textLabel = UIKit.label({
 		TextSize = 15,
@@ -109,6 +112,7 @@ function Onboarding.Start(screen: ScreenGui)
 		local myToken = token
 		textLabel.Text = STEPS[stepIndex].Text
 		stepLabel.Text = `Tip {stepIndex}/{#STEPS}`
+		Motion.shine(bubble, 0.6)
 		bubble.AnchorPoint = ANCHORS[STEPS[stepIndex].Side]
 		task.delay(STEP_SECONDS, function()
 			if running and token == myToken then
@@ -117,29 +121,28 @@ function Onboarding.Start(screen: ScreenGui)
 		end)
 	end
 
-	UIKit.button({
+	local nextButton = UIKit.button({
 		Text = "Next",
 		TextSize = 14,
-		BackgroundColor3 = colors.Gold,
-		TextColor3 = colors.Panel,
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.fromScale(1, 1),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -35, 1, -14),
 		Size = UDim2.fromOffset(70, 28),
 		ZIndex = 26,
 		Parent = bubble,
 	}, function()
 		showStep(index + 1)
 	end)
-	UIKit.button({
+	UIKit.skinButton(nextButton, "Gold")
+	local skipButton = UIKit.button({
 		Text = "Skip tips",
 		TextSize = 13,
-		BackgroundColor3 = colors.Card,
-		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -78, 1, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -118, 1, -14),
 		Size = UDim2.fromOffset(80, 28),
 		ZIndex = 26,
 		Parent = bubble,
 	}, finish)
+	UIKit.skinButton(skipButton, "Dark")
 
 	local function begin()
 		if running then
@@ -175,6 +178,7 @@ function Onboarding.Start(screen: ScreenGui)
 		local point = if step.Side == "Right"
 			then Vector2.new(position.X + size.X + GAP, position.Y + size.Y / 2)
 			elseif step.Side == "Below" then Vector2.new(position.X + size.X / 2, position.Y + size.Y + GAP)
+			elseif step.Side == "Above" then Vector2.new(position.X + size.X / 2, position.Y - GAP)
 			else Vector2.new(position.X - GAP, position.Y + size.Y / 2)
 		bubble.Position = UDim2.fromOffset(point.X, point.Y)
 		bubble.Visible = true

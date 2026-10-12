@@ -4,6 +4,7 @@
 -- dim backdrop, light rays and a camera zoom, and can be skipped. A mutation is revealed as a
 -- second stage after the base relic. Overlays queue in arrival order (Presentation queue); extra
 -- ones are coalesced into "+N more in your Journal". Nothing here touches scanning or movement.
+-- Scan finds arrive through RollReel once the roll reel has landed on them.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,15 +15,14 @@ local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local Presentation = require(ReplicatedStorage.Shared.Presentation)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RelicShapes = require(ReplicatedStorage.Shared.RelicShapes)
+local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local MutationVFX = require(script.Parent.Parent.Effects.MutationVFX)
 local RelicProjection = require(script.Parent.Parent.Effects.RelicProjection)
 local Odds = require(script.Parent.Parent.UI.Odds)
+local RollReel = require(script.Parent.Parent.UI.RollReel)
 local UIKit = require(script.Parent.Parent.UI.UIKit)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
-
-local DiscoveryResult = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("DiscoveryResult") :: RemoteEvent
 
 local RevealController = {}
 
@@ -100,6 +100,9 @@ local function build(screen: ScreenGui): Ui
 	UIKit.scaler(card)
 	local stroke = UIKit.stroke(colors.Accent, 3, 0)
 	stroke.Parent = card
+	UIKit.skinPanel(card)
+	stroke.Thickness = 3
+	stroke.Transparency = 0
 
 	local rays = UIKit.create("Frame", {
 		Name = "Rays",
@@ -235,21 +238,13 @@ local function setModel(relicId: string)
 		model:Destroy()
 		model = nil
 	end
-	local relic = RelicConfig.ById[relicId]
-	if not relic then
+	local part = RelicModels.build(relicId, CFrame.new(), 1.15)
+	if not part then
 		return
 	end
-	local props = RelicShapes.props(relic.ObjectType, CFrame.new(), 1.15)
-	local part = Instance.new("Part")
-	part.Anchored = true
-	part.Material = Enum.Material.SmoothPlastic
-	part.Color = UIKit.tierColor(relic.Tier)
-	part.Shape = props.Shape or Enum.PartType.Block
-	part.Size = props.Size
-	part.CFrame = props.CFrame
 	part.Parent = ui.Viewport
 	model = part
-	modelBase = props.CFrame
+	modelBase = part.CFrame
 end
 
 local function flash(color: Color3, from: number, seconds: number)
@@ -445,7 +440,7 @@ end
 
 function RevealController.Start(screen: ScreenGui)
 	ui = build(screen)
-	DiscoveryResult.OnClientEvent:Connect(onResults)
+	RollReel.OnResults(onResults)
 
 	RunService.RenderStepped:Connect(function(dt)
 		if not ui.Card.Visible then

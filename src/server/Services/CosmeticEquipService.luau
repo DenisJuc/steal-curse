@@ -7,16 +7,14 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
-local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RelicShapes = require(ReplicatedStorage.Shared.RelicShapes)
+local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local DataService = require(script.Parent.DataService)
 local GameEvents = require(script.Parent.GameEvents)
 
 local CosmeticEquipService = {}
 
 local MODEL_NAME = "CarriedRelic"
-local NEON_FROM_TIER = RarityConfig.IndexById.Epic
 local MODES = { Float = true, Hand = true }
 
 function CosmeticEquipService.Key(relicId: string, mutationId: string?): string
@@ -41,37 +39,21 @@ local function owns(data: any, relicId: string, mutationId: string?): boolean
 end
 
 local function build(character: Model, relicId: string, mutationId: string?, mode: string)
-	local relic = RelicConfig.ById[relicId]
 	local root = character:FindFirstChild("HumanoidRootPart")
 	local hand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
 	local anchor = if mode == "Hand" then hand else root
-	if not relic or not anchor or not anchor:IsA("BasePart") then
+	if not anchor or not anchor:IsA("BasePart") then
 		return
 	end
 	local at = if mode == "Hand"
 		then anchor.CFrame * CFrame.new(0, -anchor.Size.Y / 2 - 0.2, -0.5)
 		else anchor.CFrame * CFrame.new(2.4, 1.8, 0.6)
-	local scale = if mode == "Hand" then 0.45 else 0.55
-	local props = RelicShapes.props(relic.ObjectType, at, scale)
-	local part = Instance.new("Part")
-	for key, value in props do
-		(part :: any)[key] = value
+	local part = RelicModels.build(relicId, at, if mode == "Hand" then 0.45 else 0.55)
+	if not part then
+		return
 	end
-	part.Size = props.Size
 	part.Name = MODEL_NAME
 	part.Anchored = false
-	part.CanCollide = false
-	part.CanTouch = false
-	part.CanQuery = false
-	part.Massless = true
-	part.CastShadow = false
-	part.TopSurface = Enum.SurfaceType.Smooth
-	part.BottomSurface = Enum.SurfaceType.Smooth
-	local tier = RarityConfig.Get(relic.Tier)
-	part.Color = if tier then Color3.fromHex(tier.Color) else Color3.new(1, 1, 1)
-	part.Material = if (RarityConfig.IndexById[relic.Tier] or 1) >= NEON_FROM_TIER
-		then Enum.Material.Neon
-		else Enum.Material.SmoothPlastic
 
 	local mutation = mutationId and MutationConfig.ById[mutationId]
 	if mutation then

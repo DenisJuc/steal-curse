@@ -14,6 +14,33 @@ Config.Scan = {
 	MaxCatchUpScans = 3,
 }
 
+-- The ROLL button (Slice 9). Each scan still charges on the same timer. With Auto Roll on (the
+-- default, and always while AFK) a full charge fires by itself; with it off the charge waits
+-- (never stacks) until the player presses ROLL. The roll animation (RollReel, in the style the
+-- player picks) is cosmetic: the server has already decided the result and it always lands on it.
+Config.Roll = {
+	-- Roll length = this fraction of the scan interval, clamped to Min..Max seconds.
+	ReelFraction = 0.6,
+	ReelMinSeconds = 0.35,
+	ReelMaxSeconds = 1.6,
+	-- "Fast" roll animation setting.
+	FastSeconds = 0.35,
+	-- Relics the Flicker style cycles through; the result is the one at LandIndex (the last).
+	StripLength = 16,
+	LandIndex = 16,
+	-- Teasers over-sample rare tiers so near-misses happen. Cosmetic only, never shown as odds.
+	TeaserTierWeights = {
+		Common = 30,
+		Uncommon = 22,
+		Rare = 16,
+		Epic = 12,
+		Legendary = 9,
+		Mythic = 6,
+		Celestial = 3.5,
+		Cosmic = 1.5,
+	},
+}
+
 Config.Feed = {
 	MaxLines = 4,
 	-- Fewer lines on small (phone) screens.
@@ -67,15 +94,41 @@ Config.Afk = {
 }
 
 -- Client sounds: Id, Volume (0..1 before the player's volume setting), Speed (pitch).
--- Placeholders from Roblox's built-in sounds until Slice 8 adds the real audio.
+-- Range: 3D sounds (played at a signal) fade out over this many studs.
+-- Gap: replay limit in seconds (default 0.15); coin ticks need a shorter one.
+-- Mutation is still a Roblox built-in placeholder.
 Config.Sounds = {
-	RevealSmall = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.12, Speed = 1.5 },
-	RevealMedium = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.6, Speed = 0.7 },
-	RevealLarge = { Id = "rbxasset://sounds/impact_explosion_03.mp3", Volume = 0.45, Speed = 0.6 },
+	RevealSmall = { Id = "rbxassetid://79130903404606", Volume = 0.25 },
+	RevealMedium = { Id = "rbxassetid://114349697462397", Volume = 0.5 },
+	RevealLarge = { Id = "rbxassetid://95039614319250", Volume = 0.6 },
 	Mutation = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.6, Speed = 1.9 },
-	Click = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.25, Speed = 1.2 },
-	Seal = { Id = "rbxasset://sounds/impact_explosion_03.mp3", Volume = 0.3, Speed = 1.4 },
-	Collect = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.45, Speed = 2.2 },
+	-- Interface
+	Hover = { Id = "rbxassetid://139800881181209", Volume = 0.15, Gap = 0.06 },
+	Click = { Id = "rbxassetid://6895079853", Volume = 0.35, Gap = 0.08 },
+	MenuOpen = { Id = "rbxassetid://74947743572579", Volume = 0.35 },
+	MenuClose = { Id = "rbxassetid://88861317075079", Volume = 0.3 },
+	Upgrade = { Id = "rbxassetid://14810387808", Volume = 0.5 },
+	Error = { Id = "rbxassetid://9120885640", Volume = 0.4 },
+	Coin = { Id = "rbxassetid://307631257", Volume = 0.22, Gap = 0.035 },
+	Shine = { Id = "rbxassetid://132381858621446", Volume = 0.35 },
+	Seal = { Id = "rbxassetid://127907930462931", Volume = 0.6 },
+	Collect = { Id = "rbxassetid://96524940709824", Volume = 0.45 },
+	ReelTick = { Id = "rbxassetid://75458150587771", Volume = 0.12, Gap = 0.03 },
+	ReelLand = { Id = "rbxassetid://115778296381875", Volume = 0.35 },
+	-- Hunt (Spirit Sight, pulse, signals, bind)
+	SightOn = { Id = "rbxassetid://126941244422484", Volume = 0.5 },
+	SightOff = { Id = "rbxassetid://9118158252", Volume = 0.4 },
+	SightAmbience = { Id = "rbxassetid://82923387179908", Volume = 0.25 },
+	Pulse = { Id = "rbxassetid://9116394525", Volume = 0.5 },
+	SignalPing = { Id = "rbxassetid://119114391168229", Volume = 0.6, Range = 120 },
+	SignalHum = { Id = "rbxassetid://9125898973", Volume = 0.5, Range = 70 },
+	SignalWhisper = { Id = "rbxassetid://79028898635420", Volume = 0.35, Range = 25 },
+	Lock = { Id = "rbxassetid://108682776074559", Volume = 0.6 },
+	ChainRattle = { Id = "rbxassetid://9116539362", Volume = 0.35 },
+	ChainTighten = { Id = "rbxassetid://92066478647048", Volume = 0.55 },
+	BindRiser = { Id = "rbxassetid://9043356042", Volume = 0.4 },
+	SealSuck = { Id = "rbxassetid://676242549", Volume = 0.5 },
+	Cancel = { Id = "rbxassetid://119398240584172", Volume = 0.45 },
 }
 
 Config.RemoteLimits = {
@@ -189,6 +242,12 @@ Config.Signals = {
 	MinSpacing = 18,
 	-- Signal orbs float this high above their spawn point.
 	HoverHeight = 3,
+	-- New signals appear this far from the player (anywhere in the wild ring).
+	NearMin = 25,
+	NearMax = 90,
+	-- Walking this far from every one of your signals moves them near you again.
+	RelocateDistance = 130,
+	CheckSeconds = 1,
 }
 
 -- Hold to Bind (GDD 4.3). Hold time is measured by the server.
@@ -205,6 +264,10 @@ Config.Bind = {
 	-- A bind that never completes is cancelled after HoldSeconds + this.
 	TimeoutGraceSeconds = 4,
 	DebugMinHoldSeconds = 0.5,
+	-- Presentation beats (fractions of the hold): a chain clink and a talisman ignites at each
+	-- TightenAt; from PullAt the spirit is dragged toward the hand.
+	TightenAt = { 1 / 3, 2 / 3 },
+	PullAt = 0.9,
 }
 
 -- Bonus discoveries per successful capture (GDD 4.4):
@@ -227,31 +290,109 @@ Config.SpiritSight = {
 	PulseCooldownSeconds = 3,
 }
 
--- World layout (GDD 4.1): one map with the hub, the plot ring and three short walkable hunting
--- districts between plots. Each district is a square; its local -Z faces the hub (entrance side).
--- Spawn points and big structures of each district live in DistrictLayouts (Lune-tested).
+-- World layout (GDD 4.1, Slice 11): a shrine town in the center (hub plaza + plot ring) inside one
+-- continuous wild ring. The ring is split by angle into the Areas below; within BlendDegrees of a
+-- border the two neighbours mix (props, terrain and ambience). No walls between areas.
+-- Landmarks live in WildLayout; signal spawn points are a generated grid (WorldLayout, Lune-tested).
 Config.World = {
-	DistrictRadius = 310,
-	DistrictSize = 170,
+	-- Wild ring, in studs from the hub center.
+	WildInner = 190,
+	WildOuter = 410,
+	BlendDegrees = 25,
+	-- Signal spawn grid: spacing, distance kept from the ring edges and from landmark footprints.
+	SpawnSpacing = 20,
+	SpawnEdgeMargin = 12,
+	SpawnClearance = 5,
+	-- A water stream circles through all three areas (bridges in WildLayout).
+	StreamRadius = 300,
+	StreamWidth = 12,
 	-- The server warns at startup when the built map has more parts than this.
-	PartBudget = 6000,
+	PartBudget = 9000,
 	-- Default Roblox walk speed (studs/s), used by the travel-time tests.
 	WalkSpeed = 16,
-	-- How often the server checks which district each player is in (signals follow the player).
-	DistrictCheckSeconds = 1,
+	-- Every plot must reach the wild within this many seconds of walking.
+	MaxTravelSeconds = 15,
 }
 
--- AngleDegrees: around the hub, between two plots (plots sit at multiples of 45 degrees).
-Config.Districts = {
+-- AngleDegrees: the middle of each area's slice of the ring, and where its path runs out of town.
+-- Plots sit at multiples of 45 degrees, so every area angle is a gap between two plots (22.5 + 45k).
+Config.Areas = {
 	{ Id = "HauntedForest", Name = "Haunted Forest", AngleDegrees = 22.5, Seed = 7 },
 	{ Id = "AbandonedVillage", Name = "Abandoned Village", AngleDegrees = 157.5, Seed = 11 },
 	{ Id = "AncientRuins", Name = "Ancient Ruins", AngleDegrees = 292.5, Seed = 13 },
 }
 
+-- Client ambience per area (Slice 11), blended by WorldLayout.areaAt weights and faded in over
+-- TownFadeStuds when leaving the town. Atmosphere/Tint apply on top of the server's Lighting.
+-- Particles follow the camera (Rate per second at full weight; Low effects turns them off).
+-- SoundId: a looping ambient track ("rbxassetid://..."); empty = no sound for that area yet.
+-- Colors are {r, g, b} 0-255 and Drift is {x, y, z} studs/s^2 (plain numbers so Lune can load Config).
+-- Low particles (mist, ash, dust) hug the ground instead of filling the camera box.
+local FIREFLY = "rbxasset://textures/particles/sparkles_main.dds"
+local SMOKE = "rbxasset://textures/particles/smoke_main.dds"
+local EMBER = "rbxasset://textures/particles/fire_main.dds"
+Config.Ambience = {
+	TownFadeStuds = 20,
+	-- Fraction of the gap to the target closed per second (higher = snappier transitions).
+	BlendSpeed = 1.5,
+	ParticleBox = { 90, 24, 90 },
+	SoundVolume = 0.35,
+	Town = {
+		Atmosphere = { Density = 0.32, Haze = 1.6, Color = { 200, 175, 230 }, Decay = { 110, 80, 150 } },
+		Tint = { 255, 255, 255 },
+		Saturation = 0,
+		Particles = {},
+		SoundId = "",
+	},
+	Areas = {
+		HauntedForest = {
+			Atmosphere = { Density = 0.44, Haze = 2.4, Color = { 150, 190, 170 }, Decay = { 55, 85, 75 } },
+			Tint = { 225, 255, 238 },
+			Saturation = -0.05,
+			Particles = {
+				{ Name = "Fireflies", Texture = FIREFLY, Color = { 205, 255, 140 }, Rate = 14, Size = 0.35, Lifetime = 6, Speed = 0.6, LightEmission = 1, Drift = { 0, 0.2, 0 } },
+				{ Name = "Mist", Texture = SMOKE, Color = { 190, 215, 205 }, Rate = 3, Size = 9, Lifetime = 10, Speed = 0.4, LightEmission = 0, Transparency = 0.85, Low = true },
+			},
+			SoundId = "",
+		},
+		AbandonedVillage = {
+			Atmosphere = { Density = 0.38, Haze = 1.9, Color = { 215, 170, 140 }, Decay = { 120, 70, 55 } },
+			Tint = { 255, 236, 220 },
+			Saturation = -0.1,
+			Particles = {
+				{ Name = "Embers", Texture = EMBER, Color = { 255, 150, 70 }, Rate = 10, Size = 0.25, Lifetime = 5, Speed = 1.5, LightEmission = 1, Drift = { 0, 1.2, 0 } },
+				{ Name = "Ash", Texture = SMOKE, Color = { 160, 145, 140 }, Rate = 2, Size = 7, Lifetime = 9, Speed = 0.5, LightEmission = 0, Transparency = 0.88, Low = true },
+			},
+			SoundId = "",
+		},
+		AncientRuins = {
+			Atmosphere = { Density = 0.34, Haze = 1.3, Color = { 175, 185, 235 }, Decay = { 80, 80, 145 } },
+			Tint = { 230, 236, 255 },
+			Saturation = 0.05,
+			Particles = {
+				{ Name = "Glyphs", Texture = FIREFLY, Color = { 140, 200, 255 }, Rate = 10, Size = 0.45, Lifetime = 5, Speed = 0.8, LightEmission = 1, Drift = { 0, 0.6, 0 } },
+				{ Name = "Dust", Texture = SMOKE, Color = { 200, 195, 220 }, Rate = 2, Size = 6, Lifetime = 8, Speed = 0.6, LightEmission = 0, Transparency = 0.9, Low = true },
+			},
+			SoundId = "",
+		},
+	},
+	-- Map lights (lanterns, fungus, runes) farther than this from the camera are switched off.
+	LightRange = 120,
+}
+
+-- Home / Hub / Wild buttons (server picks every destination).
+Config.Travel = {
+	CooldownSeconds = 4,
+	-- "Wild" lands this far inside the ring, straight out from where you stand.
+	WildDepth = 16,
+	-- "Hub" lands here {x, z}, facing the obelisk (the hub spawn, on the side with no kiosk).
+	HubSpot = { 0, -22 },
+}
+
 -- Plot local space: -Z faces the hub (entrance side). Offsets are {x, z} in studs.
 Config.Plots = {
 	Count = 8,
-	RingRadius = 170,
+	RingRadius = 140,
 	Size = 64,
 	StartingPedestals = 3,
 	MaxPedestals = 6,
@@ -270,13 +411,14 @@ Config.Plots = {
 
 Config.Hub = {
 	PlazaRadius = 46,
-	GroundSize = 900,
 	LanternCount = 8,
 	-- Hub kiosks open a menu through a proximity prompt. Angle in degrees, Radius from the center.
+	-- Prop: optional map prop standing beside the counter (MapPropConfig).
 	KioskRadius = 31,
 	Kiosks = {
-		{ Menu = "Codex", Label = "Codex Archive", AngleDegrees = 30 },
-		{ Menu = "Luck", Label = "Fortune Shrine", AngleDegrees = 150 },
+		{ Menu = "Codex", Label = "Codex Archive", AngleDegrees = 30, Prop = "CodexLectern" },
+		{ Menu = "Skills", Label = "Rune Monolith", AngleDegrees = 90, Prop = "RuneMonolith" },
+		{ Menu = "Luck", Label = "Fortune Shrine", AngleDegrees = 150, Prop = "OfferingBox" },
 		{ Menu = "Relics", Label = "Relic Keeper", AngleDegrees = 210 },
 		{ Menu = "Journal", Label = "Journal Board", AngleDegrees = 330 },
 	},

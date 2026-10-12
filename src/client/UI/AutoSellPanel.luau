@@ -54,12 +54,14 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 
 	local function row(height: number?): Frame
 		order += 1
-		return UIKit.create("Frame", {
+		local frame = UIKit.create("Frame", {
 			LayoutOrder = order,
 			Size = UDim2.new(1, -10, 0, height or ROW_HEIGHT),
 			BackgroundColor3 = colors.Card,
 			Parent = body,
 		}, { UIKit.corner(8) })
+		UIKit.skinCard(frame)
+		return frame
 	end
 
 	local function text(parent: Instance, value: string, props: { [string]: any }?)
@@ -79,11 +81,10 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 
 	local function heading(value: string)
 		order += 1
-		UIKit.label({
+		UIKit.heading({
 			LayoutOrder = order,
 			Text = value,
 			TextSize = 15,
-			TextColor3 = colors.Accent,
 			Size = UDim2.new(1, -10, 0, 24),
 			Parent = body,
 		})
@@ -112,14 +113,14 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 	end
 
 	local function control(parent: Frame, label: string, width: number, color: Color3, onClick: () -> ())
-		UIKit.button({
+		local button = UIKit.button({
 			Text = label,
-			BackgroundColor3 = color,
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, -6, 0.5, 0),
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(1, -6 - width / 2, 0.5, 0),
 			Size = UDim2.fromOffset(width, 32),
 			Parent = parent,
 		}, onClick)
+		UIKit.skinButton(button, if color == colors.Accent then "Primary" else "Dark")
 	end
 
 	local function toggleRow(label: string, key: string)
@@ -279,7 +280,7 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 
 	return {
 		Open = function()
-			panel.Visible = true
+			UIKit.show(panel)
 			load()
 		end,
 		SetVisible = function(visible: boolean)

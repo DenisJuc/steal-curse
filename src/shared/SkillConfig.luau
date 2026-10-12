@@ -20,7 +20,7 @@ export type Node = {
 SkillConfig.Branches = {
 	{ Id = "Resonance", Name = "Resonance", Blurb = "Luck, scan speed, frequency and mutations" },
 	{ Id = "Sanctuary", Name = "Sanctuary", Blurb = "Shrine income, selling and offline time" },
-	{ Id = "BindingArts", Name = "Binding Arts", Blurb = "Hunting: Spirit Sight, binding and bonus finds" },
+	{ Id = "BindingArts", Name = "Binding Arts", Blurb = "Hunting: Spirit Sight, binding, bonus finds and walk speed" },
 }
 
 SkillConfig.Nodes = {
@@ -112,6 +112,15 @@ SkillConfig.Nodes = {
 		CostGrowth = 2.5,
 		Summary = "More bonus discoveries per capture: +10% per rank.",
 	},
+	{
+		Id = "SwiftStep",
+		Branch = "BindingArts",
+		Name = "Swift Step",
+		MaxRank = 10,
+		CostBase = 200,
+		CostGrowth = 1.7,
+		Summary = "Walk faster: +4 walk speed per rank (16 up to 56).",
+	},
 } :: { Node }
 
 SkillConfig.ById = {} :: { [string]: Node }
@@ -134,6 +143,8 @@ SkillConfig.Effects = {
 	HoldBaseSeconds = 6,
 	HoldSecondsPerRank = 0.5,
 	HarvestPerRank = 0.10,
+	WalkBaseSpeed = 16,
+	WalkSpeedPerRank = 4,
 }
 
 -- CE to buy rank `rank + 1`; nil when the node is maxed.
@@ -197,6 +208,11 @@ end
 -- Multiplier on hunt bonus discoveries.
 function SkillConfig.harvestMultiplier(rank: number): number
 	return 1 + effects.HarvestPerRank * rank
+end
+
+-- Humanoid WalkSpeed (studs/s).
+function SkillConfig.walkSpeed(rank: number): number
+	return effects.WalkBaseSpeed + effects.WalkSpeedPerRank * rank
 end
 
 return SkillConfig

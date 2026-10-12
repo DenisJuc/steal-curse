@@ -7,6 +7,12 @@
       "Shared": {
         "$path": "src/shared"
       },
+      "RelicModels": {
+        "$path": "assets/RelicModels"
+      },
+      "HuntModels": {
+        "$path": "assets/HuntModels"
+      },
       "Remotes": {
         "$className": "Folder",
         "DiscoveryResult": {
@@ -77,6 +83,18 @@
         },
         "ShowcaseAction": {
           "$className": "RemoteFunction"
+        },
+        "RollNow": {
+          "$className": "RemoteEvent"
+        },
+        "SetAutoRoll": {
+          "$className": "RemoteEvent"
+        },
+        "Teleport": {
+          "$className": "RemoteEvent"
+        },
+        "ItemAction": {
+          "$className": "RemoteFunction"
         }
       }
     },
@@ -90,6 +108,9 @@
     "ServerStorage": {
       "ServerPackages": {
         "$path": "ServerPackages"
+      },
+      "MapProps": {
+        "$path": "assets/MapProps"
       }
     },
 

@@ -13,6 +13,7 @@ local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local DataService = require(script.Parent.DataService)
+local GameEvents = require(script.Parent.GameEvents)
 local RemoteGuard = require(script.Parent.RemoteGuard)
 local RollService = require(script.Parent.RollService)
 local ScanService = require(script.Parent.ScanService)
@@ -203,6 +204,7 @@ local function onComplete(player: Player, signalId: any)
 	end
 	local results = DiscoveryPipeline.GrantBatch(player, entries)
 	DataService.Increment(player, "TotalCaptures", 1)
+	GameEvents.Fire("Captured", player)
 
 	local entry = statsFor(player)
 	entry.Captures += 1

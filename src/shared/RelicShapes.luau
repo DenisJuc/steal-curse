@@ -1,5 +1,5 @@
--- Placeholder relic shapes by object type, until Slice 8 imports real models. Shared by the
--- server pedestals and the client reveals (projections and the reveal viewport).
+-- Placeholder relic shapes by object type, used by RelicModels for relics without an imported
+-- model. Their sizes also set how big an imported model is shown.
 
 local RelicShapes = {}
 

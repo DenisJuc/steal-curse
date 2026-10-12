@@ -1,6 +1,6 @@
 -- Codex menu (GDD 7, 12.1): discovery progress, milestones (essential bonuses, frequency
--- unlocks, set titles, prestige titles), earned titles and one card per relic. Unknown relics
--- show as silhouettes with only their tier and base odds. Seen mutations appear as colored dots
+-- unlocks, set titles, prestige titles), earned titles and one card per relic with its 3D model.
+-- Unknown relics show as a black silhouette of the model with only their tier and base odds. Seen mutations appear as colored dots
 -- on the relic's card (no separate mutation Codex).
 
 local Players = game:GetService("Players")
@@ -13,8 +13,11 @@ local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local Banner = require(script.Parent.Banner)
+local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
+local RelicViewport = require(script.Parent.RelicViewport)
 local UIKit = require(script.Parent.UIKit)
+local Sounds = require(script.Parent.Parent.Sounds)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local GetCodex = Remotes:WaitForChild("GetCodex") :: RemoteFunction
@@ -40,6 +43,8 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	local panel, content = UIKit.modal(screen, "CodexMenu", "CODEX", colors.Accent, Vector2.new(580, 640))
 	local body = UIKit.scrollList(content, 6)
 	local order = 0
+	-- One render per relic, kept across refreshes; unknown relics tint it black.
+	local renders = RelicViewport.cache(#CodexBook.AllIds)
 
 	local function nextOrder(): number
 		order += 1
@@ -47,11 +52,10 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	end
 
 	local function heading(value: string)
-		UIKit.label({
+		UIKit.heading({
 			LayoutOrder = nextOrder(),
 			Text = value,
 			TextSize = 15,
-			TextColor3 = colors.Accent,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			Size = UDim2.new(1, -10, 0, 24),
 			Parent = body,
@@ -61,13 +65,16 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	local claim: (string) -> ()
 
 	local function milestoneRow(milestone: Codex.Milestone, have: number, claimed: boolean, ready: boolean)
-		local frame = UIKit.create("Frame", {
-			LayoutOrder = nextOrder(),
-			Size = UDim2.new(1, -10, 0, 46),
-			BackgroundColor3 = colors.Card,
-			Parent = body,
-		}, { UIKit.corner(8), UIKit.stroke(colors.Gold, 2, if ready and not claimed then 0 else 1) })
 		local done = claimed or milestone.Need == 0
+		local holder = UIKit.slot(body, milestone.Id, UDim2.new(1, -10, 0, 46), nextOrder())
+		local frame = UIKit.create("Frame", {
+			Name = "Card",
+			BackgroundColor3 = colors.Card,
+			Parent = holder,
+		}, { UIKit.corner(8) })
+		UIKit.fill(frame)
+		UIKit.skinCard(frame, if ready and not done then colors.Gold elseif done then DONE_COLOR else nil)
+		frame:SetAttribute("PopIn", true)
 		UIKit.label({
 			Text = Codex.goalText(CodexBook, milestone),
 			TextSize = 14,
@@ -87,18 +94,18 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			Parent = frame,
 		})
 		if ready and not done then
-			UIKit.button({
+			local claimButton = UIKit.button({
 				Text = "Claim",
 				TextSize = 16,
-				TextColor3 = colors.Panel,
-				BackgroundColor3 = colors.Gold,
-				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -6, 0.5, 0),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(1, -50, 0.5, 0),
 				Size = UDim2.fromOffset(88, 34),
 				Parent = frame,
 			}, function()
 				claim(milestone.Id)
 			end)
+			UIKit.skinButton(claimButton, "Gold")
+			Motion.shineLoop(claimButton, 2.2)
 			return
 		end
 		UIKit.label({
@@ -122,24 +129,21 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			LayoutOrder = index,
 			BackgroundColor3 = if known then colors.Card else colors.Track,
 		}, { UIKit.corner(8), UIKit.stroke(tierColor, 1.5, if known then 0.1 else 0.6) })
-		if not known then
-			UIKit.create("Frame", {
-				AnchorPoint = Vector2.new(0.5, 0),
-				Position = UDim2.new(0.5, 0, 0, 8),
-				Size = UDim2.fromOffset(26, 26),
-				BackgroundColor3 = Color3.fromRGB(4, 4, 8),
-				Parent = card,
-			}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
-		end
+		UIKit.skinCard(card)
+		local render = renders.Get(relicId, relicId)
+		render.AnchorPoint = Vector2.new(0.5, 0)
+		render.Position = UDim2.new(0.5, 0, 0, 3)
+		render.Size = UDim2.fromOffset(42, 42)
+		render.ImageColor3 = if known then Color3.new(1, 1, 1) else Color3.new(0, 0, 0)
+		render.Parent = card
 		UIKit.label({
 			Text = if known then relic.Name else "???",
 			TextSize = 12,
-			TextWrapped = true,
+			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			TextYAlignment = Enum.TextYAlignment.Top,
 			TextColor3 = if known then tierColor else colors.SubText,
-			Position = UDim2.fromOffset(4, if known then 6 else 38),
-			Size = UDim2.new(1, -8, 0, if known then 32 else 16),
+			Position = UDim2.fromOffset(4, 46),
+			Size = UDim2.new(1, -8, 0, 16),
 			Parent = card,
 		})
 		UIKit.label({
@@ -148,7 +152,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextColor3 = tierColor,
 			TextTruncate = Enum.TextTruncate.AtEnd,
-			Position = UDim2.new(0, 4, 1, -36),
+			Position = UDim2.new(0, 4, 1, -32),
 			Size = UDim2.new(1, -8, 0, 14),
 			Parent = card,
 		})
@@ -156,7 +160,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		if known and seen then
 			local dots = UIKit.create("Frame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.new(0, 6, 1, -18),
+				Position = UDim2.new(0, 6, 1, -16),
 				Size = UDim2.new(1, -12, 0, 12),
 				Parent = card,
 			}, {
@@ -183,6 +187,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 
 	local function render(snapshot: any)
 		order = 0
+		renders.DetachAll()
 		for _, child in body:GetChildren() do
 			if child:IsA("GuiObject") then
 				child:Destroy()
@@ -208,12 +213,14 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			end
 		end
 		local luck, income = Codex.bonuses(CodexBook, claimed)
+		local summaryHolder = UIKit.slot(body, "Summary", UDim2.new(1, -10, 0, 52), nextOrder())
 		local summary = UIKit.create("Frame", {
-			LayoutOrder = nextOrder(),
-			Size = UDim2.new(1, -10, 0, 52),
 			BackgroundColor3 = colors.Card,
-			Parent = body,
+			Parent = summaryHolder,
 		}, { UIKit.corner(8) })
+		UIKit.fill(summary)
+		UIKit.skinCard(summary, colors.Trim)
+		summary:SetAttribute("PopIn", true)
 		UIKit.label({
 			Text = `Discovered {discovered} / {#CodexBook.AllIds}   |   Essential {essential} / {#CodexBook.Pool}`,
 			TextSize = 15,
@@ -231,17 +238,17 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		})
 
 		if claimable > 0 then
-			UIKit.button({
-				LayoutOrder = nextOrder(),
+			local claimSlot = UIKit.slot(body, "ClaimAll", UDim2.new(1, -10, 0, 40), nextOrder())
+			local claimAll = UIKit.button({
 				Text = `Claim all rewards ({claimable})`,
 				TextSize = 17,
-				TextColor3 = colors.Panel,
-				BackgroundColor3 = colors.Gold,
-				Size = UDim2.new(1, -10, 0, 40),
-				Parent = body,
+				Parent = claimSlot,
 			}, function()
 				claim("All")
 			end)
+			UIKit.fill(claimAll)
+			UIKit.skinButton(claimAll, "Gold")
+			Motion.shineLoop(claimAll, 2.2)
 		end
 
 		for _, kind in KIND_ORDER do
@@ -314,6 +321,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 				end
 			end
 			if #milestones > 0 then
+				Sounds.Play("Shine")
 				local title = if #milestones == 1 then "MILESTONE CLAIMED!" else `{#milestones} MILESTONES CLAIMED!`
 				Banner.Show(title, Codex.combinedRewardText(milestones), colors.Gold)
 			end
@@ -347,8 +355,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 
 	return {
 		Toggle = function()
-			panel.Visible = not panel.Visible
-			if panel.Visible then
+			if UIKit.toggle(panel) then
 				load()
 			end
 		end,

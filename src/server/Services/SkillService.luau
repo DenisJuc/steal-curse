@@ -3,8 +3,10 @@
 -- row, stopping at the first one the player can't afford). Remote: SkillAction ("Get", or
 -- "Buy", nodeId, 1 | 10 | "Max") returns { Ranks, Message } so the menu redraws from server truth.
 -- Effects are read where they apply (ScanService, BindService, EconomyService, client Spirit
--- Sight); this service registers the Income/Sell bonuses and mirrors ranks as Skill_<Id>.
+-- Sight); this service registers the Income/Sell bonuses, sets the character's walk speed (Swift
+-- Step) and mirrors ranks as Skill_<Id>.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Format = require(ReplicatedStorage.Shared.Format)
@@ -35,6 +37,14 @@ local function mirror(player: Player)
 	end
 end
 
+local function applyWalkSpeed(player: Player)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = SkillConfig.walkSpeed(SkillService.Rank(player, "SwiftStep"))
+	end
+end
+
 -- Everything that depends on a rank refreshes after a change (purchase, debug, data reset).
 local function applied(player: Player, nodeId: string)
 	mirror(player)
@@ -42,6 +52,7 @@ local function applied(player: Player, nodeId: string)
 	if nodeId == "ScanSpeed" then
 		ScanService.Restart(player)
 	end
+	applyWalkSpeed(player)
 	EconomyService.Mirror(player)
 end
 
@@ -116,7 +127,20 @@ function SkillService.Init()
 		return SkillConfig.sellBonus(SkillService.Rank(player, "SpiritMerchant"))
 	end)
 	RemoteGuard.Function(SkillAction, onAction, "Shrine")
-	DataService.OnPlayerLoaded(mirror)
+	DataService.OnPlayerLoaded(function(player)
+		mirror(player)
+		applyWalkSpeed(player)
+	end)
+	local function watch(player: Player)
+		player.CharacterAdded:Connect(function(character)
+			character:WaitForChild("Humanoid", 10)
+			applyWalkSpeed(player)
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
 	GameEvents.On("DataReset", function(player: Player)
 		applied(player, "")
 	end)

@@ -74,6 +74,8 @@ export type Data = {
 	Settings: {
 		RarityFocus: string,
 		Frequency: string,
+		-- Fire each full ROLL charge automatically (AFK players always auto-roll).
+		AutoRoll: boolean,
 		AutoSell: {
 			Tiers: { [string]: string },
 			SellAllDuplicates: boolean,
@@ -98,6 +100,12 @@ export type Data = {
 		Key: string,
 		Mode: string,
 	},
+	-- Potions owned by ItemConfig id.
+	Items: { [string]: number },
+	-- Active potion buffs: seconds left, counted down only while online.
+	Buffs: { [string]: number },
+	-- One-time item rewards already given (e.g. "FirstRare") = time.
+	ItemRewards: { [string]: number },
 }
 
 DataTemplate.Template = {
@@ -137,6 +145,7 @@ DataTemplate.Template = {
 	Settings = {
 		RarityFocus = "MaxLuck",
 		Frequency = "All",
+		AutoRoll = true,
 		-- Must equal AutoSell.defaults() (checked by a Lune test).
 		AutoSell = {
 			Tiers = {
@@ -158,6 +167,8 @@ DataTemplate.Template = {
 		Client = {
 			Effects = "Full",
 			Reveals = "Full",
+			RollAnimation = "Full",
+			RollStyle = "Omikuji",
 			Camera = "On",
 			Sound = 100,
 			InterfaceSize = "Medium",
@@ -177,6 +188,7 @@ DataTemplate.Template = {
 		SpiritSight = 0,
 		BindingEfficiency = 0,
 		ResonantHarvest = 0,
+		SwiftStep = 0,
 	},
 	Showcases = {
 		Active = "",
@@ -187,6 +199,9 @@ DataTemplate.Template = {
 		Key = "",
 		Mode = "Float",
 	},
+	Items = {},
+	Buffs = {},
+	ItemRewards = {},
 } :: Data
 
 function DataTemplate.deepCopy<T>(value: T): T

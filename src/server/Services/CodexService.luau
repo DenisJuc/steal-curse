@@ -127,6 +127,7 @@ local function claim(player: Player, which: any)
 		MultiplierService.Refresh(player)
 		mirror(player, data)
 		DataService.RequestSave(player)
+		GameEvents.Fire("CodexClaimed", player, claimed)
 	end
 	return { Claimed = claimed, Snapshot = snapshot(player) }
 end

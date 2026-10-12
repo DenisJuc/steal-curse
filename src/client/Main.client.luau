@@ -8,12 +8,17 @@ local ClientSettings = require(ReplicatedStorage.Shared.ClientSettings)
 local HUD = require(script.Parent.UI.HUD)
 local AutoSellPanel = require(script.Parent.UI.AutoSellPanel)
 local Banner = require(script.Parent.UI.Banner)
+local BuffTimers = require(script.Parent.UI.BuffTimers)
 local CodexPanel = require(script.Parent.UI.CodexPanel)
 local DiscoveryFeed = require(script.Parent.UI.DiscoveryFeed)
 local FocusPanel = require(script.Parent.UI.FocusPanel)
 local InventoryPanel = require(script.Parent.UI.InventoryPanel)
 local JournalPanel = require(script.Parent.UI.JournalPanel)
+local MenuMotion = require(script.Parent.UI.MenuMotion)
 local Onboarding = require(script.Parent.UI.Onboarding)
+local RollBar = require(script.Parent.UI.RollBar)
+local RollReel = require(script.Parent.UI.RollReel)
+local TravelBar = require(script.Parent.UI.TravelBar)
 local SettingsPanel = require(script.Parent.UI.SettingsPanel)
 local ShowcasePanel = require(script.Parent.UI.ShowcasePanel)
 local ShrinePanel = require(script.Parent.UI.ShrinePanel)
@@ -25,6 +30,8 @@ local Announcements = require(script.Parent.Announcements)
 local AfkController = require(script.Parent.Controllers.AfkController)
 local GamepadController = require(script.Parent.Controllers.GamepadController)
 local KioskController = require(script.Parent.Controllers.KioskController)
+local Ambience = require(script.Parent.Effects.Ambience)
+local MapLightLOD = require(script.Parent.Effects.MapLightLOD)
 local OtherBinds = require(script.Parent.Effects.OtherBinds)
 local ShowcaseLOD = require(script.Parent.Effects.ShowcaseLOD)
 local RevealController = require(script.Parent.Controllers.RevealController)
@@ -94,6 +101,7 @@ menus = {
 	settingsPanel,
 	welcomeBack,
 }
+MenuMotion.Start(screen)
 
 local function toggleOnly(menu: Menu & { Toggle: () -> () })
 	return function()
@@ -114,13 +122,18 @@ local openers = {
 local hud = HUD.Start(screen, {
 	OnShrine = openers.Shrine,
 	OnLuck = openers.Luck,
-	OnRelics = openers.Relics,
-	OnSkills = openers.Skills,
 	OnCodex = openers.Codex,
 	OnJournal = openers.Journal,
 	OnSettings = openers.Settings,
 })
+local rollBar = RollBar.Start(screen, {
+	OnBackpack = openers.Relics,
+	OnUpgrades = openers.Skills,
+})
+local travelBar = TravelBar.Start(screen)
+BuffTimers.Start(screen)
 KioskController.Start(openers)
+RollReel.Start(screen, rollBar.Frame)
 DiscoveryFeed.Start(screen)
 RevealController.Start(screen)
 Toasts.Start(screen)
@@ -130,7 +143,17 @@ HuntController.Start(screen, {
 	-- Spirit Sight hides management UI; scanning itself never stops.
 	SetManagementVisible = function(visible: boolean)
 		hud.SetVisible(visible)
+		rollBar.SetSideVisible(visible)
+		travelBar.SetVisible(visible)
+		RollReel.SetEnabled(visible)
 		if not visible then
+			closeAllExcept(nil)
+		end
+	end,
+	-- Sealing hides this whole screen; the bind bar lives in its own ScreenGui.
+	SetSealing = function(sealing: boolean)
+		screen.Enabled = not sealing
+		if sealing then
 			closeAllExcept(nil)
 		end
 	end,
@@ -140,6 +163,8 @@ GamepadController.Start(screen, function()
 end)
 OtherBinds.Start()
 ShowcaseLOD.Start()
+Ambience.Start()
+MapLightLOD.Start()
 Onboarding.Start(screen)
 local afk = AfkController.Start()
 

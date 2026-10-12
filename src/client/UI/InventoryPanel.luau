@@ -1,17 +1,25 @@
--- Relics menu (GDD 9.2, 12.1): the one place for relics. Held relics grouped by relic + mutation,
--- with base and current 1-in-X odds (RollMath via Odds). Tap a relic to select it; the action bar
--- equips/unequips it (pedestal), sells, locks, favorites or carries it (for show: floating, then in
--- hand, then put away; display only). Equip Best and Auto-Sell Rules sit in
--- the header. The Shrine's "Choose" opens this menu in pick mode: tapping a relic places it on
--- that pedestal. Every button sends an intent; the server answers with the fresh state.
+-- Backpack (GDD 9.2, 12.1; Slice 10): the one place for relics and items. The Relics tab is a card
+-- grid (3D render, name, count, income, mutation gem, lock / favorite / pedestal markers) with a
+-- detail panel on the right for the selected card: base and current 1-in-X odds (RollMath via
+-- Odds), income, sell value and the actions: equip/unequip (pedestal), sell, lock, favorite and
+-- carry (for show: floating, then in hand, then put away; display only). Equip Best, Auto-Sell
+-- and the held count sit in the footer. The Items tab lists potions.
+-- The Shrine's "Choose" opens this menu in pick mode: tapping a card places it on that pedestal.
+-- Every button sends an intent; the server answers with the fresh state.
+-- Renders: only cards scrolled into view get a 3D render, from a shared cache (RelicViewport).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Format = require(ReplicatedStorage.Shared.Format)
+local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
+local ItemsTab = require(script.Parent.ItemsTab)
+local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
+local RelicViewport = require(script.Parent.RelicViewport)
 local UIKit = require(script.Parent.UIKit)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -36,12 +44,17 @@ export type Hooks = {
 	OnPickDone: () -> (),
 }
 
-local ROW_HEIGHT = 64
-local HEADER_HEIGHT = 34
-local LIST_TOP = 62
-local BAR_HEIGHT = 40
+local TAB_HEIGHT = 32
+local FOOTER_HEIGHT = 36
+local SIDE_WIDTH = 230
+local CELL = Vector2.new(100, 126)
+local MAX_LIVE_RENDERS = 36
+local RENDER_SHARE = 0.32
+local NAME_HEIGHT = 38
+local ACTIONS_HEIGHT = 64
 local REFRESH_SECONDS = 1
-local SELECT_HINT = "Tap a relic to select it. Favorite: never auto-sold. Lock: can't be sold."
+local LAYOUT_SETTLE_SECONDS = 0.05
+local SELECT_HINT = "Tap a card to see it here."
 
 local function relicColor(relicId: string, mutation: string?): Color3
 	if mutation then
@@ -51,8 +64,31 @@ local function relicColor(relicId: string, mutation: string?): Color3
 	return if relic then UIKit.tierColor(relic.Tier) else UIKit.Colors.Text
 end
 
+-- Plain text for a RichText label.
+local function escape(text: string): string
+	return (string.gsub(string.gsub(string.gsub(text, "&", "&amp;"), "<", "&lt;"), ">", "&gt;"))
+end
+
 local function groupKey(group: any): string
 	return `{group.Id}|{group.Mutation or ""}`
+end
+
+local function marker(parent: Instance, text: string, color: Color3, anchor: Vector2, position: UDim2)
+	local badge = UIKit.label({
+		Text = text,
+		TextSize = 12,
+		TextColor3 = UIKit.Colors.Panel,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = color,
+		AnchorPoint = anchor,
+		Position = position,
+		Size = UDim2.fromOffset(20, 20),
+		ZIndex = 3,
+		Parent = parent,
+	})
+	UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = badge })
+	return badge
 end
 
 function InventoryPanel.Start(
@@ -63,106 +99,233 @@ function InventoryPanel.Start(
 	local colors = UIKit.Colors
 	local state: State? = nil
 	local selectedKey: string? = nil
+	-- The card just tapped gets a bounce when the grid is rebuilt.
+	local justSelected: string? = nil
 	local pickSlot: number? = nil
+	local renders = RelicViewport.cache(MAX_LIVE_RENDERS)
 
-	local panel, content = UIKit.modal(screen, "RelicsMenu", "RELICS", colors.Gold, Vector2.new(560, 620))
+	local panel, content = UIKit.modal(screen, "RelicsMenu", "BACKPACK", colors.Gold, Vector2.new(860, 620))
 
-	-- Normal header: count, Equip Best, Auto-Sell Rules.
-	local header = UIKit.create("Frame", {
+	-- Tabs.
+	local tabs = UIKit.create("Frame", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
-		Parent = content,
-	})
-	local countLabel = UIKit.label({
-		TextSize = 15,
-		TextColor3 = colors.Gold,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		Size = UDim2.fromScale(0.4, 1),
-		Parent = header,
-	})
-	UIKit.button({
-		Name = "EquipBest",
-		Text = "Equip Best",
-		Position = UDim2.fromScale(0.4, 0),
-		Size = UDim2.new(0.3, -4, 1, 0),
-		Parent = header,
-	}, function()
-		ShrineAction:FireServer("EquipBest")
-	end)
-	UIKit.button({
-		Text = "Auto-Sell Rules",
-		BackgroundColor3 = colors.Card,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.new(0.3, -4, 1, 0),
-		Parent = header,
-	}, function()
-		hooks.OnOpenAutoSell(state)
-	end)
-
-	-- Pick-mode header: which pedestal, empty it, or go back.
-	local pickHeader = UIKit.create("Frame", {
-		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, HEADER_HEIGHT),
-		Visible = false,
-		Parent = content,
-	})
-	local pickLabel = UIKit.label({
-		TextSize = 15,
-		TextColor3 = colors.Gold,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		Size = UDim2.fromScale(0.5, 1),
-		Parent = pickHeader,
-	})
-	local function endPick()
-		pickSlot = nil
-		hooks.OnPickDone()
-	end
-	UIKit.button({
-		Text = "Empty pedestal",
-		BackgroundColor3 = colors.Card,
-		Position = UDim2.fromScale(0.5, 0),
-		Size = UDim2.new(0.3, -4, 1, 0),
-		Parent = pickHeader,
-	}, function()
-		if pickSlot then
-			ShrineAction:FireServer("Clear", pickSlot)
-		end
-		endPick()
-	end)
-	UIKit.button({
-		Text = "Back",
-		BackgroundColor3 = colors.Card,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.new(0.2, -4, 1, 0),
-		Parent = pickHeader,
-	}, endPick)
-
-	local statusLabel = UIKit.label({
-		TextSize = 13,
-		TextColor3 = colors.SubText,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		Position = UDim2.fromOffset(0, 40),
-		Size = UDim2.new(1, 0, 0, 18),
-		Text = SELECT_HINT,
-		Parent = content,
-	})
-	local list = UIKit.scrollList(content, 4)
-	list.Position = UDim2.fromOffset(0, LIST_TOP)
-
-	-- Action bar for the selected relic.
-	local bar = UIKit.create("Frame", {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0, 1),
-		Position = UDim2.fromScale(0, 1),
-		Size = UDim2.new(1, 0, 0, BAR_HEIGHT),
+		Size = UDim2.new(1, 0, 0, TAB_HEIGHT),
 		Parent = content,
 	}, {
 		UIKit.create("UIListLayout", {
 			FillDirection = Enum.FillDirection.Horizontal,
 			SortOrder = Enum.SortOrder.LayoutOrder,
 			Padding = UDim.new(0, 6),
+		}),
+	})
+	local relicsPage = UIKit.create("Frame", {
+		Name = "RelicsPage",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, TAB_HEIGHT + 6),
+		Size = UDim2.new(1, 0, 1, -(TAB_HEIGHT + 6)),
+		Parent = content,
+	})
+	local itemsPage = UIKit.create("Frame", {
+		Name = "ItemsPage",
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, TAB_HEIGHT + 6),
+		Size = UDim2.new(1, 0, 1, -(TAB_HEIGHT + 6)),
+		Visible = false,
+		Parent = content,
+	})
+	local items = ItemsTab.Build(itemsPage)
+
+	local tabButtons: { [string]: TextButton } = {}
+	local currentTab = "Relics"
+	local function showTab(name: string)
+		currentTab = name
+		relicsPage.Visible = name == "Relics"
+		itemsPage.Visible = name == "Items"
+		for tabName, button in tabButtons do
+			UIKit.skinButton(button, if tabName == name then "Gold" else "Dark")
+			button.TextColor3 = if tabName == name then colors.Panel else colors.Text
+		end
+		if name == "Items" then
+			items.Refresh()
+		end
+	end
+	for order, name in { "Relics", "Items" } do
+		tabButtons[name] = UIKit.button({
+			Name = `{name}Tab`,
+			Text = name,
+			TextSize = 16,
+			LayoutOrder = order,
+			Size = UDim2.fromOffset(110, TAB_HEIGHT),
+			Parent = tabs,
+		}, function()
+			if pickSlot == nil then
+				showTab(name)
+			end
+		end)
+	end
+
+	-- Relics page: grid (left), detail (right), footer (under the grid).
+	local gridArea = UIKit.create("Frame", {
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, -(SIDE_WIDTH + 8), 1, -(FOOTER_HEIGHT + 6)),
+		Parent = relicsPage,
+	})
+	local grid = UIKit.create("ScrollingFrame", {
+		Name = "Grid",
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Size = UDim2.fromScale(1, 1),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		ScrollBarThickness = 6,
+		Parent = gridArea,
+	}, {
+		UIKit.create("UIGridLayout", {
+			CellSize = UDim2.fromOffset(CELL.X, CELL.Y),
+			CellPadding = UDim2.fromOffset(6, 6),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+		UIKit.create("UIPadding", { PaddingTop = UDim.new(0, 2), PaddingLeft = UDim.new(0, 2) }),
+	})
+	local emptyLabel = UIKit.label({
+		Text = "No relics yet. Your ROLL button finds one every few seconds.",
+		TextColor3 = colors.SubText,
+		TextSize = 14,
+		TextWrapped = true,
+		Size = UDim2.new(1, -10, 0, 40),
+		Visible = false,
+		Parent = gridArea,
+	})
+
+	local footer = UIKit.create("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, -(SIDE_WIDTH + 8), 0, FOOTER_HEIGHT),
+		Parent = relicsPage,
+	})
+	local countLabel = UIKit.label({
+		TextSize = 15,
+		TextColor3 = colors.Gold,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Size = UDim2.new(0.4, -4, 1, 0),
+		Parent = footer,
+	})
+	local equipBest = UIKit.button({
+		Name = "EquipBest",
+		Text = "Equip Best",
+		TextSize = 15,
+		Position = UDim2.fromScale(0.4, 0),
+		Size = UDim2.new(0.3, -4, 1, 0),
+		Parent = footer,
+	}, function()
+		ShrineAction:FireServer("EquipBest")
+	end)
+	UIKit.skinButton(equipBest, "Gold")
+	local autoSell = UIKit.button({
+		Text = "Auto-Sell",
+		TextSize = 15,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.new(0.3, -4, 1, 0),
+		Parent = footer,
+	}, function()
+		hooks.OnOpenAutoSell(state)
+	end)
+	UIKit.skinButton(autoSell, "Dark")
+
+	-- Pick mode reuses the footer: which pedestal, empty it, or go back.
+	local function endPick()
+		pickSlot = nil
+		hooks.OnPickDone()
+	end
+	local emptyPedestal = UIKit.button({
+		Text = "Empty pedestal",
+		TextSize = 15,
+		Position = UDim2.fromScale(0.4, 0),
+		Size = UDim2.new(0.3, -4, 1, 0),
+		Visible = false,
+		Parent = footer,
+	}, function()
+		if pickSlot then
+			ShrineAction:FireServer("Clear", pickSlot)
+		end
+		endPick()
+	end)
+	local backButton = UIKit.button({
+		Text = "Back",
+		TextSize = 15,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.new(0.3, -4, 1, 0),
+		Visible = false,
+		Parent = footer,
+	}, endPick)
+	UIKit.skinButton(emptyPedestal, "Dark")
+	UIKit.skinButton(backButton, "Dark")
+
+	-- Detail panel.
+	local side = UIKit.create("Frame", {
+		Name = "Detail",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.new(0, SIDE_WIDTH, 1, 0),
+		BackgroundColor3 = colors.Card,
+		Parent = relicsPage,
+	}, { UIKit.corner(10), UIKit.padding(8) })
+	local sideStroke = UIKit.stroke(colors.Gold, 2, 0.4)
+	sideStroke.Parent = side
+	UIKit.skinCard(side)
+	local detailView = RelicViewport.new("SenzoBean", {
+		Name = "DetailRender",
+		Size = UDim2.fromScale(1, RENDER_SHARE),
+		Visible = false,
+	})
+	detailView.Parent = side
+	local detailName = UIKit.label({
+		TextSize = 16,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Position = UDim2.new(0, 0, RENDER_SHARE, 2),
+		Size = UDim2.new(1, 0, 0, NAME_HEIGHT),
+		Text = SELECT_HINT,
+		TextColor3 = colors.SubText,
+		Parent = side,
+	})
+	local infoScroll = UIKit.create("ScrollingFrame", {
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		Position = UDim2.new(0, 0, RENDER_SHARE, NAME_HEIGHT + 4),
+		Size = UDim2.new(1, 0, 1 - RENDER_SHARE, -(NAME_HEIGHT + 4 + ACTIONS_HEIGHT + 4)),
+		CanvasSize = UDim2.new(),
+		AutomaticCanvasSize = Enum.AutomaticSize.Y,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		ScrollBarThickness = 4,
+		Parent = side,
+	})
+	local detailInfo = UIKit.label({
+		TextSize = 13,
+		TextWrapped = true,
+		TextColor3 = colors.SubText,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		RichText = true,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, -6, 0, 0),
+		Text = "",
+		Parent = infoScroll,
+	})
+	local actions = UIKit.create("Frame", {
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, ACTIONS_HEIGHT),
+		Parent = side,
+	}, {
+		UIKit.create("UIGridLayout", {
+			CellSize = UDim2.new(1 / 3, -4, 0, 30),
+			CellPadding = UDim2.fromOffset(5, 4),
+			SortOrder = Enum.SortOrder.LayoutOrder,
 		}),
 	})
 
@@ -180,6 +343,7 @@ function InventoryPanel.Start(
 		return nil
 	end
 
+	local statusText = ""
 	local function send(action: string, ...: any)
 		local args = table.pack(...)
 		task.spawn(function()
@@ -187,20 +351,17 @@ function InventoryPanel.Start(
 				return InventoryAction:InvokeServer(action, table.unpack(args, 1, args.n))
 			end)
 			if ok and type(result) == "table" and result.State then
-				if result.Message then
-					statusLabel.Text = result.Message
-				end
+				statusText = result.Message or ""
 				render(result.State)
 			end
 		end)
 	end
 
-	local function barButton(order: number, onClick: (group: any) -> ()): TextButton
+	local function actionButton(order: number, onClick: (group: any) -> ()): TextButton
 		local instance = UIKit.button({
 			LayoutOrder = order,
 			TextScaled = true,
-			Size = UDim2.new(1 / 6, -5, 1, 0),
-			Parent = bar,
+			Parent = actions,
 		}, function()
 			local group = selectedGroup()
 			if group then
@@ -210,74 +371,119 @@ function InventoryPanel.Start(
 		UIKit.create("UITextSizeConstraint", { MaxTextSize = 14, Parent = instance })
 		return instance
 	end
-	local equipButton = barButton(1, function(group)
+	local equipButton = actionButton(1, function(group)
 		ShrineAction:FireServer(if group.Displayed > 0 then "UnequipGroup" else "EquipGroup", group.Id, group.Mutation)
 	end)
-	local sellOneButton = barButton(2, function(group)
-		send("Sell", group.Id, group.Mutation, 1)
-	end)
-	local sellAllButton = barButton(3, function(group)
-		send("Sell", group.Id, group.Mutation, "All")
-	end)
-	local lockButton = barButton(4, function(group)
-		send("Lock", group.Id, group.Mutation, group.Locked < group.Count)
-	end)
-	local favButton = barButton(5, function(group)
-		send("Favorite", group.Id, group.Mutation, not group.Favorite)
-	end)
-	-- Carry for show (display only): not carried -> floating -> in hand -> put away.
+	local carryButton
 	local function carryMode(group: any): string?
 		if state and state.Carry and state.Carry.Key == groupKey(group) then
 			return state.Carry.Mode
 		end
 		return nil
 	end
-	local carryButton = barButton(6, function(group)
+	carryButton = actionButton(2, function(group)
 		local mode = carryMode(group)
 		local nextMode = if mode == nil then "Float" elseif mode == "Float" then "Hand" else "None"
 		send("Carry", group.Id, group.Mutation, nextMode)
 	end)
+	local sellOneButton, sellAllButton
+	sellOneButton = actionButton(3, function(group)
+		Motion.markCoinSource(sellOneButton)
+		send("Sell", group.Id, group.Mutation, 1)
+	end)
+	sellAllButton = actionButton(4, function(group)
+		Motion.markCoinSource(sellAllButton)
+		send("Sell", group.Id, group.Mutation, "All")
+	end)
+	local lockButton = actionButton(5, function(group)
+		send("Lock", group.Id, group.Mutation, group.Locked < group.Count)
+	end)
+	local favButton = actionButton(6, function(group)
+		send("Favorite", group.Id, group.Mutation, not group.Favorite)
+	end)
 
-	local function styleBarButton(instance: TextButton, text: string, enabled: boolean, color: Color3?)
+	local function styleAction(instance: TextButton, text: string, enabled: boolean, color: Color3?)
 		instance.Text = text
-		instance.AutoButtonColor = enabled
-		instance.BackgroundColor3 = if not enabled then colors.Card else color or colors.Accent
+		local kind = if not enabled or color == colors.Panel then "Dark" elseif color == colors.Gold then "Gold" else "Primary"
+		UIKit.skinButton(instance, kind)
 		instance.TextColor3 = if enabled then (if color == colors.Gold then colors.Panel else colors.Text) else colors.SubText
+		Motion.setDisabled(instance, not enabled)
 	end
 
-	local function refreshBar()
+	local function refreshDetail()
 		local inPick = pickSlot ~= nil
-		bar.Visible = not inPick
-		list.Size = UDim2.new(1, 0, 1, if inPick then -LIST_TOP else -(LIST_TOP + BAR_HEIGHT + 6))
+		actions.Visible = not inPick
 		local group = selectedGroup()
-		if not group then
-			styleBarButton(equipButton, "Equip", false)
-			styleBarButton(sellOneButton, "Sell 1", false)
-			styleBarButton(sellAllButton, "Sell all", false)
-			styleBarButton(lockButton, "Lock", false)
-			styleBarButton(favButton, "Favorite", false)
-			styleBarButton(carryButton, "Carry", false)
+		if inPick then
+			detailView.Visible = false
+			detailName.Text = `Pick a relic for pedestal {pickSlot}`
+			detailName.TextColor3 = colors.Gold
+			detailInfo.Text = "Tap a card to place it. Favorites first, then best income."
+			sideStroke.Color = colors.Gold
 			return
 		end
+		if not group then
+			detailView.Visible = false
+			detailName.Text = SELECT_HINT
+			detailName.TextColor3 = colors.SubText
+			detailInfo.Text = if statusText ~= "" then escape(statusText) else "Favorite: never auto-sold. Lock: can't be sold."
+			sideStroke.Color = colors.Gold
+			for _, button in { equipButton, carryButton, sellOneButton, sellAllButton, lockButton, favButton } do
+				styleAction(button, button.Text, false)
+			end
+			return
+		end
+		local color = relicColor(group.Id, group.Mutation)
+		if detailView:GetAttribute("RelicId") ~= group.Id then
+			RelicViewport.show(detailView, group.Id)
+		end
+		detailView.Visible = true
+		sideStroke.Color = color
+		detailName.Text = `{if group.Favorite then "* " else ""}{Odds.displayName(group.Id, group.Mutation)}`
+		detailName.TextColor3 = color
+		local relic = RelicConfig.ById[group.Id]
+		local tier = relic and RarityConfig.Get(relic.Tier)
+		local yours = RollMath.comboProbability(Odds.current(), group.Id, group.Mutation)
+		local lines = {
+			`<b>{if tier then tier.Name else "?"}</b>{if group.Mutation then `  |  {group.Mutation}` else ""}`,
+			`Owned x{group.Count}{if group.Displayed > 0 then `  |  {group.Displayed} on pedestal` else ""}{if group.Locked > 0
+				then `  |  {group.Locked} locked`
+				else ""}`,
+			`Income +{Format.number(group.IncomePerMin)} CE/min`,
+			`Sells for {Format.number(group.SellValue)} CE`,
+			`Base {Format.odds(Odds.baseItem(group.Id))}  |  Yours {Format.odds(yours)}`,
+		}
+		if relic and relic.Description then
+			table.insert(lines, `<i>{escape(relic.Description)}</i>`)
+		end
+		if statusText ~= "" then
+			table.insert(lines, escape(statusText))
+		end
+		detailInfo.Text = table.concat(lines, "\n")
+
 		local carried = carryMode(group)
-		local carryText = if carried == nil then "Carry" elseif carried == "Float" then "Hold" else "Put away"
-		styleBarButton(carryButton, carryText, true, if carried then colors.Gold else colors.Panel)
 		local equipped = group.Displayed > 0
 		local allLocked = group.Locked >= group.Count
-		styleBarButton(equipButton, if equipped then "Unequip" else "Equip", true, if equipped then colors.Gold else nil)
-		styleBarButton(sellOneButton, "Sell 1", group.Sellable > 0)
-		styleBarButton(sellAllButton, "Sell all", group.Sellable > 0)
-		styleBarButton(lockButton, if allLocked then "Unlock" else "Lock", true, if allLocked then colors.Gold else colors.Panel)
-		styleBarButton(favButton, if group.Favorite then "Unfavorite" else "Favorite", true, if group.Favorite
+		styleAction(equipButton, if equipped then "Unequip" else "Equip", true, if equipped then colors.Gold else nil)
+		styleAction(
+			carryButton,
+			if carried == nil then "Carry" elseif carried == "Float" then "Hold" else "Put away",
+			true,
+			if carried then colors.Gold else colors.Panel
+		)
+		styleAction(sellOneButton, "Sell 1", group.Sellable > 0)
+		styleAction(sellAllButton, "Sell all", group.Sellable > 0)
+		styleAction(lockButton, if allLocked then "Unlock" else "Lock", true, if allLocked then colors.Gold else colors.Panel)
+		styleAction(favButton, if group.Favorite then "Unfavorite" else "Favorite", true, if group.Favorite
 			then colors.Gold
 			else colors.Panel)
 	end
 
-	local function onRowClicked(group: any)
+	local function onCardClicked(group: any)
 		local slot = pickSlot
 		if slot then
 			if group.Count - group.Displayed <= 0 then
-				statusLabel.Text = "Every copy of that relic is already on a pedestal."
+				detailInfo.Text = "Every copy of that relic is already on a pedestal."
 				return
 			end
 			ShrineAction:FireServer("DisplayGroup", slot, group.Id, group.Mutation)
@@ -285,112 +491,147 @@ function InventoryPanel.Start(
 			return
 		end
 		selectedKey = groupKey(group)
-		statusLabel.Text = `Selected: {Odds.displayName(group.Id, group.Mutation)}`
+		justSelected = selectedKey
+		statusText = ""
 		if state then
 			render(state)
 		end
 	end
 
+	-- Cards waiting for a render: [card] = group. Filled in as they scroll into view.
+	local cards: { [Frame]: any } = {}
+	local renderedAt = 0
+	local function attachVisibleRenders()
+		local top = grid.AbsolutePosition.Y
+		local bottom = top + grid.AbsoluteSize.Y
+		for card, group in cards do
+			local y = card.AbsolutePosition.Y
+			local slot = card:FindFirstChild("RenderSlot")
+			if slot and y + card.AbsoluteSize.Y >= top - CELL.Y and y <= bottom + CELL.Y then
+				local viewport = renders.Get(groupKey(group), group.Id)
+				viewport.Parent = slot
+				cards[card] = nil
+			end
+		end
+	end
+	local function makeCard(index: number, group: any)
+		local spare = group.Count - group.Displayed
+		local dimmed = pickSlot ~= nil and spare <= 0
+		local selected = pickSlot == nil and groupKey(group) == selectedKey
+		local color = relicColor(group.Id, group.Mutation)
+		local cell = UIKit.slot(grid, "Cell", UDim2.new(), index)
+		local card = UIKit.create("TextButton", {
+			Name = "Card",
+			Text = "",
+			BackgroundColor3 = colors.Card,
+			BackgroundTransparency = if dimmed then 0.5 else 0,
+			Parent = cell,
+		}, {
+			UIKit.corner(10),
+			UIKit.stroke(if selected then colors.Gold else color, if selected then 3 else 2, if selected then 0 else 0.35),
+			UIKit.create("UIGradient", {
+				Rotation = 90,
+				Color = ColorSequence.new(colors.Card, color:Lerp(colors.Card, 0.7)),
+			}),
+		})
+		UIKit.fill(card)
+		Motion.button(card)
+		Motion.setDisabled(card, dimmed)
+		card:SetAttribute("PopIn", true)
+		if selected and groupKey(group) == justSelected then
+			justSelected = nil
+			Motion.punch(card, 2)
+		end
+		card.Activated:Connect(function()
+			if not dimmed then
+				onCardClicked(group)
+			end
+		end)
+		UIKit.create("Frame", {
+			Name = "RenderSlot",
+			BackgroundTransparency = 1,
+			Position = UDim2.fromOffset(4, 4),
+			Size = UDim2.new(1, -8, 0, 70),
+			Parent = card,
+		})
+		UIKit.label({
+			Name = "RelicName",
+			Text = Odds.displayName(group.Id, group.Mutation),
+			TextSize = 12,
+			TextWrapped = true,
+			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextColor3 = color,
+			Position = UDim2.fromOffset(3, 74),
+			Size = UDim2.new(1, -6, 0, 28),
+			Parent = card,
+		})
+		UIKit.label({
+			Name = "Income",
+			Text = `+{Format.number(group.IncomePerMin)}/m`,
+			TextSize = 11,
+			TextColor3 = colors.Gold,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Position = UDim2.new(0, 5, 1, -19),
+			Size = UDim2.new(0.6, 0, 0, 16),
+			Parent = card,
+		})
+		UIKit.label({
+			Name = "Count",
+			Text = `x{group.Count}`,
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -5, 1, -19),
+			Size = UDim2.new(0.4, 0, 0, 16),
+			Parent = card,
+		})
+		if group.Mutation then
+			marker(card, string.sub(group.Mutation, 1, 1), color, Vector2.new(0, 0), UDim2.fromOffset(4, 4))
+		end
+		local right = 4
+		local function corner(text: string, badgeColor: Color3)
+			marker(card, text, badgeColor, Vector2.new(1, 0), UDim2.new(1, -right, 0, 4))
+			right += 22
+		end
+		if group.Displayed > 0 then
+			corner("P", colors.Gold)
+		end
+		if group.Locked > 0 then
+			corner("L", colors.SubText)
+		end
+		if group.Favorite then
+			corner("*", colors.Red)
+		end
+		if carryMode(group) then
+			corner("C", colors.Accent)
+		end
+		cards[card] = group
+	end
+
 	function render(newState: State)
 		state = newState
-		for _, child in list:GetChildren() do
+		renderedAt = os.clock()
+		renders.DetachAll()
+		table.clear(cards)
+		for _, child in grid:GetChildren() do
 			if child:IsA("GuiObject") then
 				child:Destroy()
 			end
 		end
 		local over = newState.Count - newState.Capacity
 		local full = over >= 0
-		countLabel.Text = `{if full then "[INVENTORY FULL] " else ""}Held {newState.Count} / {newState.Capacity}{if over > 0
-			then `  (+{over} protected)`
+		countLabel.Text = `{if full then "FULL " else ""}{newState.Count} / {newState.Capacity}{if over > 0
+			then ` (+{over})`
 			else ""}`
 		countLabel.TextColor3 = if full then colors.Red else colors.Gold
 		if not selectedGroup() then
 			selectedKey = nil
 		end
-		refreshBar()
-		if #newState.Groups == 0 then
-			UIKit.label({
-				Text = "No relics yet. Your resonator finds one every few seconds.",
-				TextColor3 = colors.SubText,
-				TextSize = 14,
-				Size = UDim2.new(1, -10, 0, 30),
-				Parent = list,
-			})
-			return
-		end
-
-		local ctx = Odds.current()
+		refreshDetail()
+		emptyLabel.Visible = #newState.Groups == 0
 		for index, group in newState.Groups do
-			local spare = group.Count - group.Displayed
-			local dimmed = pickSlot ~= nil and spare <= 0
-			local selected = pickSlot == nil and groupKey(group) == selectedKey
-			local row = UIKit.create("TextButton", {
-				Text = "",
-				AutoButtonColor = not dimmed,
-				LayoutOrder = index,
-				Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
-				BackgroundColor3 = colors.Card,
-				BackgroundTransparency = if dimmed then 0.5 else 0,
-				Parent = list,
-			}, {
-				UIKit.corner(8),
-				UIKit.stroke(colors.Gold, 2, if selected then 0 else 1),
-			})
-			row.Activated:Connect(function()
-				onRowClicked(group)
-			end)
-
-			local tags = {}
-			if group.Displayed > 0 then
-				table.insert(tags, if group.Displayed > 1 then `ON PEDESTAL x{group.Displayed}` else "ON PEDESTAL")
-			end
-			if group.Locked > 0 then
-				table.insert(tags, "LOCKED")
-			end
-			local carried = carryMode(group)
-			if carried then
-				table.insert(tags, if carried == "Hand" then "IN HAND" else "CARRIED")
-			end
-			UIKit.label({
-				Text = table.concat(tags, "  "),
-				TextSize = 12,
-				TextColor3 = colors.Gold,
-				TextXAlignment = Enum.TextXAlignment.Right,
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -8, 0, 6),
-				Size = UDim2.fromOffset(170, 16),
-				Parent = row,
-			})
-			UIKit.label({
-				Text = `{if group.Favorite then "* " else ""}{Odds.displayName(group.Id, group.Mutation)}`,
-				TextSize = 15,
-				TextColor3 = relicColor(group.Id, group.Mutation),
-				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(8, 4),
-				Size = UDim2.new(1, -190, 0, 20),
-				Parent = row,
-			})
-			UIKit.label({
-				Text = `x{group.Count}  |  +{Format.number(group.IncomePerMin)}/min  |  sells {Format.number(group.SellValue)}`,
-				TextSize = 12,
-				TextColor3 = colors.SubText,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(8, 25),
-				Size = UDim2.new(1, -16, 0, 16),
-				Parent = row,
-			})
-			local yours = RollMath.comboProbability(ctx, group.Id, group.Mutation)
-			UIKit.label({
-				Text = `Base {Format.odds(Odds.baseItem(group.Id))}  |  Yours {Format.odds(yours)}{if group.Mutation
-					then ` ({group.Mutation})`
-					else ""}`,
-				TextSize = 12,
-				TextColor3 = colors.SubText,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(8, 43),
-				Size = UDim2.new(1, -16, 0, 16),
-				Parent = row,
-			})
+			makeCard(index, group)
 		end
 	end
 
@@ -407,21 +648,34 @@ function InventoryPanel.Start(
 
 	local function setMode(slot: number?)
 		pickSlot = slot
-		header.Visible = slot == nil
-		pickHeader.Visible = slot ~= nil
+		countLabel.Visible = slot == nil
+		equipBest.Visible = slot == nil
+		autoSell.Visible = slot == nil
+		emptyPedestal.Visible = slot ~= nil
+		backButton.Visible = slot ~= nil
 		if slot then
-			pickLabel.Text = `Pick a relic for pedestal {slot}`
-			statusLabel.Text = "Tap a relic to place it. Favorites first, then best income."
-		else
-			statusLabel.Text = SELECT_HINT
+			showTab("Relics")
 		end
-		refreshBar()
+		refreshDetail()
 	end
 
-	-- New finds and pedestal changes alter the list while it's open; refresh at most once per REFRESH_SECONDS.
+	-- Layout positions settle a frame after a rebuild, so pending renders are checked each frame.
+	RunService.RenderStepped:Connect(function(dt)
+		if not panel.Visible then
+			return
+		end
+		if detailView.Visible then
+			RelicViewport.spin(detailView, dt * 0.8)
+		end
+		if next(cards) ~= nil and relicsPage.Visible and os.clock() - renderedAt > LAYOUT_SETTLE_SECONDS then
+			attachVisibleRenders()
+		end
+	end)
+
+	-- New finds and pedestal changes alter the grid while it's open; refresh at most once per REFRESH_SECONDS.
 	local refreshQueued = false
 	local function queueRefresh()
-		if not panel.Visible or refreshQueued then
+		if not panel.Visible or refreshQueued or currentTab ~= "Relics" then
 			return
 		end
 		refreshQueued = true
@@ -441,15 +695,14 @@ function InventoryPanel.Start(
 
 	return {
 		Toggle = function()
-			panel.Visible = not panel.Visible
-			if panel.Visible then
+			if UIKit.toggle(panel) then
 				setMode(nil)
 				load()
 			end
 		end,
 		Pick = function(slot: number)
 			setMode(slot)
-			panel.Visible = true
+			UIKit.show(panel)
 			load()
 		end,
 		SetVisible = function(visible: boolean)

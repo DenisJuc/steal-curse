@@ -14,9 +14,11 @@ local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local RevealController = require(script.Parent.Parent.Controllers.RevealController)
 local BindEffects = require(script.Parent.Parent.Effects.BindEffects)
 local CaptureAnimation = require(script.Parent.Parent.Effects.CaptureAnimation)
+local SealBurst = require(script.Parent.Parent.Effects.SealBurst)
 local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
 local HuntHUD = require(script.Parent.Parent.UI.HuntHUD)
 local Settings = require(script.Parent.Parent.Settings)
+local Sounds = require(script.Parent.Parent.Sounds)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local SignalsUpdated = Remotes:WaitForChild("SignalsUpdated") :: RemoteEvent
@@ -29,6 +31,8 @@ local HuntController = {}
 
 type Options = {
 	SetManagementVisible: (visible: boolean) -> (),
+	-- While sealing (holding to bind) only the bind bar and hint stay on screen.
+	SetSealing: (sealing: boolean) -> (),
 }
 
 local REASON_TEXT = {
@@ -56,12 +60,16 @@ local savedMovement: { WalkSpeed: number, JumpPower: number, JumpHeight: number,
 -- True from the first Complete until the result: rare-find overlays wait for the capture.
 local holdingReveals = false
 local captureToken = 0
+-- Seconds the camera keeps watching the jar seal after a capture.
+local SEAL_VIEW_SECONDS = SealBurst.RevealAt + 0.8
+local sealViewUntil = 0
+local sealViewToken = 0
 local hud: HuntHUD.Hud
 local options: Options
 
-local DISTRICT_NAMES: { [string]: string } = {}
-for _, district in Config.Districts do
-	DISTRICT_NAMES[district.Id] = district.Name
+local AREA_NAMES: { [string]: string } = {}
+for _, area in Config.Areas do
+	AREA_NAMES[area.Id] = area.Name
 end
 
 local function getRoot(): BasePart?
@@ -112,6 +120,23 @@ local function resetBind()
 	BindEffects.Stop()
 	unlockMovement()
 	hud.SetProgress(nil)
+	options.SetSealing(false)
+end
+
+-- After a capture: movement stays locked and the UI hidden while the camera watches the seal.
+local function holdSealView()
+	sealViewToken += 1
+	local token = sealViewToken
+	sealViewUntil = os.clock() + SEAL_VIEW_SECONDS
+	lockMovement()
+	options.SetSealing(true)
+	task.delay(SEAL_VIEW_SECONDS, function()
+		if token ~= sealViewToken or state ~= "Idle" then
+			return
+		end
+		unlockMovement()
+		options.SetSealing(false)
+	end)
 end
 
 local function nearestInRange(): number?
@@ -130,7 +155,7 @@ local function nearestInRange(): number?
 end
 
 local function startHold()
-	if not SpiritSight.IsEnabled() or state ~= "Idle" then
+	if not SpiritSight.IsEnabled() or state ~= "Idle" or os.clock() < sealViewUntil then
 		return
 	end
 	local id = nearestInRange()
@@ -141,6 +166,7 @@ local function startHold()
 	state = "Pending"
 	activeId = id
 	pendingSince = os.clock()
+	options.SetSealing(true)
 	BeginBind:FireServer(id)
 end
 
@@ -151,13 +177,17 @@ local function releaseHold()
 	if activeId then
 		CancelBind:FireServer(activeId)
 	end
+	if state == "Binding" then
+		Sounds.Play("Cancel")
+	end
 	resetBind()
 	hud.ShowHint("Bind released.", 1.5)
 end
 
 local function setSight(on: boolean)
-	if not on and state ~= "Idle" then
-		releaseHold()
+	-- Spirit Sight can't be left mid-seal (or while the seal plays); letting go comes first.
+	if state ~= "Idle" or os.clock() < sealViewUntil then
+		return
 	end
 	SpiritSight.SetEnabled(on)
 	hud.SetSightMode(on)
@@ -174,7 +204,7 @@ local function pulseCooldown(): number
 end
 
 local function pulse()
-	if not SpiritSight.IsEnabled() then
+	if not SpiritSight.IsEnabled() or state ~= "Idle" then
 		return
 	end
 	local rootPart = getRoot()
@@ -197,7 +227,7 @@ local function onBindConfirmed()
 	state = "Binding"
 	bindPosition = orb.Position
 	lockMovement()
-	BindEffects.Start(orb)
+	BindEffects.Start(activeId :: number)
 	hud.ShowHint("Keep holding...")
 end
 
@@ -208,8 +238,8 @@ local function stopHoldingReveals()
 	end
 end
 
--- Family animation at the seal, then the summary card; overlays for rare finds wait until the
--- card closes (tap or timeout).
+-- The jar seal, the family animation rising out of it, then the summary card; overlays for rare
+-- finds wait until the card closes (tap or timeout).
 local function presentCapture(result: { [string]: any }, position: Vector3?)
 	local relicId = result.CapturedId
 	local relic = type(relicId) == "string" and RelicConfig.ById[relicId]
@@ -228,14 +258,19 @@ local function presentCapture(result: { [string]: any }, position: Vector3?)
 	end
 	local mutation = if type(result.CapturedMutation) == "string" then result.CapturedMutation else nil
 	local family = CaptureFamilies.forObjectType(relic.ObjectType)
-	local seconds = CaptureFamilies.totalSeconds(family)
-	RevealController.Hold(seconds + Config.Hunt.SummarySeconds + 1)
+	local lead = if position then SealBurst.RevealAt + CaptureFamilies.totalSeconds(family) else 0
+	RevealController.Hold(lead + Config.Hunt.SummarySeconds + 1)
 	if position then
-		BindEffects.Seal(position)
-		CaptureAnimation.Play(relic.Id, mutation, position, rootPart, { Low = Settings.LowEffects(), Sound = true })
+		local low = Settings.LowEffects()
+		SealBurst.Play(position, relic.Id, { Low = low, Personal = true })
+		task.delay(SealBurst.RevealAt, function()
+			if rootPart.Parent then
+				CaptureAnimation.Play(relic.Id, mutation, position, rootPart, { Low = low, Sound = true })
+			end
+		end)
 	end
 	local summary = result.Summary
-	task.delay(if position then seconds else 0, function()
+	task.delay(lead, function()
 		if type(summary) == "table" and type(summary.CapturedId) == "string" then
 			hud.ShowSummary(summary, release)
 		else
@@ -250,7 +285,17 @@ local function onBindResult(result: { [string]: any })
 	end
 	if result.Ok then
 		local position = bindPosition
+		local capturedId = activeId
+		-- The bind camera stays to watch the jar seal until the relic rises out of it; the player
+		-- stays put and the UI hidden until then.
+		BindEffects.Stop(SEAL_VIEW_SECONDS)
 		resetBind()
+		holdSealView()
+		-- The jar swallows this spirit now; the server's signal update follows.
+		if capturedId then
+			signals[capturedId] = nil
+			SpiritSight.Remove(capturedId)
+		end
 		hud.ShowHint("")
 		presentCapture(result, position)
 		return
@@ -262,6 +307,9 @@ local function onBindResult(result: { [string]: any })
 	stopHoldingReveals()
 	if state == "Idle" then
 		return
+	end
+	if state == "Binding" then
+		Sounds.Play("Cancel")
 	end
 	resetBind()
 	if result.Reason ~= "Released" then
@@ -284,8 +332,8 @@ local function step(dt: number)
 	local regen = if type(nextAt) == "number"
 		then `next in {formatCountdown(nextAt - workspace:GetServerTimeNow())}`
 		else "full"
-	local district = DISTRICT_NAMES[player:GetAttribute("SignalDistrict") :: string] or "?"
-	hud.SetSignalInfo(`{district}: signals {count}/{max}  |  {regen}`)
+	local area = AREA_NAMES[player:GetAttribute("SignalArea") :: string] or "?"
+	hud.SetSignalInfo(`{area}: signals {count}/{max}  |  {regen}`)
 	hud.SetPulseCooldown(pulseCooldown() - (os.clock() - lastPulse))
 	hud.SetBindAvailable(state ~= "Idle" or nearestInRange() ~= nil)
 

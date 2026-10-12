@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Format = require(ReplicatedStorage.Shared.Format)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
 
@@ -26,18 +27,14 @@ local LIST_TOP = 50
 type Snapshot = { Slots: { any }, IncomePerMin: number, IncomeMultiplier: number }
 
 local function button(parent: Instance, text: string, width: number, x: number, onClick: () -> ()): TextButton
-	local instance = UIKit.create("TextButton", {
+	local instance = UIKit.button({
 		Text = text,
-		Font = UIKit.Font,
-		TextSize = 14,
-		TextColor3 = UIKit.Colors.Text,
-		BackgroundColor3 = UIKit.Colors.Accent,
-		AnchorPoint = Vector2.new(1, 0.5),
-		Position = UDim2.new(1, x, 0.5, 0),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, x - width / 2, 0.5, 0),
 		Size = UDim2.fromOffset(width, 34),
 		Parent = parent,
-	}, { UIKit.corner(8) })
-	instance.Activated:Connect(onClick)
+	}, onClick)
+	UIKit.skinButton(instance, "Primary")
 	return instance
 end
 
@@ -69,14 +66,15 @@ function ShrinePanel.Start(
 		Size = UDim2.new(1, -130, 0, 20),
 		Parent = content,
 	})
-	UIKit.button({
+	local showcases = UIKit.button({
 		Name = "Showcases",
 		Text = "Showcases >",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -10, 0, -2),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -69, 0, 10),
 		Size = UDim2.fromOffset(118, 24),
 		Parent = content,
 	}, onShowcases)
+	UIKit.skinButton(showcases, "Gold")
 	UIKit.label({
 		Text = "Choose what each pedestal shows, or use Equip Best in Relics. Locked pedestals never change.",
 		TextSize = 12,
@@ -95,9 +93,7 @@ function ShrinePanel.Start(
 	local function refreshAffordability()
 		local ce = player:GetAttribute("CE") or 0
 		for _, entry in costButtons do
-			local affordable = ce + 1e-9 >= entry.Cost
-			entry.Button.BackgroundColor3 = if affordable then colors.Accent else colors.Card
-			entry.Button.TextColor3 = if affordable then colors.Text else colors.SubText
+			UIKit.setAffordable(entry.Button, ce + 1e-9 >= entry.Cost, entry.Cost)
 		end
 	end
 
@@ -107,8 +103,13 @@ function ShrinePanel.Start(
 		incomeLabel.Text = `CE {Format.ce(ce)}   |   +{Format.number(perMin)} CE/min`
 	end
 
+	-- Rows of the last render by slot number, and what each showed (to celebrate changes).
+	local rowsBySlot: { [number]: Frame } = {}
+	local lastSeen: { [number]: { Owned: boolean, Level: number, Locked: boolean } } = {}
+
 	local function renderSlots()
 		costButtons = {}
+		rowsBySlot = {}
 		for _, child in slotsFrame:GetChildren() do
 			if child:IsA("Frame") then
 				child:Destroy()
@@ -118,13 +119,17 @@ function ShrinePanel.Start(
 			return
 		end
 		for _, slot in snapshot.Slots do
+			local holder = UIKit.slot(slotsFrame, `Pedestal{slot.Slot}`, UDim2.new(1, -10, 0, ROW_HEIGHT), slot.Slot)
 			local row = UIKit.create("Frame", {
-				LayoutOrder = slot.Slot,
-				Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
+				Name = "Card",
 				BackgroundColor3 = colors.Card,
 				BackgroundTransparency = if slot.Owned then 0 else 0.5,
-				Parent = slotsFrame,
+				Parent = holder,
 			}, { UIKit.corner(10) })
+			UIKit.fill(row)
+			UIKit.skinCard(row, if slot.Locked then colors.Gold else nil)
+			row:SetAttribute("PopIn", true)
+			rowsBySlot[slot.Slot] = row
 			UIKit.label({
 				Text = tostring(slot.Slot),
 				TextSize = 18,
@@ -187,17 +192,45 @@ function ShrinePanel.Start(
 				table.insert(costButtons, { Button = maxButton, Cost = slot.UpgradeCost })
 				table.insert(costButtons, { Button = upButton, Cost = slot.UpgradeCost })
 			else
-				local maxed = button(row, "MAX LV", 126, -74, function() end)
-				maxed.BackgroundColor3 = colors.Card
-				maxed.AutoButtonColor = false
+				local maxed = UIKit.label({
+					Text = "MAX LV",
+					TextSize = 14,
+					TextColor3 = colors.Panel,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					BackgroundTransparency = 0,
+					BackgroundColor3 = colors.Gold,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(1, -74 - 63, 0.5, 0),
+					Size = UDim2.fromOffset(126, 34),
+					Parent = row,
+				})
+				UIKit.corner(8).Parent = maxed
 			end
 			local lock = button(row, if slot.Locked then "Locked" else "Lock", 58, -208, function()
 				ShrineAction:FireServer("Lock", slotNumber, not slot.Locked)
 			end)
-			lock.BackgroundColor3 = if slot.Locked then colors.Gold else colors.Card
-			lock.TextColor3 = if slot.Locked then colors.Panel else colors.Text
+			UIKit.skinButton(lock, if slot.Locked then "Gold" else "Dark")
 		end
 		refreshAffordability()
+	end
+
+	-- Bought pedestals and new levels get the purchase celebration; locking gives a small bounce.
+	local function celebrate()
+		if not snapshot then
+			return
+		end
+		for _, slot in snapshot.Slots do
+			local before = lastSeen[slot.Slot]
+			local row = rowsBySlot[slot.Slot]
+			if before and row and panel.Visible then
+				if (slot.Owned and not before.Owned) or (slot.Level or 0) > before.Level then
+					Motion.purchased(row)
+				elseif slot.Locked ~= before.Locked then
+					Motion.punch(row, 0.6)
+				end
+			end
+			lastSeen[slot.Slot] = { Owned = slot.Owned == true, Level = slot.Level or 0, Locked = slot.Locked == true }
+		end
 	end
 
 	ShrineState.OnClientEvent:Connect(function(state: Snapshot)
@@ -206,6 +239,7 @@ function ShrinePanel.Start(
 		end
 		snapshot = state
 		renderSlots()
+		celebrate()
 	end)
 	player:GetAttributeChangedSignal("CE"):Connect(function()
 		refreshIncome()
@@ -216,10 +250,10 @@ function ShrinePanel.Start(
 
 	return {
 		Toggle = function()
-			panel.Visible = not panel.Visible
+			UIKit.toggle(panel)
 		end,
 		Open = function()
-			panel.Visible = true
+			UIKit.show(panel)
 		end,
 		SetVisible = function(visible: boolean)
 			if not visible then

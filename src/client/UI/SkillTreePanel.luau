@@ -2,6 +2,9 @@
 -- with its rank, what it does now and at the next rank, and Buy / +10 / Max buttons (all CE).
 -- Costs come from SkillConfig (shared with the server); the server re-checks every purchase and
 -- answers with the fresh ranks.
+-- Feel: rows pop in one after another when the menu opens (MenuMotion "PopIn") or the tab changes; a purchase flashes
+-- the row gold, springs its rank bar forward and plays the upgrade sound (plus a shine when the
+-- node maxes); buttons you can't afford shake "no" (Toasts says how much CE is missing).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,7 +14,10 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local Formulas = require(ReplicatedStorage.Shared.Formulas)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
+local Motion = require(script.Parent.Motion)
+local Spring = require(script.Parent.Spring)
 local UIKit = require(script.Parent.UIKit)
+local Sounds = require(script.Parent.Parent.Sounds)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local SkillAction = Remotes:WaitForChild("SkillAction") :: RemoteFunction
@@ -20,6 +26,7 @@ local SkillTreePanel = {}
 
 local ROW_HEIGHT = 84
 local LIST_TOP = 66
+local STAGGER = 0.045
 
 local function percent(value: number): string
 	return `{Format.number(value * 100)}%`
@@ -56,9 +63,13 @@ local function effectText(nodeId: string, rank: number): string
 		return `bind in {Format.seconds(SkillConfig.holdSeconds(rank))}`
 	elseif nodeId == "ResonantHarvest" then
 		return `+{percent(SkillConfig.harvestMultiplier(rank) - 1)} bonus finds`
+	elseif nodeId == "SwiftStep" then
+		return `walk speed {Format.number(SkillConfig.walkSpeed(rank))}`
 	end
 	return ""
 end
+
+type RowParts = { Card: Frame, Fill: Frame, Rank: TextLabel, MaxRank: number }
 
 function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (boolean) -> () }
 	local player = Players.LocalPlayer
@@ -66,6 +77,8 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	local ranks: { [string]: number } = {}
 	local branch = SkillConfig.Branches[1].Id
 	local costButtons: { { Button: TextButton, Cost: number } } = {}
+	local rows: { [string]: RowParts } = {}
+	local popNext = false
 
 	local panel, content = UIKit.modal(screen, "SkillsMenu", "SKILLS", colors.Accent, Vector2.new(560, 620))
 
@@ -91,6 +104,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	local list = UIKit.scrollList(content, 6)
 	list.Position = UDim2.fromOffset(0, LIST_TOP)
 	list.Size = UDim2.new(1, 0, 1, -LIST_TOP)
+	list.ScrollBarImageColor3 = colors.Trim
 
 	local render: () -> ()
 	local tabButtons: { [string]: TextButton } = {}
@@ -99,12 +113,17 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		branchBlurb[each.Id] = each.Blurb
 		tabButtons[each.Id] = UIKit.button({
 			Text = each.Name,
+			TextSize = 15,
 			LayoutOrder = index,
 			Size = UDim2.new(1 / #SkillConfig.Branches, -4, 1, 0),
 			Parent = tabs,
 		}, function()
+			if branch == each.Id then
+				return
+			end
 			branch = each.Id
 			infoLabel.Text = each.Blurb
+			popNext = true
 			render()
 		end)
 	end
@@ -112,9 +131,26 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	local function refreshAffordability()
 		local ce = player:GetAttribute("CE") or 0
 		for _, entry in costButtons do
-			local affordable = ce + 1e-9 >= entry.Cost
-			entry.Button.BackgroundColor3 = if affordable then colors.Accent else colors.Card
-			entry.Button.TextColor3 = if affordable then colors.Text else colors.SubText
+			UIKit.setAffordable(entry.Button, ce + 1e-9 >= entry.Cost, entry.Cost)
+		end
+	end
+
+	-- Celebrates the rows whose rank went up (rows were just rebuilt by render).
+	local function celebrate(before: { [string]: number })
+		for nodeId, parts in rows do
+			local old = before[nodeId] or 0
+			local new = ranks[nodeId] or 0
+			if new <= old then
+				continue
+			end
+			parts.Fill.Size = UDim2.fromScale(math.clamp(old / parts.MaxRank, 0, 1), 1)
+			Spring.target(parts.Fill, 3, 0.6, { Size = UDim2.fromScale(math.clamp(new / parts.MaxRank, 0, 1), 1) })
+			Motion.purchased(parts.Card)
+			Motion.punch(parts.Rank, 3)
+			if new >= parts.MaxRank then
+				Motion.shine(parts.Card, 0.9)
+				Sounds.Play("Shine")
+			end
 		end
 	end
 
@@ -125,30 +161,37 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				return SkillAction:InvokeServer(action, table.unpack(args, 1, args.n))
 			end)
 			if ok and type(result) == "table" and type(result.State) == "table" then
+				local before = table.clone(ranks)
 				ranks = result.State.Ranks or ranks
 				if result.Message then
 					infoLabel.Text = result.Message
 				end
 				render()
+				if action == "Buy" then
+					celebrate(before)
+				end
 			end
 		end)
 	end
 
-	local function rowButton(row: Instance, text: string, width: number, x: number, onClick: () -> ()): TextButton
-		local instance = UIKit.button({
+	local function rowButton(card: Instance, text: string, width: number, x: number, cost: number, onClick: () -> ()): TextButton
+		local button = UIKit.button({
 			Text = text,
-			AnchorPoint = Vector2.new(1, 1),
-			Position = UDim2.new(1, x, 1, -8),
+			TextSize = 14,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(1, x - width / 2, 1, -23),
 			Size = UDim2.fromOffset(width, 30),
-			Parent = row,
+			Parent = card,
 		}, onClick)
-		return instance
+		table.insert(costButtons, { Button = button, Cost = cost })
+		return button
 	end
 
 	function render()
 		costButtons = {}
+		rows = {}
 		for id, tab in tabButtons do
-			tab.BackgroundColor3 = if id == branch then colors.Accent else colors.Card
+			UIKit.skinButton(tab, if id == branch then "Primary" else "Dark")
 		end
 		for _, child in list:GetChildren() do
 			if child:IsA("GuiObject") then
@@ -163,75 +206,124 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			order += 1
 			local rank = ranks[node.Id] or 0
 			local maxed = rank >= node.MaxRank
-			local row = UIKit.create("Frame", {
-				LayoutOrder = order,
-				Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
+			local slot = UIKit.slot(list, node.Id, UDim2.new(1, -10, 0, ROW_HEIGHT), order)
+			local card = UIKit.create("Frame", {
+				Name = "Card",
 				BackgroundColor3 = colors.Card,
-				Parent = list,
-			}, { UIKit.corner(10) })
+				Parent = slot,
+			}, {
+				UIKit.corner(10),
+				UIKit.stroke(if maxed then colors.Gold else colors.Trim, 1.5, if maxed then 0.2 else 0.7),
+				UIKit.create("UIGradient", {
+					Rotation = 90,
+					Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 145, 160)),
+				}),
+			})
+			UIKit.fill(card)
+			UIKit.create("Frame", {
+				Name = "Spine",
+				Position = UDim2.fromOffset(0, 10),
+				Size = UDim2.new(0, 3, 1, -20),
+				BackgroundColor3 = if maxed then colors.Gold else colors.Accent,
+				BorderSizePixel = 0,
+				Parent = card,
+			}, { UIKit.corner(2) })
 			UIKit.label({
 				Text = node.Name,
 				TextSize = 16,
-				Position = UDim2.fromOffset(10, 6),
-				Size = UDim2.new(1, -120, 0, 20),
-				Parent = row,
+				Position = UDim2.fromOffset(12, 6),
+				Size = UDim2.new(1, -130, 0, 20),
+				Parent = card,
 			})
-			UIKit.label({
+			local rankLabel = UIKit.label({
+				Name = "Rank",
 				Text = `Rank {rank}/{node.MaxRank}`,
 				TextSize = 14,
 				TextColor3 = if maxed then colors.Gold else colors.SubText,
 				TextXAlignment = Enum.TextXAlignment.Right,
-				AnchorPoint = Vector2.new(1, 0),
-				Position = UDim2.new(1, -10, 0, 6),
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(1, -65, 0, 16),
 				Size = UDim2.fromOffset(110, 20),
-				Parent = row,
+				Parent = card,
 			})
 			UIKit.label({
 				Text = node.Summary,
 				TextSize = 12,
 				TextColor3 = colors.SubText,
 				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(10, 27),
-				Size = UDim2.new(1, -20, 0, 16),
-				Parent = row,
+				Position = UDim2.fromOffset(12, 27),
+				Size = UDim2.new(1, -22, 0, 16),
+				Parent = card,
 			})
 			local now = effectText(node.Id, rank)
 			UIKit.label({
 				Text = if maxed then `Now: {now}` else `Now: {now}  ->  {effectText(node.Id, rank + 1)}`,
 				TextSize = 13,
-				TextColor3 = Color3.fromRGB(170, 230, 255),
+				TextColor3 = colors.Cyan,
 				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(10, 50),
-				Size = UDim2.new(1, -230, 0, 18),
-				Parent = row,
+				Position = UDim2.fromOffset(12, 48),
+				Size = UDim2.new(1, -240, 0, 18),
+				Parent = card,
 			})
+			local track = UIKit.create("Frame", {
+				Name = "RankBar",
+				Position = UDim2.new(0, 12, 1, -13),
+				Size = UDim2.new(1, -252, 0, 5),
+				BackgroundColor3 = colors.Track,
+				BorderSizePixel = 0,
+				Parent = card,
+			}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+			local fill = UIKit.create("Frame", {
+				Name = "Fill",
+				Size = UDim2.fromScale(math.clamp(rank / node.MaxRank, 0, 1), 1),
+				BackgroundColor3 = if maxed then colors.Gold else colors.Accent,
+				BorderSizePixel = 0,
+				Parent = track,
+			}, {
+				UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				UIKit.create("UIGradient", {
+					Color = ColorSequence.new(Color3.fromRGB(200, 200, 210), Color3.new(1, 1, 1)),
+				}),
+			})
+			rows[node.Id] = { Card = card, Fill = fill, Rank = rankLabel, MaxRank = node.MaxRank }
+			card:SetAttribute("PopIn", true)
+			if popNext then
+				Motion.pop(card, (order - 1) * STAGGER, 0.6)
+			end
 
 			local nodeId = node.Id
 			if maxed then
-				local done = rowButton(row, "MAXED", 120, -8, function() end)
-				done.BackgroundColor3 = colors.Gold
-				done.TextColor3 = colors.Panel
-				done.AutoButtonColor = false
+				local tag = UIKit.label({
+					Text = "MAXED",
+					TextSize = 15,
+					TextColor3 = colors.Panel,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					BackgroundTransparency = 0,
+					BackgroundColor3 = colors.Gold,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(1, -68, 1, -23),
+					Size = UDim2.fromOffset(120, 30),
+					Parent = card,
+				})
+				UIKit.corner(8).Parent = tag
 				continue
 			end
 			local cost = SkillConfig.cost(node, rank) or 0
-			local maxButton = rowButton(row, "Max", 46, -8, function()
+			rowButton(card, "Max", 46, -8, cost, function()
 				send("Buy", nodeId, "Max")
 			end)
-			table.insert(costButtons, { Button = maxButton, Cost = cost })
 			local nextX = -60
 			if node.MaxRank - rank > 1 then
-				local tenButton = rowButton(row, "+10", 46, nextX, function()
+				rowButton(card, "+10", 46, nextX, cost, function()
 					send("Buy", nodeId, 10)
 				end)
-				table.insert(costButtons, { Button = tenButton, Cost = cost })
 				nextX -= 52
 			end
-			local buyButton = rowButton(row, `+1  {Format.number(cost)} CE`, 110, nextX, function()
+			rowButton(card, `+1  {Format.number(cost)} CE`, 110, nextX, cost, function()
 				send("Buy", nodeId, 1)
 			end)
-			table.insert(costButtons, { Button = buyButton, Cost = cost })
 		end
+		popNext = false
 		refreshAffordability()
 		if infoLabel.Text == "" then
 			infoLabel.Text = branchBlurb[branch] or ""
@@ -242,8 +334,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 
 	return {
 		Toggle = function()
-			panel.Visible = not panel.Visible
-			if panel.Visible then
+			if UIKit.toggle(panel) then
 				infoLabel.Text = ""
 				send("Get")
 			end
