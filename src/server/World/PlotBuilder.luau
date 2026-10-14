@@ -35,7 +35,7 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 		Material = Enum.Material.Marble,
 		Color = MARBLE,
 	})
-	local top = BuildUtil.cylinder(model, at(x, FLOOR_TOP + height - 0.2, z), 0.4, width, {
+	BuildUtil.cylinder(model, at(x, FLOOR_TOP + height - 0.2, z), 0.4, width, {
 		Name = "Top",
 		Material = Enum.Material.Slate,
 		Color = STONE,
@@ -56,10 +56,6 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 			end
 		end
 	end
-	local info = BuildUtil.billboard(top, "", 9, 2.4, 6.5, Color3.fromRGB(245, 240, 255))
-	local gui = info.Parent :: BillboardGui
-	gui.Name = "Info"
-	gui.MaxDistance = 70
 	model.Parent = parent
 end
 

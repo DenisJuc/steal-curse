@@ -1,5 +1,5 @@
--- Showcases (GDD 6.7, 10). Collect Showcases (CE purchase, a relic discovery or a Codex
--- milestone), upgrade them (levels 1-4, same stats for every Showcase) and pick one as active.
+-- Showcases (GDD 6.7, 10). Collect Showcases (CE purchase, a relic discovery, a Codex
+-- milestone or zone mastery), upgrade them (levels 1-4, same stats for every Showcase) and pick one as active.
 -- Only the active one buffs ("Showcase" Luck factor and Income bonus); switching is free and
 -- moves the buff at once. Posing on the podium is optional and cosmetic.
 -- Remote: ShowcaseAction ("Get" | "Unlock" id | "Upgrade" id | "Activate" id |
@@ -9,9 +9,13 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Codex = require(ReplicatedStorage.Shared.Codex)
+local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local ShowcaseConfig = require(ReplicatedStorage.Shared.ShowcaseConfig)
 local Showcases = require(ReplicatedStorage.Shared.Showcases)
+local ZoneMastery = require(ReplicatedStorage.Shared.ZoneMastery)
 local ShowcaseVisuals = require(script.Parent.Parent.World.ShowcaseVisuals)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
@@ -33,7 +37,11 @@ local function progressOf(data: any): Showcases.Progress
 	for id, at in data.CodexMilestones do
 		milestones[id] = at
 	end
-	return { Discovered = data.Discovered, Milestones = milestones }
+	local mastery = {}
+	for area, xp in data.Mastery do
+		mastery[area] = (ZoneMastery.level(xp, Config.Mastery :: any))
+	end
+	return { Discovered = data.Discovered, Milestones = milestones, Mastery = mastery }
 end
 
 local function bonus(player: Player): (number, number)
@@ -201,11 +209,32 @@ local function state(player: Player)
 	for id, accessory in ShowcaseConfig.AccessoryById do
 		accessories[id] = Showcases.accessoryUnlocked(accessory, progress)
 	end
+	-- How far each locked free-unlock Showcase is (CE ones: the client compares CE to the price).
+	local unlockProgress = {}
+	local codexState = { Discovered = data.Discovered, Mutations = data.CodexMutations }
+	for id, showcase in ShowcaseConfig.ById do
+		if not data.Showcases.Owned[id] then
+			local unlock = showcase.Unlock
+			if unlock.Kind == "Relic" then
+				unlockProgress[id] = { Have = if data.Discovered[unlock.RelicId] then 1 else 0, Need = 1 }
+			elseif unlock.Kind == "Mastery" and unlock.Area then
+				local need = unlock.Level or 1
+				unlockProgress[id] = { Have = math.min((progress.Mastery :: any)[unlock.Area] or 0, need), Need = need }
+			elseif unlock.Kind == "Codex" and unlock.Milestone then
+				local milestone = CodexBook.ById[unlock.Milestone]
+				if milestone then
+					local have = if progress.Milestones[unlock.Milestone] then milestone.Need else Codex.progress(milestone, codexState)
+					unlockProgress[id] = { Have = math.min(have, milestone.Need), Need = milestone.Need }
+				end
+			end
+		end
+	end
 	return {
 		Active = data.Showcases.Active,
 		Owned = table.clone(data.Showcases.Owned),
 		AccessoriesOff = table.clone(data.Showcases.AccessoriesOff),
 		AccessoriesUnlocked = accessories,
+		UnlockProgress = unlockProgress,
 	}
 end
 

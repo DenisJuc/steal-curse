@@ -72,20 +72,28 @@ function RollService.GetFullLuck(player: Player): number
 	return MultiplierService.Get(player, "Luck")
 end
 
-function RollService.BuildContext(player: Player): RollMath.Context
+-- Extra factors for one batch (zone events): LuckFactor joins the full luck before Rarity Focus
+-- caps it; MutationFactor scales the mutation chance (still 0 until Mutation Resonance is bought).
+export type RollOptions = { LuckFactor: number?, MutationFactor: number? }
+
+function RollService.BuildContext(player: Player, options: RollOptions?): RollMath.Context
 	local data = DataService.Get(player)
-	return RollMath.contextFor(RollRules, {
-		FullLuck = RollService.GetFullLuck(player),
+	local ctx = RollMath.contextFor(RollRules, {
+		FullLuck = RollService.GetFullLuck(player) * (if options and options.LuckFactor then options.LuckFactor else 1),
 		RarityFocus = if data then data.Settings.RarityFocus else Config.Focus.Default,
 		Frequency = if data then data.Settings.Frequency else Config.Frequency.Default,
 		FrequencyRank = if data then data.Skills.FrequencyFocus else 0,
 		MutationRank = if data then data.Skills.MutationResonance else 0,
 	})
+	if options and options.MutationFactor then
+		ctx.MutationChance = math.min(1, ctx.MutationChance * options.MutationFactor)
+	end
+	return ctx
 end
 
 -- Rolls `count` discoveries with one shared context (a capture batch can't change luck mid-way).
-function RollService.RollMany(player: Player, count: number): { RollResult }
-	local ctx = RollService.BuildContext(player)
+function RollService.RollMany(player: Player, count: number, options: RollOptions?): { RollResult }
+	local ctx = RollService.BuildContext(player, options)
 	local nextNumber = numberSource(rngFor(player))
 	local results = table.create(count)
 	for index = 1, count do

@@ -95,6 +95,36 @@
         },
         "ItemAction": {
           "$className": "RemoteFunction"
+        },
+        "WildFind": {
+          "$className": "RemoteEvent"
+        },
+        "WildFindAction": {
+          "$className": "RemoteEvent"
+        },
+        "SetLantern": {
+          "$className": "RemoteEvent"
+        },
+        "ShrineAction": {
+          "$className": "RemoteEvent"
+        },
+        "ShrineResult": {
+          "$className": "RemoteEvent"
+        },
+        "BountyAction": {
+          "$className": "RemoteFunction"
+        },
+        "BountiesUpdated": {
+          "$className": "RemoteEvent"
+        },
+        "SetTitle": {
+          "$className": "RemoteEvent"
+        },
+        "GetTitles": {
+          "$className": "RemoteFunction"
+        },
+        "Rebirth": {
+          "$className": "RemoteFunction"
         }
       }
     },

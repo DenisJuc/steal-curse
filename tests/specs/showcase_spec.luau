@@ -22,7 +22,7 @@ return {
 		Run = function()
 			local income = { 0.02, 0.05, 0.10, 0.15 }
 			local luck = { 0.01, 0.03, 0.05, 0.10 }
-			local costs = { nil, 5000, 250000, 5000000 }
+			local costs = { nil, 200000, 20000000, 2000000000 }
 			expect.equal(ShowcaseConfig.MaxLevel, 4, "max level")
 			for level = 1, 4 do
 				expect.equal(LEVELS[level].Income, income[level], `income at level {level}`)
@@ -36,7 +36,7 @@ return {
 	{
 		Name = "every Showcase gives equal stats at equal levels",
 		Run = function()
-			expect.equal(#ShowcaseConfig.Showcases, 3, "three prototypes")
+			expect.equal(#ShowcaseConfig.Showcases, 6, "three prototypes and three zone Showcases")
 			for level = 1, ShowcaseConfig.MaxLevel do
 				local firstIncome, firstLuck = nil, nil
 				for _, showcase in ShowcaseConfig.Showcases do
@@ -90,6 +90,8 @@ return {
 					expect.truthy(unlock.Price and unlock.Price > 0, `{showcase.Id} price`)
 				elseif unlock.Kind == "Relic" then
 					expect.truthy(RelicConfig.ById[unlock.RelicId :: string], `{showcase.Id} relic exists`)
+				elseif unlock.Kind == "Mastery" then
+					expect.truthy(unlock.Area and unlock.Level and unlock.Level >= 1, `{showcase.Id} mastery goal`)
 				else
 					expect.truthy(book.ById[unlock.Milestone :: string], `{showcase.Id} milestone exists`)
 				end

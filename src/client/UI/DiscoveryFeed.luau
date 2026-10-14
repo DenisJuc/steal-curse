@@ -1,5 +1,6 @@
 -- Top-middle feed of recent discoveries, newest on top. Lines fade out on their own and never block anything.
--- Batches arrive through RollReel, after the roll reel has landed.
+-- Batches arrive through RollReel, after the roll reel has landed. Hunt batches roll on the hunt
+-- papers (HuntRolls) instead.
 -- Base odds come from RollMath (via Odds), the same math the server rolls with.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -163,8 +164,9 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 		list.Size = UDim2.fromOffset(340, (LINE_HEIGHT + 6) * maxLines)
 	end)
 
-	RollReel.OnResults(function(results: { Result })
-		if type(results) ~= "table" then
+	RollReel.OnResults(function(results: { Result }, hunt: boolean)
+		-- A hunt's finds were just rolled on the hunt papers; no banners for them.
+		if type(results) ~= "table" or hunt then
 			return
 		end
 		if #results <= maxLines then

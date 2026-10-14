@@ -24,6 +24,10 @@ export type Summary = {
 	NewCount: number,
 	SoldCount: number,
 	SoldCE: number,
+	-- Set by BindService: the combined bonus-roll multiplier and what raised it ("Streak x1.6",
+	-- "Purified", event names...).
+	BonusMultiplier: number?,
+	Tags: { string }?,
 }
 
 -- results[1] is the captured relic, the rest are bonus discoveries. tierOf(relicId) -> tier index.

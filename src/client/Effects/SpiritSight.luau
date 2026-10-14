@@ -6,6 +6,7 @@
 -- shockwave and a wisp racing to every signal, which pings when it arrives.
 -- Every signal looks and sounds identical on purpose: nothing here may hint at a relic's rarity.
 
+local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,12 +15,17 @@ local SoundService = game:GetService("SoundService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
+local Ambience = require(script.Parent.Ambience)
 local HuntFX = require(script.Parent.HuntFX)
 local HuntModels = require(script.Parent.HuntModels)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
 
 local SpiritSight = {}
+
+local pulsed = Instance.new("BindableEvent")
+-- Fires (origin: Vector3) whenever the local player pulses.
+SpiritSight.Pulsed = pulsed.Event
 
 local SIGNAL_COLOR = Color3.fromRGB(140, 220, 255)
 local TRAIL_COLOR = Color3.fromRGB(180, 140, 255)
@@ -39,6 +45,16 @@ local PING_SPEED = 90
 local GATHER_SECONDS = 0.35
 -- Seconds a talisman takes to burn away after its beat.
 local BURN_SECONDS = 0.6
+-- The light that blooms from the player on a pulse.
+local FLASH_RANGE = 60
+local FLASH_BRIGHTNESS = 2.5
+local FLASH_SECONDS = 1.1
+
+-- Zone mastery widens sight and landmark range where it applies (MasteryService).
+local function rangeFactor(): number
+	local factor = Players.LocalPlayer:GetAttribute("SightRangeFactor")
+	return if type(factor) == "number" then factor else 1
+end
 
 type Signal = {
 	Id: number,
@@ -361,7 +377,7 @@ function SpiritSight.Update(dt: number, viewer: Vector3?)
 	-- Follows respawns (a new character has a new head).
 	setListener(true)
 	local rank = Players.LocalPlayer:GetAttribute("Skill_SpiritSight")
-	local revealRange = SkillConfig.sightRange(if type(rank) == "number" then rank else 0)
+	local revealRange = SkillConfig.sightRange(if type(rank) == "number" then rank else 0) * rangeFactor()
 	for _, signal in signals do
 		local isBound = bound ~= nil and bound.Signal == signal
 		signal.Flare = math.max(0, signal.Flare - dt)
@@ -630,14 +646,100 @@ local function makeWisp(from: Vector3, signal: Signal, low: boolean): Wisp
 	}
 end
 
+-- A wide light that blooms from the player with the shockwave, then dies.
+local function flashLight(origin: Vector3)
+	local holder = HuntFX.part({ Name = "PulseLight", Size = Vector3.one * 0.2, Transparency = 1, CFrame = CFrame.new(origin) })
+	local light = Instance.new("PointLight")
+	light.Color = SIGNAL_COLOR
+	light.Range = FLASH_RANGE
+	light.Brightness = 0
+	light.Shadows = false
+	light.Parent = holder
+	holder.Parent = workspace
+	local start = os.clock()
+	local connection: RBXScriptConnection
+	connection = RunService.RenderStepped:Connect(function()
+		local t = (os.clock() - start) / FLASH_SECONDS
+		if t >= 1 then
+			connection:Disconnect()
+			holder:Destroy()
+			return
+		end
+		light.Brightness = FLASH_BRIGHTNESS * (if t < 0.12 then t / 0.12 else (1 - t) / 0.88)
+	end)
+end
+
+-- Outlines the nearest landmarks for a few seconds so you can find your way in the fog.
+local function echoLandmarks(origin: Vector3)
+	local cfg = Config.SpiritSight
+	local range = cfg.LandmarkRange * rangeFactor()
+	local found: { { Model: Model, Distance: number } } = {}
+	for _, model in CollectionService:GetTagged("Landmark") do
+		if model:IsA("Model") and model:IsDescendantOf(workspace) then
+			local distance = (model:GetPivot().Position - origin).Magnitude
+			if distance <= range then
+				table.insert(found, { Model = model, Distance = distance })
+			end
+		end
+	end
+	table.sort(found, function(a, b)
+		return a.Distance < b.Distance
+	end)
+	local highlights: { { Highlight: Highlight, Delay: number } } = {}
+	for index = 1, math.min(cfg.LandmarkCount, #found) do
+		local entry = found[index]
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "PulseEcho"
+		highlight.Adornee = entry.Model
+		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.FillColor = SIGNAL_COLOR
+		highlight.FillTransparency = 1
+		highlight.OutlineColor = SIGNAL_COLOR
+		highlight.OutlineTransparency = 1
+		highlight.Parent = entry.Model
+		-- Lights up when the shockwave would reach it.
+		table.insert(highlights, { Highlight = highlight, Delay = entry.Distance / PING_SPEED })
+	end
+	if #highlights == 0 then
+		return
+	end
+	local seconds = cfg.PulseSeconds
+	local start = os.clock()
+	local connection: RBXScriptConnection
+	connection = RunService.RenderStepped:Connect(function()
+		local elapsed = os.clock() - start
+		local done = true
+		for _, entry in highlights do
+			local t = (elapsed - entry.Delay) / seconds
+			if t < 1 then
+				done = false
+			end
+			local shown = if t < 0 then 0 elseif t < 0.08 then t / 0.08 else math.max(0, 1 - (t - 0.08) / 0.92)
+			entry.Highlight.OutlineTransparency = 1 - shown * 0.85
+			entry.Highlight.FillTransparency = 1 - shown * 0.12
+		end
+		if done then
+			connection:Disconnect()
+			for _, entry in highlights do
+				entry.Highlight:Destroy()
+			end
+		end
+	end)
+end
+
 -- Ground shockwave from the player plus a wisp flying to every signal; each pings on arrival and
--- shows its pillar for a few seconds, even beyond reveal range.
+-- shows its pillar for a few seconds, even beyond reveal range. In the wild the fog lifts for a
+-- moment and the nearest landmarks are outlined.
 function SpiritSight.Pulse(root: BasePart)
 	local low = Settings.LowEffects()
 	local origin = root.Position
 	Sounds.Play("Pulse")
 	HuntFX.shockwave(Vector3.new(origin.X, groundBelow(origin), origin.Z), TRAIL_COLOR, 120, 1)
 	HuntFX.shake(0.25, 0.35)
+	Ambience.Reveal()
+	flashLight(origin)
+	echoLandmarks(origin)
+	pulsed:Fire(origin)
 	if not low then
 		HuntFX.burst(origin, TRAIL_COLOR, 25, 14)
 	end

@@ -1,4 +1,4 @@
--- Showcases menu (GDD 6.7, 10), opened from the Shrine. Lists the three Showcases: how to unlock
+-- Showcases menu (GDD 6.7, 10), opened from the Shrine. Lists every Showcase: how to unlock
 -- each, its level and bonus, Upgrade, Set active and the accessory toggles. Every Showcase gives
 -- the same bonus at the same level; only the active one counts. Switching is free. The server
 -- validates everything and answers with the fresh state.
@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Codex = require(ReplicatedStorage.Shared.Codex)
 local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local ShowcaseConfig = require(ReplicatedStorage.Shared.ShowcaseConfig)
@@ -23,6 +24,7 @@ local ShowcasePanel = {}
 local ROW_HEIGHT = 132
 local LIST_TOP = 66
 local FOOTER_HEIGHT = 34
+local PRICE_WIDTH = 150
 
 local STYLE_COLORS = {
 	Stance = Color3.fromRGB(150, 210, 255),
@@ -35,7 +37,19 @@ type State = {
 	Owned: { [string]: number },
 	AccessoriesOff: { [string]: boolean },
 	AccessoriesUnlocked: { [string]: boolean },
+	UnlockProgress: { [string]: { Have: number, Need: number } }?,
 }
+
+local PROGRESS_WIDTH = 110
+
+local function setProgress(holder: Frame, have: number, need: number)
+	local fraction = if need > 0 then math.clamp(have / need, 0, 1) else 0
+	local count = holder:FindFirstChild("Count") :: TextLabel
+	count.Text = `{Format.number(math.floor(math.min(have, need)))} / {Format.number(need)}`
+	local fill = (holder:FindFirstChild("Track") :: Frame):FindFirstChild("Fill") :: Frame
+	fill.Size = UDim2.fromScale(fraction, 1)
+	fill.BackgroundColor3 = if fraction >= 1 then UIKit.Colors.Gold else UIKit.Colors.Jade
+end
 
 local function percent(value: number): string
 	return `{Format.number(value * 100)}%`
@@ -54,12 +68,20 @@ end
 local function unlockText(showcase: ShowcaseConfig.Showcase): string
 	local unlock = showcase.Unlock
 	if unlock.Kind == "CE" then
-		return `Unlock for {Format.number(unlock.Price or 0)} CE`
+		return `buy it for {Format.number(unlock.Price or 0)} CE`
 	elseif unlock.Kind == "Relic" then
-		return `Unlocks when you discover {relicName(unlock.RelicId)}`
+		return `discover {relicName(unlock.RelicId)}`
+	elseif unlock.Kind == "Mastery" then
+		local name = unlock.Area or "?"
+		for _, area in Config.Areas do
+			if area.Id == unlock.Area then
+				name = area.Name
+			end
+		end
+		return `reach {name} mastery {unlock.Level or "?"} (capture signals there)`
 	end
 	local milestone = unlock.Milestone and CodexBook.ById[unlock.Milestone]
-	return if milestone then `Codex: {Codex.goalText(CodexBook, milestone)}` else "Codex milestone"
+	return if milestone then `Codex: {Codex.goalText(CodexBook, milestone)}` else "a Codex milestone"
 end
 
 function ShowcasePanel.Start(
@@ -70,8 +92,10 @@ function ShowcasePanel.Start(
 	local colors = UIKit.Colors
 	local state: State? = nil
 	local costButtons: { { Button: TextButton, Cost: number } } = {}
+	local ceBars: { { Bar: Frame, Price: number } } = {}
 
-	local panel, content = UIKit.modal(screen, "ShowcaseMenu", "SHOWCASES", colors.Gold, Vector2.new(560, 640))
+	local panel, content =
+		UIKit.modal(screen, "ShowcaseMenu", "SHOWCASES", colors.Gold, Vector2.new(560, 640), "Shrine")
 
 	local activeLabel = UIKit.label({
 		TextSize = 15,
@@ -113,10 +137,48 @@ function ShowcasePanel.Start(
 
 	local render: () -> ()
 
+	-- Unlock progress at the right of a locked row: "3 / 5" over a slim bar.
+	local function progressBar(row: Instance, have: number, need: number): Frame
+		local holder = UIKit.create("Frame", {
+			Name = "Progress",
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -10, 0, 58),
+			Size = UDim2.fromOffset(PROGRESS_WIDTH, 28),
+			BackgroundTransparency = 1,
+			Parent = row,
+		})
+		UIKit.label({
+			Name = "Count",
+			TextSize = 12,
+			TextColor3 = colors.SubText,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			Size = UDim2.new(1, 0, 0, 14),
+			Parent = holder,
+		})
+		local track = UIKit.create("Frame", {
+			Name = "Track",
+			Position = UDim2.fromOffset(0, 17),
+			Size = UDim2.new(1, 0, 0, 8),
+			BackgroundColor3 = colors.Track,
+			Parent = holder,
+		}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+		UIKit.create("Frame", {
+			Name = "Fill",
+			Size = UDim2.fromScale(0, 1),
+			BackgroundColor3 = colors.Jade,
+			Parent = track,
+		}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+		setProgress(holder, have, need)
+		return holder
+	end
+
 	local function refreshAffordability()
 		local ce = player:GetAttribute("CE") or 0
 		for _, entry in costButtons do
 			UIKit.setAffordable(entry.Button, ce + 1e-9 >= entry.Cost, entry.Cost)
+		end
+		for _, entry in ceBars do
+			setProgress(entry.Bar, ce, entry.Price)
 		end
 	end
 
@@ -160,8 +222,19 @@ function ShowcasePanel.Start(
 		return button
 	end
 
+	local function priceButton(row: Instance, verb: string, cost: number, x: number, onClick: () -> ()): TextButton
+		return UIKit.priceButton({
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, x, 0, 23),
+			Size = UDim2.fromOffset(PRICE_WIDTH, 30),
+			TextSize = 15,
+			Parent = row,
+		}, verb, cost, onClick)
+	end
+
 	function render()
 		costButtons = {}
+		ceBars = {}
 		rowsById = {}
 		for _, child in list:GetChildren() do
 			if child:IsA("GuiObject") then
@@ -199,7 +272,7 @@ function ShowcasePanel.Start(
 				TextColor3 = accent,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				Position = UDim2.fromOffset(10, 8),
-				Size = UDim2.new(1, -240, 0, 22),
+				Size = UDim2.new(1, -(120 + PRICE_WIDTH), 0, 22),
 				Parent = row,
 			})
 			UIKit.label({
@@ -221,14 +294,24 @@ function ShowcasePanel.Start(
 				detail = unlockText(showcase)
 			end
 			UIKit.label({
-				Text = detail,
+				Text = if level then detail else `How to unlock: {detail}`,
 				TextSize = 13,
 				TextColor3 = if level then Color3.fromRGB(170, 230, 255) else colors.Gold,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				Position = UDim2.fromOffset(10, 64),
-				Size = UDim2.new(1, -20, 0, 18),
+				Size = UDim2.new(1, if level then -20 else -(PROGRESS_WIDTH + 30), 0, 18),
 				Parent = row,
 			})
+			if not level then
+				local unlock = showcase.Unlock
+				local progress = (current.UnlockProgress or {})[showcase.Id]
+				if unlock.Kind == "CE" and unlock.Price then
+					local bar = progressBar(row, 0, unlock.Price)
+					table.insert(ceBars, { Bar = bar, Price = unlock.Price })
+				elseif progress then
+					progressBar(row, progress.Have, progress.Need)
+				end
+			end
 
 			local showcaseId = showcase.Id
 			if level then
@@ -242,14 +325,14 @@ function ShowcasePanel.Start(
 				end
 				local cost = Showcases.upgradeCost(ShowcaseConfig.Levels, level)
 				if cost then
-					local upgrade = rowButton(row, `Lv+ {Format.number(cost)}`, 110, -110, function()
+					local upgrade = priceButton(row, "Upgrade", cost, -110, function()
 						send("Upgrade", showcaseId)
 					end)
 					table.insert(costButtons, { Button = upgrade, Cost = cost })
 				end
 			elseif showcase.Unlock.Kind == "CE" and showcase.Unlock.Price then
 				local price = showcase.Unlock.Price
-				local buy = rowButton(row, `Unlock {Format.number(price)}`, 130, -8, function()
+				local buy = priceButton(row, "Unlock", price, -8, function()
 					send("Unlock", showcaseId)
 				end)
 				table.insert(costButtons, { Button = buy, Cost = price })

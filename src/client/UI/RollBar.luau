@@ -1,8 +1,9 @@
 -- Bottom-center ROLL bar (Slice 9): Backpack on the left, Upgrades (skill tree) on the right.
 -- With Auto Roll on, the middle is only a slim "AUTO ROLL" pill that fills as the next scan
 -- charges (NextScanAt / ScanInterval attributes); rolls fire by themselves and only the roll
--- animation shows. With it off, the big ROLL button appears (pill underneath): it fills up, glows
--- "ROLL!" when charged and waits for a press (R key, L1 on a gamepad). Clicking the pill toggles.
+-- animation shows. With it off, the ROLL button appears (pill underneath): an omikuji box
+-- (OmikujiBox) that fills with gold, rocks with "ROLL!" when charged and waits for a press (click,
+-- R key, L1 on a gamepad); pressing rattles it and rolls. Clicking the pill toggles.
 -- The server decides everything; this only shows the charge and sends RollNow / SetAutoRoll.
 
 local Players = game:GetService("Players")
@@ -13,6 +14,7 @@ local UserInputService = game:GetService("UserInputService")
 local Format = require(ReplicatedStorage.Shared.Format)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
+local OmikujiBox = require(script.Parent.OmikujiBox)
 local UIKit = require(script.Parent.UIKit)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -27,6 +29,9 @@ export type Callbacks = {
 }
 
 local ROLL_SIZE = 112
+local BOX_SIZE = Vector2.new(78, 102)
+-- The charge lights the lacquer up from the bottom (bright red over the dark box).
+local CHARGE_COLOR = Color3.fromRGB(235, 82, 58)
 local SIDE_SIZE = 76
 
 local function sideButton(parent: Instance, name: string, caption: string, order: number): (TextButton, Frame)
@@ -40,19 +45,22 @@ local function sideButton(parent: Instance, name: string, caption: string, order
 	UIKit.fill(button)
 	UIKit.skinPanel(button)
 	Motion.button(button)
-	UIKit.label({
-		Name = "Caption",
-		Text = caption,
-		TextSize = 13,
-		TextStrokeTransparency = 0.5,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -3),
-		Size = UDim2.new(1, -4, 0, 14),
-		ZIndex = 2,
-		Parent = button,
-	})
+	UIKit.iconCaption(button, caption, 15)
 	return button, slot
+end
+
+-- The icon centered in a side button at full size (the caption hangs below the button).
+local function sideIcon(button: TextButton, key: string)
+	local icon = Icons.draw(button, key)
+	if not icon then
+		return
+	end
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.new(0.5, 0, 0.5, -3)
+	local scale = icon:FindFirstChildOfClass("UIScale")
+	if scale then
+		scale.Scale = math.max(scale.Scale, 1.15)
+	end
 end
 
 -- Transparency sequence that shows the bottom `fraction` of a vertical gradient.
@@ -93,7 +101,7 @@ function RollBar.Start(screen: ScreenGui, callbacks: Callbacks): { Frame: Frame,
 	UIKit.scaler(bar)
 
 	local backpack, backpackSlot = sideButton(bar, "BackpackButton", "Backpack", 1)
-	Icons.draw(backpack, "Backpack")
+	sideIcon(backpack, "Backpack")
 	backpack.Activated:Connect(callbacks.OnBackpack)
 
 	local middle = UIKit.create("Frame", {
@@ -103,50 +111,31 @@ function RollBar.Start(screen: ScreenGui, callbacks: Callbacks): { Frame: Frame,
 		BackgroundTransparency = 1,
 		Parent = bar,
 	})
-	local roll = UIKit.create("TextButton", {
+	-- The ROLL button is the omikuji box (the same one the roll animation rattles): the charge fills
+	-- it from the bottom in gold, and the caption on its bottom edge shows the timer, "ROLL!" or FULL.
+	-- `roll` holds the box and does the charged rocking; the box is the button (and shakes).
+	local roll = UIKit.create("Frame", {
 		Name = "RollButton",
-		Text = "",
-		AutoButtonColor = false,
-		BackgroundColor3 = colors.Panel,
+		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromOffset(ROLL_SIZE / 2, ROLL_SIZE / 2),
-		Size = UDim2.fromOffset(ROLL_SIZE, ROLL_SIZE),
+		Position = UDim2.fromOffset(ROLL_SIZE / 2, math.round(ROLL_SIZE * 0.47)),
+		Size = UDim2.fromOffset(BOX_SIZE.X, BOX_SIZE.Y),
 		Parent = middle,
-	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
-	local rollStroke = UIKit.stroke(colors.Accent, 4, 0.1)
-	rollStroke.Parent = roll
-	Motion.button(roll)
+	})
+	local box = OmikujiBox.draw(roll, BOX_SIZE, 1, "TextButton") :: TextButton
+	Motion.button(box)
+	OmikujiBox.SetLauncher(box)
+	local rollStroke = box:FindFirstChildOfClass("UIStroke") :: UIStroke
 	local charge = UIKit.create("Frame", {
 		Name = "Charge",
 		Size = UDim2.fromScale(1, 1),
-		BackgroundColor3 = colors.Accent,
-		BackgroundTransparency = 0.25,
-		Parent = roll,
-	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+		BackgroundColor3 = CHARGE_COLOR,
+		BackgroundTransparency = 0.35,
+		ZIndex = 1,
+		Parent = box,
+	}, { UIKit.corner(math.round(8 * BOX_SIZE.X / 66)) })
 	local gradient = UIKit.create("UIGradient", { Rotation = -90, Parent = charge })
-	local rollLabel = UIKit.label({
-		Name = "Title",
-		Text = "ROLL",
-		TextSize = 30,
-		TextStrokeTransparency = 0.4,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.42),
-		Size = UDim2.new(1, 0, 0, 32),
-		ZIndex = 2,
-		Parent = roll,
-	})
-	local subLabel = UIKit.label({
-		Name = "Timer",
-		TextSize = 14,
-		TextStrokeTransparency = 0.5,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.68),
-		Size = UDim2.new(1, 0, 0, 16),
-		ZIndex = 2,
-		Parent = roll,
-	})
+	local rollLabel = UIKit.iconCaption(box, "ROLL", 20)
 
 	-- With Auto Roll on this pill is all that shows between Backpack and Upgrades: it fills up as
 	-- the next roll charges. With it off it sits under the ROLL button.
@@ -174,7 +163,7 @@ function RollBar.Start(screen: ScreenGui, callbacks: Callbacks): { Frame: Frame,
 	})
 
 	local upgrades, upgradesSlot = sideButton(bar, "UpgradesButton", "Upgrades", 3)
-	Icons.draw(upgrades, "Upgrades")
+	sideIcon(upgrades, "Upgrades")
 	upgrades.Activated:Connect(callbacks.OnUpgrades)
 
 	local function isAuto(): boolean
@@ -211,10 +200,11 @@ function RollBar.Start(screen: ScreenGui, callbacks: Callbacks): { Frame: Frame,
 		if player:GetAttribute("RollCharged") == true then
 			RollNow:FireServer()
 			Motion.punch(roll, 3)
+			Motion.shake(box, 120)
 		end
 	end
-	roll.Activated:Connect(press)
-	Motion.shineLoop(roll, 1.8, function()
+	box.Activated:Connect(press)
+	Motion.shineLoop(box, 1.8, function()
 		return player:GetAttribute("RollCharged") == true and player:GetAttribute("ScanPaused") ~= true
 	end)
 	local wasCharged = player:GetAttribute("RollCharged") == true
@@ -268,34 +258,40 @@ function RollBar.Start(screen: ScreenGui, callbacks: Callbacks): { Frame: Frame,
 			gradient.Transparency = fillSequence(1)
 			charge.BackgroundColor3 = colors.Red
 			rollStroke.Color = colors.Red
+			rollStroke.Thickness = 3
+			roll.Rotation = 0
 			rollLabel.Text = "FULL"
-			subLabel.Text = "Sell relics"
+			rollLabel.TextColor3 = colors.Red
 			return
 		end
 		if player:GetAttribute("RollCharged") == true then
-			local pulse = 0.5 + 0.5 * math.sin(os.clock() * 8)
+			-- Charged: the box lights up, its rim pulses and it rocks, begging to be shaken.
+			local now = os.clock()
+			local pulse = 0.5 + 0.5 * math.sin(now * 8)
 			gradient.Transparency = fillSequence(1)
-			charge.BackgroundColor3 = colors.Gold
+			charge.BackgroundColor3 = CHARGE_COLOR
 			rollStroke.Color = colors.Gold
-			rollStroke.Thickness = 4 + pulse * 3
+			rollStroke.Thickness = 2 + pulse * 3
+			roll.Rotation = math.sin(now * 6) * 4
 			rollLabel.Text = "ROLL!"
-			subLabel.Text = "Ready"
+			rollLabel.TextColor3 = colors.Gold
 			return
 		end
-		rollStroke.Thickness = 4
-		rollStroke.Color = colors.Accent
-		charge.BackgroundColor3 = colors.Accent
-		rollLabel.Text = "ROLL"
+		rollStroke.Thickness = 2
+		rollStroke.Color = colors.Gold
+		charge.BackgroundColor3 = CHARGE_COLOR
+		roll.Rotation = 0
+		rollLabel.TextColor3 = colors.Text
 		local nextAt = player:GetAttribute("NextScanAt")
 		local interval = player:GetAttribute("ScanInterval")
 		if type(nextAt) ~= "number" or type(interval) ~= "number" or interval <= 0 then
 			gradient.Transparency = fillSequence(0)
-			subLabel.Text = "Warming up"
+			rollLabel.Text = "ROLL"
 			return
 		end
 		local remaining = math.max(0, nextAt - workspace:GetServerTimeNow())
 		gradient.Transparency = fillSequence(math.clamp(1 - remaining / interval, 0, 1))
-		subLabel.Text = if isAuto() then `Auto {Format.seconds(remaining)}` else Format.seconds(remaining)
+		rollLabel.Text = Format.seconds(remaining)
 	end)
 
 	return {

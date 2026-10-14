@@ -9,8 +9,7 @@ local AutoSell = require(ReplicatedStorage.Shared.AutoSell)
 local Config = require(ReplicatedStorage.Shared.Config)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RollMath = require(ReplicatedStorage.Shared.RollMath)
-local RollRules = require(ReplicatedStorage.Shared.RollRules)
+local RelicIncome = require(ReplicatedStorage.Shared.RelicIncome)
 local DataService = require(script.Parent.DataService)
 local PedestalService = require(script.Parent.PedestalService)
 local SellService = require(script.Parent.SellService)
@@ -24,15 +23,6 @@ for _, tier in RarityConfig.Tiers do
 	table.insert(TIER_IDS, tier.Id)
 end
 local DEFAULTS = AutoSell.defaults(TIER_IDS)
-
-local baseOneIn: { [string]: number } = {}
-do
-	local base = RollMath.contextFor(RollRules, { FullLuck = 1 })
-	for _, relic in RelicConfig.Relics do
-		local p = RollMath.itemProbability(base, relic.Id)
-		baseOneIn[relic.Id] = if p > 0 then 1 / p else math.huge
-	end
-end
 
 local KEEP_TIER = RarityConfig.IndexById[Config.Inventory.OverflowKeepTier]
 local KEEP_MUTATED_TIER = RarityConfig.IndexById[Config.Inventory.OverflowKeepMutatedTier]
@@ -63,7 +53,7 @@ function AutoSellService.SetRules(player: Player, raw: any): boolean
 end
 
 function AutoSellService.BaseOneIn(relicId: string): number
-	return baseOneIn[relicId] or math.huge
+	return RelicIncome.oneIn(relicId)
 end
 
 -- Pipeline stage. `items` are the batch's new items (already in the inventory, in grant order),
@@ -87,11 +77,14 @@ function AutoSellService.Apply(
 		inBatch[item.Uid] = true
 	end
 	-- Best income already held per base relic (items held before this batch, plus displayed ones).
+	-- `held` counts backpack slots only: relics on pedestals don't use them.
 	local bestHeld: { [string]: number } = {}
 	local held = 0
 	for _, item in data.Inventory do
 		if not inBatch[item.Uid] or shown[item.Uid] then
-			held += 1
+			if not PedestalService.IsDisplayed(player, item.Uid) then
+				held += 1
+			end
 			local income = PedestalService.RelicIncome(item)
 			bestHeld[item.Id] = math.max(bestHeld[item.Id] or -1, income)
 		end

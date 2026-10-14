@@ -158,11 +158,47 @@ return {
 			expect.equal(data.CodexMutations.HolloBait.Golden, 10, "mutation record")
 			expect.truthy(data.Favorites.HolloBait and data.Favorites["HolloBait|Golden"], "favorites")
 			expect.equal(data.RareHistory[1].Id, "KubikiriCleaver", "rare history")
-			expect.equal(data.Cosmetic.Key, "HolloBait|Golden", "carried relic")
+			expect.equal(data.Cosmetic.Uid, 1, "carried relic becomes the floating copy")
 			for oldId, newId in Migrations.RenamedRelics do
 				expect.truthy(RelicConfig.ById[newId], `{oldId} renames to unknown {newId}`)
 				expect.equal(RelicConfig.ById[oldId], nil, `{oldId} is still in the roster`)
 			end
+		end,
+	},
+	{
+		Name = "v4 data converts the offline snapshot to CE per second and gains Rebirths",
+		Run = function()
+			local data = { DataVersion = 4, Offline = { IncomePerMin = 600, At = 123 } }
+			expect.equal(Migrations.run(data, DataTemplate.Version), "Migrated", "outcome")
+			expect.equal(data.Offline.IncomePerSec, 10, "per second")
+			expect.equal(data.Offline.IncomePerMin, nil, "old field removed")
+			expect.equal(data.Offline.At, 123, "time kept")
+			reconcile(data, DataTemplate.Template)
+			expect.equal(data.Rebirths, 0, "rebirths reconciled")
+			expect.equal(data.Settings.AutoEquip, false, "auto-equip defaults off (game pass)")
+		end,
+	},
+	{
+		Name = "v5 data turns the carried relic into one floating copy that isn't on a pedestal",
+		Run = function()
+			local data = {
+				DataVersion = 5,
+				Inventory = {
+					{ Uid = 4, Id = "SenzoBean", Mutation = "Golden" },
+					{ Uid = 7, Id = "SenzoBean", Mutation = "Golden" },
+					{ Uid = 9, Id = "SenzoBean" },
+				},
+				Pedestals = { { Level = 1, Locked = false, Uid = 4 } },
+				Cosmetic = { Key = "SenzoBean|Golden", Mode = "Hand" },
+			}
+			expect.equal(Migrations.run(data, DataTemplate.Version), "Migrated", "outcome")
+			expect.equal(data.Cosmetic.Uid, 7, "the copy in the backpack floats")
+			expect.equal(data.Cosmetic.Key, nil, "old key removed")
+			expect.equal(data.Cosmetic.Mode, nil, "hold mode removed")
+
+			local none = { DataVersion = 5, Inventory = {}, Cosmetic = { Key = "", Mode = "Float" } }
+			Migrations.run(none, DataTemplate.Version)
+			expect.equal(none.Cosmetic.Uid, 0, "nothing carried, nothing floats")
 		end,
 	},
 	{

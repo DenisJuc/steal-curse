@@ -7,9 +7,10 @@ function Formulas.coreLuck(rank: number): number
 	return 10 ^ (rank / 10)
 end
 
--- CE cost to buy Core Luck rank n (GDD 5.3 test baseline).
+-- CE cost to buy Core Luck rank n + 1 (test baseline for SkillConfig): x10 luck costs about
+-- x100 CE, so luck grows like the square root of what is spent on it.
 function Formulas.coreLuckCost(rank: number): number
-	return math.ceil(20 * 1.12 ^ rank)
+	return math.ceil(100 * 1.6 ^ rank - 1e-9)
 end
 
 -- Bonus discoveries for one successful capture (GDD 4.4). The captured relic is in addition to these.

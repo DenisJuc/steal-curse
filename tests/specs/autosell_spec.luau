@@ -41,7 +41,7 @@ end
 
 return {
 	{
-		Name = "saved defaults equal AutoSell.defaults and keep everything",
+		Name = "saved defaults equal AutoSell.defaults: auto-sell is off, everything is kept",
 		Run = function()
 			local defaults = AutoSell.defaults(TIER_IDS)
 			local saved = DataTemplate.Template.Settings.AutoSell
@@ -54,7 +54,41 @@ return {
 			for _, tierId in TIER_IDS do
 				local sell = AutoSell.decide(defaults, facts({ Tier = tierId, Duplicate = true }))
 				expect.equal(sell, false, `default rules keep a {tierId} duplicate`)
+				local keep = AutoSell.decide(defaults, facts({ Tier = tierId }))
+				expect.equal(keep, false, `default rules keep a new {tierId}`)
+				local mutated = AutoSell.decide(defaults, facts({ Tier = tierId, Duplicate = true, Mutated = true }))
+				expect.equal(mutated, false, `default rules keep a mutated {tierId}`)
 			end
+		end,
+	},
+	{
+		Name = "sell all empties the backpack except locked, favorite and floating copies",
+		Run = function()
+			local function copy(uid: number, extra: { [string]: any }?): AutoSell.Copy
+				local result = { Uid = uid, Displayed = false, Locked = false, Favorite = false, Floating = false }
+				for key, value in extra or {} do
+					(result :: any)[key] = value
+				end
+				return result
+			end
+			local sold = {}
+			for _, uid in
+				AutoSell.sellAll({
+					copy(1),
+					copy(2, { Displayed = true }),
+					copy(3, { Locked = true }),
+					copy(4, { Favorite = true }),
+					copy(5, { Floating = true }),
+					copy(6),
+				})
+			do
+				sold[uid] = true
+			end
+			expect.truthy(sold[1] and sold[6], "plain backpack copies sold")
+			expect.truthy(not sold[2], "pedestal relics are not in the backpack")
+			expect.truthy(not sold[3], "locked kept")
+			expect.truthy(not sold[4], "favorite kept")
+			expect.truthy(not sold[5], "floating kept")
 		end,
 	},
 	{

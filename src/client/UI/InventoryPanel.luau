@@ -1,9 +1,11 @@
--- Backpack (GDD 9.2, 12.1; Slice 10): the one place for relics and items. The Relics tab is a card
--- grid (3D render, name, count, income, mutation gem, lock / favorite / pedestal markers) with a
--- detail panel on the right for the selected card: base and current 1-in-X odds (RollMath via
--- Odds), income, sell value and the actions: equip/unequip (pedestal), sell, lock, favorite and
--- carry (for show: floating, then in hand, then put away; display only). Equip Best, Auto-Sell
--- and the held count sit in the footer. The Items tab lists potions.
+-- Backpack (GDD 9.2, 12.1; Slice 10): the one place for relics and items. Relics on pedestals are
+-- not in it (take one back with E on its pedestal). The Relics tab is a card grid (3D render, name,
+-- count, income, mutation gem, lock / favorite / floating markers) with a detail panel on the right
+-- for the selected card: base and current 1-in-X odds (RollMath via Odds), income, sell value and
+-- the actions: equip (best pedestal), float (one copy hovers beside you; display only), sell,
+-- lock and favorite. Equip Best, Auto-Sell (the rules) and the slot count sit in the footer. The
+-- header has "Sell all" (everything but locked, favorite and floating relics; tap twice to confirm)
+-- and a link to the auto-sell rules. The Items tab lists potions.
 -- The Shrine's "Choose" opens this menu in pick mode: tapping a card places it on that pedestal.
 -- Every button sends an intent; the server answers with the fresh state.
 -- Renders: only cards scrolled into view get a 3D render, from a shared cache (RelicViewport).
@@ -35,7 +37,8 @@ export type State = {
 	Count: number,
 	Capacity: number,
 	AutoSell: any,
-	Carry: { Key: string, Mode: string }?,
+	-- What "Sell all" sells right now.
+	SellAll: { Count: number, Value: number }?,
 }
 
 export type Hooks = {
@@ -45,6 +48,8 @@ export type Hooks = {
 }
 
 local TAB_HEIGHT = 32
+local SELL_ALL_WIDTH = 250
+local CONFIRM_SECONDS = 4
 local FOOTER_HEIGHT = 36
 local SIDE_WIDTH = 230
 local CELL = Vector2.new(100, 126)
@@ -104,7 +109,8 @@ function InventoryPanel.Start(
 	local pickSlot: number? = nil
 	local renders = RelicViewport.cache(MAX_LIVE_RENDERS)
 
-	local panel, content = UIKit.modal(screen, "RelicsMenu", "BACKPACK", colors.Gold, Vector2.new(860, 620))
+	local panel, content =
+		UIKit.modal(screen, "RelicsMenu", "BACKPACK", colors.Gold, Vector2.new(860, 620), "Backpack")
 
 	-- Tabs.
 	local tabs = UIKit.create("Frame", {
@@ -163,6 +169,82 @@ function InventoryPanel.Start(
 			end
 		end)
 	end
+
+	local send: (string, ...any) -> ()
+
+	-- Header right: "Sell all" (tap, then tap again within CONFIRM_SECONDS) and a link to the
+	-- auto-sell rules.
+	local sellAll: TextButton
+	local confirmUntil = 0
+	local refreshSellAll: () -> ()
+	sellAll = UIKit.button({
+		Name = "SellAll",
+		Text = "Sell all",
+		TextSize = 15,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.fromOffset(SELL_ALL_WIDTH, TAB_HEIGHT),
+		Parent = content,
+	}, function()
+		if not (state and state.SellAll and state.SellAll.Count > 0) then
+			return
+		end
+		if os.clock() < confirmUntil then
+			confirmUntil = 0
+			Motion.markCoinSource(sellAll)
+			send("SellAll")
+		else
+			confirmUntil = os.clock() + CONFIRM_SECONDS
+			Motion.punch(sellAll, 2)
+			task.delay(CONFIRM_SECONDS, function()
+				if confirmUntil ~= 0 and os.clock() >= confirmUntil then
+					confirmUntil = 0
+					refreshSellAll()
+				end
+			end)
+		end
+		refreshSellAll()
+	end)
+	local autoSellLink = UIKit.button({
+		Name = "AutoSellLink",
+		Text = "",
+		TextSize = 13,
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -(SELL_ALL_WIDTH + 8), 0, 0),
+		Size = UDim2.fromOffset(220, TAB_HEIGHT),
+		TextXAlignment = Enum.TextXAlignment.Right,
+		Parent = content,
+	}, function()
+		hooks.OnOpenAutoSell(state)
+	end)
+	autoSellLink.TextColor3 = colors.SubText
+
+	function refreshSellAll()
+		local preview = state and state.SellAll
+		local count = if preview then preview.Count else 0
+		local confirming = count > 0 and os.clock() < confirmUntil
+		if confirming then
+			sellAll.Text = `Tap again: sell {count} (+{Format.ce(preview.Value)})`
+		elseif count > 0 then
+			sellAll.Text = `Sell all {count} (+{Format.ce(preview.Value)})`
+		else
+			sellAll.Text = "Sell all"
+		end
+		UIKit.skinButton(sellAll, if confirming then "Danger" elseif count > 0 then "Gold" else "Dark")
+		sellAll.TextColor3 = if confirming then colors.Text elseif count > 0 then colors.Panel else colors.SubText
+		Motion.setDisabled(sellAll, count == 0)
+
+		local highest
+		for _, tier in RarityConfig.Tiers do
+			local mode = state and state.AutoSell and state.AutoSell.Tiers[tier.Id]
+			if mode == "SellDuplicates" or mode == "SellAll" then
+				highest = tier.Name
+			end
+		end
+		autoSellLink.Text = if highest then `<u>Auto-sell: duplicates up to {highest}</u>` else "<u>Auto-sell: off (set up)</u>"
+	end
+	autoSellLink.RichText = true
 
 	-- Relics page: grid (left), detail (right), footer (under the grid).
 	local gridArea = UIKit.create("Frame", {
@@ -344,7 +426,7 @@ function InventoryPanel.Start(
 	end
 
 	local statusText = ""
-	local function send(action: string, ...: any)
+	function send(action: string, ...: any)
 		local args = table.pack(...)
 		task.spawn(function()
 			local ok, result = pcall(function()
@@ -372,19 +454,10 @@ function InventoryPanel.Start(
 		return instance
 	end
 	local equipButton = actionButton(1, function(group)
-		ShrineAction:FireServer(if group.Displayed > 0 then "UnequipGroup" else "EquipGroup", group.Id, group.Mutation)
+		ShrineAction:FireServer("EquipGroup", group.Id, group.Mutation)
 	end)
-	local carryButton
-	local function carryMode(group: any): string?
-		if state and state.Carry and state.Carry.Key == groupKey(group) then
-			return state.Carry.Mode
-		end
-		return nil
-	end
-	carryButton = actionButton(2, function(group)
-		local mode = carryMode(group)
-		local nextMode = if mode == nil then "Float" elseif mode == "Float" then "Hand" else "None"
-		send("Carry", group.Id, group.Mutation, nextMode)
+	local floatButton = actionButton(2, function(group)
+		send("Float", group.Id, group.Mutation, not group.Floating)
 	end)
 	local sellOneButton, sellAllButton
 	sellOneButton = actionButton(3, function(group)
@@ -428,7 +501,7 @@ function InventoryPanel.Start(
 			detailName.TextColor3 = colors.SubText
 			detailInfo.Text = if statusText ~= "" then escape(statusText) else "Favorite: never auto-sold. Lock: can't be sold."
 			sideStroke.Color = colors.Gold
-			for _, button in { equipButton, carryButton, sellOneButton, sellAllButton, lockButton, favButton } do
+			for _, button in { equipButton, floatButton, sellOneButton, sellAllButton, lockButton, favButton } do
 				styleAction(button, button.Text, false)
 			end
 			return
@@ -446,10 +519,10 @@ function InventoryPanel.Start(
 		local yours = RollMath.comboProbability(Odds.current(), group.Id, group.Mutation)
 		local lines = {
 			`<b>{if tier then tier.Name else "?"}</b>{if group.Mutation then `  |  {group.Mutation}` else ""}`,
-			`Owned x{group.Count}{if group.Displayed > 0 then `  |  {group.Displayed} on pedestal` else ""}{if group.Locked > 0
-				then `  |  {group.Locked} locked`
+			`In backpack x{group.Count}{if group.Locked > 0 then `  |  {group.Locked} locked` else ""}{if group.Floating
+				then "  |  1 floating"
 				else ""}`,
-			`Income +{Format.number(group.IncomePerMin)} CE/min`,
+			`Income +{Format.rate(group.IncomePerSec)} CE`,
 			`Sells for {Format.number(group.SellValue)} CE`,
 			`Base {Format.odds(Odds.baseItem(group.Id))}  |  Yours {Format.odds(yours)}`,
 		}
@@ -461,15 +534,13 @@ function InventoryPanel.Start(
 		end
 		detailInfo.Text = table.concat(lines, "\n")
 
-		local carried = carryMode(group)
-		local equipped = group.Displayed > 0
 		local allLocked = group.Locked >= group.Count
-		styleAction(equipButton, if equipped then "Unequip" else "Equip", true, if equipped then colors.Gold else nil)
+		styleAction(equipButton, "Equip", true)
 		styleAction(
-			carryButton,
-			if carried == nil then "Carry" elseif carried == "Float" then "Hold" else "Put away",
+			floatButton,
+			if group.Floating then "Stop floating" else "Float",
 			true,
-			if carried then colors.Gold else colors.Panel
+			if group.Floating then colors.Gold else colors.Panel
 		)
 		styleAction(sellOneButton, "Sell 1", group.Sellable > 0)
 		styleAction(sellAllButton, "Sell all", group.Sellable > 0)
@@ -482,10 +553,6 @@ function InventoryPanel.Start(
 	local function onCardClicked(group: any)
 		local slot = pickSlot
 		if slot then
-			if group.Count - group.Displayed <= 0 then
-				detailInfo.Text = "Every copy of that relic is already on a pedestal."
-				return
-			end
 			ShrineAction:FireServer("DisplayGroup", slot, group.Id, group.Mutation)
 			endPick()
 			return
@@ -515,8 +582,6 @@ function InventoryPanel.Start(
 		end
 	end
 	local function makeCard(index: number, group: any)
-		local spare = group.Count - group.Displayed
-		local dimmed = pickSlot ~= nil and spare <= 0
 		local selected = pickSlot == nil and groupKey(group) == selectedKey
 		local color = relicColor(group.Id, group.Mutation)
 		local cell = UIKit.slot(grid, "Cell", UDim2.new(), index)
@@ -524,7 +589,6 @@ function InventoryPanel.Start(
 			Name = "Card",
 			Text = "",
 			BackgroundColor3 = colors.Card,
-			BackgroundTransparency = if dimmed then 0.5 else 0,
 			Parent = cell,
 		}, {
 			UIKit.corner(10),
@@ -536,16 +600,13 @@ function InventoryPanel.Start(
 		})
 		UIKit.fill(card)
 		Motion.button(card)
-		Motion.setDisabled(card, dimmed)
 		card:SetAttribute("PopIn", true)
 		if selected and groupKey(group) == justSelected then
 			justSelected = nil
 			Motion.punch(card, 2)
 		end
 		card.Activated:Connect(function()
-			if not dimmed then
-				onCardClicked(group)
-			end
+			onCardClicked(group)
 		end)
 		UIKit.create("Frame", {
 			Name = "RenderSlot",
@@ -568,7 +629,7 @@ function InventoryPanel.Start(
 		})
 		UIKit.label({
 			Name = "Income",
-			Text = `+{Format.number(group.IncomePerMin)}/m`,
+			Text = `+{Format.rate(group.IncomePerSec)}`,
 			TextSize = 11,
 			TextColor3 = colors.Gold,
 			TextXAlignment = Enum.TextXAlignment.Left,
@@ -594,17 +655,14 @@ function InventoryPanel.Start(
 			marker(card, text, badgeColor, Vector2.new(1, 0), UDim2.new(1, -right, 0, 4))
 			right += 22
 		end
-		if group.Displayed > 0 then
-			corner("P", colors.Gold)
+		if group.Floating then
+			corner("F", colors.Accent)
 		end
 		if group.Locked > 0 then
 			corner("L", colors.SubText)
 		end
 		if group.Favorite then
 			corner("*", colors.Red)
-		end
-		if carryMode(group) then
-			corner("C", colors.Accent)
 		end
 		cards[card] = group
 	end
@@ -625,6 +683,7 @@ function InventoryPanel.Start(
 			then ` (+{over})`
 			else ""}`
 		countLabel.TextColor3 = if full then colors.Red else colors.Gold
+		refreshSellAll()
 		if not selectedGroup() then
 			selectedKey = nil
 		end
@@ -651,6 +710,8 @@ function InventoryPanel.Start(
 		countLabel.Visible = slot == nil
 		equipBest.Visible = slot == nil
 		autoSell.Visible = slot == nil
+		sellAll.Visible = slot == nil
+		autoSellLink.Visible = slot == nil
 		emptyPedestal.Visible = slot ~= nil
 		backButton.Visible = slot ~= nil
 		if slot then

@@ -59,6 +59,7 @@ AutoSell.ReasonText = {
 	InventoryFull = "inventory full",
 } :: { [string]: string }
 
+-- Every tier starts on "Keep All": auto-selling is opt-in (Backpack > Auto-sell).
 function AutoSell.defaults(tierIds: { string }): Rules
 	local tiers = {}
 	for _, tierId in tierIds do
@@ -122,6 +123,27 @@ function AutoSell.decide(rules: Rules, facts: Facts): (boolean, Reason)
 		return true, "OddsThreshold"
 	end
 	return false, "NoRule"
+end
+
+export type Copy = {
+	Uid: number,
+	-- On a pedestal: not in the backpack at all.
+	Displayed: boolean,
+	Locked: boolean,
+	Favorite: boolean,
+	Floating: boolean,
+}
+
+-- The Backpack's "Sell all": every copy in the backpack except locked, favorite and floating ones.
+-- Relics on pedestals aren't in the backpack, so equipping is how a player keeps the best ones.
+function AutoSell.sellAll(copies: { Copy }): { number }
+	local sell = {}
+	for _, copy in copies do
+		if not (copy.Displayed or copy.Locked or copy.Favorite or copy.Floating) then
+			table.insert(sell, copy.Uid)
+		end
+	end
+	return sell
 end
 
 -- Favorites are per relic + mutation, so future copies are protected too.

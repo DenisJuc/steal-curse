@@ -1,5 +1,5 @@
--- Top-right quick travel (Slice 11): Home (your shrine), Hub (the plaza) and Wild (the nearest edge
--- of the wild ring). The server picks the spot, applies the cooldown and refuses during a bind;
+-- Top-right quick travel (Slice 11): Home (your shrine), Hub (the plaza), Wild (the nearest edge
+-- of the wild ring) and Shrines (a list of the Cursed Shrines you cleansed). The server picks the spot, applies the cooldown and refuses during a bind;
 -- this only sends Teleport and greys the buttons while the cooldown runs (TravelReadyAt). Pressing
 -- a greyed button shakes it and says when travel is ready.
 
@@ -7,6 +7,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local Config = require(ReplicatedStorage.Shared.Config)
+local WildLayout = require(ReplicatedStorage.Shared.WildLayout)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local Toasts = require(script.Parent.Toasts)
@@ -32,7 +34,7 @@ function TravelBar.Start(screen: ScreenGui): { SetVisible: (boolean) -> () }
 		Name = "TravelBar",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -12, 0, 12),
-		Size = UDim2.fromOffset(width * #DESTINATIONS + 6 * (#DESTINATIONS - 1), BUTTON_HEIGHT),
+		Size = UDim2.fromOffset(width * (#DESTINATIONS + 1) + 6 * #DESTINATIONS, BUTTON_HEIGHT),
 		BackgroundTransparency = 1,
 		Parent = screen,
 	}, {
@@ -73,6 +75,80 @@ function TravelBar.Start(screen: ScreenGui): { SetVisible: (boolean) -> () }
 		end)
 		table.insert(buttons, button)
 	end
+
+	-- Shrines: a drop-down of the Cursed Shrines this player has cleansed.
+	local areaNames: { [string]: string } = {}
+	for _, area in Config.Areas do
+		areaNames[area.Id] = area.Name
+	end
+	local shrineSlot = UIKit.slot(bar, "ShrinesSlot", UDim2.fromOffset(width, BUTTON_HEIGHT), #DESTINATIONS + 1)
+	local menu = UIKit.create("Frame", {
+		Name = "ShrineMenu",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, 0, 1, 6),
+		Size = UDim2.fromOffset(210, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = colors.Panel,
+		BackgroundTransparency = 0.1,
+		Visible = false,
+		Parent = shrineSlot,
+	}, {
+		UIKit.corner(8),
+		UIKit.padding(6),
+		UIKit.create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 4) }),
+	})
+	local function cleansedIds(): { string }
+		local text = player:GetAttribute("Cleansed")
+		return if type(text) == "string" and text ~= "" then string.split(text, ",") else {}
+	end
+	local function fillMenu()
+		for _, child in menu:GetChildren() do
+			if child:IsA("GuiButton") then
+				child:Destroy()
+			end
+		end
+		for order, id in cleansedIds() do
+			local shrine = WildLayout.ShrineById[id]
+			if not shrine then
+				continue
+			end
+			local number = string.match(id, "%d+") or ""
+			local item = UIKit.button({
+				Name = id,
+				LayoutOrder = order,
+				Text = `{areaNames[shrine.Area] or shrine.Area} Shrine {number}`,
+				TextSize = 14,
+				Size = UDim2.new(1, 0, 0, 28),
+				Parent = menu,
+			}, function()
+				menu.Visible = false
+				Teleport:FireServer(`Shrine:{id}`)
+			end)
+			UIKit.skinButton(item, "Dark")
+		end
+	end
+	local shrineButton = UIKit.button({
+		Name = "ShrinesTravel",
+		Text = "Shrines",
+		TextSize = 14,
+		Parent = shrineSlot,
+	}, function()
+		if #cleansedIds() == 0 then
+			Toasts.Show("Cleanse a Cursed Shrine in the wild to travel to it.")
+			return
+		end
+		fillMenu()
+		menu.Visible = not menu.Visible
+	end)
+	UIKit.fill(shrineButton)
+	UIKit.skinButton(shrineButton, "Dark")
+	shrineButton.BackgroundColor3 = colors.Panel
+	table.insert(buttons, shrineButton)
+	player:GetAttributeChangedSignal("Cleansed"):Connect(function()
+		if menu.Visible then
+			fillMenu()
+		end
+	end)
 
 	local wasCooling = false
 	RunService.Heartbeat:Connect(function()

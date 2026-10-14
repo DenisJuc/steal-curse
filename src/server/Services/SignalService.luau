@@ -20,6 +20,8 @@ local SignalService = {}
 export type Signal = {
 	Id: number,
 	Position: Vector3,
+	-- Lightning-struck until this server time (WildFindsService): its capture gives Lightning Luck.
+	StruckUntil: number?,
 }
 
 export type SpawnPoint = { Position: Vector3, Area: string }
@@ -46,7 +48,7 @@ end
 local function push(player: Player, state: State)
 	local list = {}
 	for _, signal in state.Signals do
-		table.insert(list, { Id = signal.Id, Position = signal.Position })
+		table.insert(list, { Id = signal.Id, Position = signal.Position, StruckUntil = signal.StruckUntil })
 	end
 	SignalsUpdated:FireClient(player, list)
 	player:SetAttribute("SignalCount", #list)
@@ -160,6 +162,7 @@ local function relocate(player: Player, state: State)
 	state.Area = areaOf(anchor)
 	for _, signal in moving do
 		signal.Position = pickPosition(state, anchor) or signal.Position
+		signal.StruckUntil = nil
 		state.Signals[signal.Id] = signal
 	end
 	push(player, state)
@@ -257,6 +260,56 @@ function SignalService.Consume(player: Player, signalId: number): boolean
 	updateRegen(state, workspace:GetServerTimeNow())
 	push(player, state)
 	return true
+end
+
+-- A random signal spot between minDistance and maxDistance (flat) from `from`, or nil.
+function SignalService.RandomPoint(from: Vector3, minDistance: number, maxDistance: number, rng: Random): SpawnPoint?
+	local pool = {}
+	for _, point in spawnPoints do
+		local distance = flatDistance(point.Position, from)
+		if distance >= minDistance and distance <= maxDistance then
+			table.insert(pool, point)
+		end
+	end
+	return if #pool > 0 then pool[rng:NextInteger(1, #pool)] else nil
+end
+
+-- Lightning hits `ground`: every signal within `radius` is struck until `untilTime`. With none
+-- there, a struck signal appears at the strike (a new one, or the farthest one moved there when at
+-- the cap). Returns the struck ids.
+function SignalService.Strike(player: Player, ground: Vector3, radius: number, untilTime: number): { number }
+	local state = states[player]
+	if not state then
+		return {}
+	end
+	local bound = player:GetAttribute("BindSignalId")
+	local struck = {}
+	for id, signal in state.Signals do
+		if id ~= bound and flatDistance(signal.Position, ground) <= radius then
+			signal.StruckUntil = untilTime
+			table.insert(struck, id)
+		end
+	end
+	if #struck == 0 then
+		local at = ground + Vector3.new(0, Config.Signals.HoverHeight, 0)
+		-- At the cap, the farthest signal (not the one being bound) jumps to the strike instead.
+		local farthest, farthestDistance = nil, -1
+		if countOf(state) >= Config.Signals.MaxCount then
+			for id, signal in state.Signals do
+				local distance = flatDistance(signal.Position, ground)
+				if id ~= bound and distance > farthestDistance then
+					farthest, farthestDistance = signal, distance
+				end
+			end
+		end
+		local signal = farthest or addSignal(state, at)
+		signal.Position = at
+		signal.StruckUntil = untilTime
+		table.insert(struck, signal.Id)
+		updateRegen(state, workspace:GetServerTimeNow())
+	end
+	push(player, state)
+	return struck
 end
 
 -- Debug: spawn a signal at a given position, ignoring the cap.

@@ -5,8 +5,16 @@
 
 local ShowcaseConfig = {}
 
--- Kind "CE" (bought for Price), "Relic" (discover RelicId) or "Codex" (reach Milestone).
-export type Unlock = { Kind: string, Price: number?, RelicId: string?, Milestone: string? }
+-- Kind "CE" (bought for Price), "Relic" (discover RelicId), "Codex" (reach Milestone) or
+-- "Mastery" (reach zone mastery Level in Area).
+export type Unlock = {
+	Kind: string,
+	Price: number?,
+	RelicId: string?,
+	Milestone: string?,
+	Area: string?,
+	Level: number?,
+}
 
 export type Accessory = {
 	Id: string,
@@ -27,9 +35,9 @@ export type Showcase = {
 -- Level n: Income and Luck bonus; Cost = CE to reach level n from n - 1 (level 1 comes from the unlock).
 ShowcaseConfig.Levels = {
 	{ Income = 0.02, Luck = 0.01 },
-	{ Income = 0.05, Luck = 0.03, Cost = 5000 },
-	{ Income = 0.10, Luck = 0.05, Cost = 250000 },
-	{ Income = 0.15, Luck = 0.10, Cost = 5000000 },
+	{ Income = 0.05, Luck = 0.03, Cost = 200000 },
+	{ Income = 0.10, Luck = 0.05, Cost = 20000000 },
+	{ Income = 0.15, Luck = 0.10, Cost = 2000000000 },
 }
 
 ShowcaseConfig.MaxLevel = #ShowcaseConfig.Levels
@@ -40,7 +48,7 @@ ShowcaseConfig.Showcases = {
 		Name = "Simple Stance",
 		Style = "Stance",
 		Description = "A quiet spirit circle. You stand at its heart while wisps orbit.",
-		Unlock = { Kind = "CE", Price = 25000 },
+		Unlock = { Kind = "CE", Price = 500000 },
 		Accessories = {
 			{ Id = "BoneFluteCharm", Name = "Hollo Bait Charm", RelicId = "HolloBait" },
 		},
@@ -64,6 +72,30 @@ ShowcaseConfig.Showcases = {
 		Accessories = {
 			{ Id = "GuardianSigilTome", Name = "Guardian's Grimoire", RelicId = "QuadLeafGrimoire" },
 		},
+	},
+	{
+		Id = "ForestGrove",
+		Name = "Forest Grove",
+		Style = "Stance",
+		Description = "The forest's spirits gather around the one who knows its every path.",
+		Unlock = { Kind = "Mastery", Area = "HauntedForest", Level = 10 },
+		Accessories = {},
+	},
+	{
+		Id = "BellWatch",
+		Name = "Bell Watch",
+		Style = "Throne",
+		Description = "The old village seat, kept for the one who walked every lane after dark.",
+		Unlock = { Kind = "Mastery", Area = "AbandonedVillage", Level = 10 },
+		Accessories = {},
+	},
+	{
+		Id = "StarCircle",
+		Name = "Star Circle",
+		Style = "Guardian",
+		Description = "An ancient guardian of the ruins stands behind the one who read their stones.",
+		Unlock = { Kind = "Mastery", Area = "AncientRuins", Level = 10 },
+		Accessories = {},
 	},
 } :: { Showcase }
 

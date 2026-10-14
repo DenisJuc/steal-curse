@@ -1,7 +1,13 @@
--- Shrine pedestals (GDD 6.3, 6.4): buy slots 4-6 with CE, per-slot levels 1-10, manual display,
--- slot locks and Equip Best. New finds are never placed automatically: pedestals only change
--- when the player picks a relic or presses Equip Best. A displayed relic stays in the inventory;
--- the pedestal only points at it by Uid, so swapping never loses an item.
+-- Shrine pedestals (GDD 6.3, 6.4): buy slots 4-6 with CE, per-slot levels, manual display,
+-- slot locks and Equip Best (a free button). Auto-equip is the "AutoEquip" game pass: with the pass
+-- and the toggle on (Settings.AutoEquip, off by default, switched on when the pass is bought) Equip
+-- Best also runs after new finds (DiscoveryPipeline), slot purchases and upgrades; locked pedestals
+-- keep their relic, which is how a player keeps a hand-placed one. A displayed relic stays in the
+-- inventory; the pedestal only points at it by Uid, so swapping never loses an item. It is not in
+-- the backpack, though (InventoryService hides it, and it uses no backpack slot).
+-- "Grab" (hold E on a pedestal) takes its relic off: it floats beside the player and goes back to
+-- the backpack (CosmeticEquipService). On an empty pedestal it places the floating relic; on a full
+-- one while something floats, it swaps them. Floating relics are skipped by Equip Best.
 --
 -- Client intents arrive on ShrineAction (action name + arguments); every argument is validated and
 -- every handler is synchronous, so rapid clicks are processed one at a time against current CE.
@@ -14,10 +20,12 @@ local Economy = require(ReplicatedStorage.Shared.Economy)
 local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RelicIncome = require(ReplicatedStorage.Shared.RelicIncome)
+local CosmeticEquipService = require(script.Parent.CosmeticEquipService)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local GameEvents = require(script.Parent.GameEvents)
-local MultiplierService = require(script.Parent.MultiplierService)
+local GamePassService = require(script.Parent.GamePassService)
 local PlotService = require(script.Parent.PlotService)
 local RemoteGuard = require(script.Parent.RemoteGuard)
 local PedestalVisuals = require(script.Parent.Parent.World.PedestalVisuals)
@@ -35,12 +43,7 @@ local settings = Config.Economy
 local displayed: { [Player]: { [number]: any } } = {}
 
 local function relicIncome(item: any): number
-	local relic = RelicConfig.ById[item.Id]
-	if not relic then
-		return 0
-	end
-	local mutation = item.Mutation and MutationConfig.ById[item.Mutation]
-	return Economy.relicIncome(settings, relic.Tier, if mutation then mutation.IncomeMultiplier else 1)
+	return RelicIncome.of(item.Id, item.Mutation)
 end
 PedestalService.RelicIncome = relicIncome
 
@@ -130,7 +133,8 @@ function PedestalService.Snapshot(player: Player): { [string]: any }?
 				Multiplier = mult,
 				Id = item and item.Id,
 				Mutation = item and item.Mutation,
-				IncomePerMin = if item then relicIncome(item) * mult else 0,
+				IncomePerSec = if item then relicIncome(item) * mult else 0,
+				MaxLevel = settings.PedestalMaxLevel,
 				UpgradeCost = if pedestal.Level < settings.PedestalMaxLevel
 					then Economy.upgradeCost(settings, pedestal.Level)
 					else nil,
@@ -146,8 +150,10 @@ function PedestalService.Snapshot(player: Player): { [string]: any }?
 	end
 	return {
 		Slots = slots,
-		IncomePerMin = EconomyService.GetIncomePerMin(player),
-		IncomeMultiplier = MultiplierService.Get(player, "Income"),
+		IncomePerSec = EconomyService.GetIncomePerSec(player),
+		IncomeMultiplier = EconomyService.GetIncomeMultiplier(player),
+		AutoEquip = PedestalService.AutoEquipOn(player),
+		AutoEquipOwned = GamePassService.Owns(player, "AutoEquip"),
 	}
 end
 
@@ -160,24 +166,29 @@ function PedestalService.Refresh(player: Player)
 	ShrineState:FireClient(player, snapshot)
 	PedestalVisuals.Apply(PlotService.GetPlot(player), snapshot.Slots)
 	EconomyService.Mirror(player)
+	DataService.MirrorAttributes(player)
 end
 
+-- Placing the floating copy on a pedestal ends its float.
 local function setDisplay(player: Player, slot: number, item: any?)
 	local data = DataService.Get(player) :: any
 	data.Pedestals[slot].Uid = if item then item.Uid else nil
 	displayed[player][slot] = item
+	if item and CosmeticEquipService.IsFloating(player, item.Uid) then
+		CosmeticEquipService.Stop(player)
+	end
 end
 
 -- Equip Best (GDD 6.4): fills every unlocked pedestal with the best relics the player holds,
 -- best relic on the highest-level pedestal. Locked pedestals and their relics are never touched.
--- Returns the CE/min gained.
+-- Returns the CE/sec gained.
 function PedestalService.EquipBest(player: Player): number
 	local data = DataService.Get(player)
 	local cache = displayed[player]
 	if not data or not cache then
 		return 0
 	end
-	local before = EconomyService.GetIncomePerMin(player)
+	local before = EconomyService.GetIncomePerSec(player)
 	local views, lockedUids = {}, {}
 	for slot, pedestal in data.Pedestals do
 		views[slot] = { Locked = pedestal.Locked, Multiplier = multiplier(pedestal) }
@@ -187,7 +198,7 @@ function PedestalService.EquipBest(player: Player): number
 	end
 	local candidates, byUid = {}, {}
 	for _, item in data.Inventory do
-		if not lockedUids[item.Uid] then
+		if not lockedUids[item.Uid] and not CosmeticEquipService.IsFloating(player, item.Uid) then
 			byUid[item.Uid] = item
 			table.insert(candidates, {
 				Key = item.Uid,
@@ -203,7 +214,20 @@ function PedestalService.EquipBest(player: Player): number
 			setDisplay(player, slot, if uid then byUid[uid] else nil)
 		end
 	end
-	return EconomyService.GetIncomePerMin(player) - before
+	return EconomyService.GetIncomePerSec(player) - before
+end
+
+function PedestalService.AutoEquipOn(player: Player): boolean
+	local data = DataService.Get(player)
+	return data ~= nil and data.Settings.AutoEquip == true and GamePassService.Owns(player, "AutoEquip")
+end
+
+-- Equip Best when Auto-equip is on. Returns the CE/sec gained (0 when off).
+function PedestalService.AutoEquip(player: Player): number
+	if not PedestalService.AutoEquipOn(player) then
+		return 0
+	end
+	return PedestalService.EquipBest(player)
 end
 
 local function validSlot(data: any, slot: any): number?
@@ -220,13 +244,18 @@ local function validGroup(relicId: any, mutationId: any): boolean
 	return mutationId == nil or (type(mutationId) == "string" and MutationConfig.ById[mutationId] ~= nil)
 end
 
+-- A backpack copy of a relic + mutation, preferring one that isn't floating.
 local function spareCopy(player: Player, data: any, relicId: string, mutationId: string?): any?
+	local floating = nil
 	for _, item in data.Inventory do
 		if item.Id == relicId and item.Mutation == mutationId and not PedestalService.IsDisplayed(player, item.Uid) then
-			return item
+			if not CosmeticEquipService.IsFloating(player, item.Uid) then
+				return item
+			end
+			floating = item
 		end
 	end
-	return nil
+	return floating
 end
 
 local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
@@ -242,6 +271,7 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 			return
 		end
 		table.insert(data.Pedestals, { Level = 1, Locked = false })
+		PedestalService.AutoEquip(player)
 		DataService.RequestSave(player)
 	end,
 
@@ -266,6 +296,7 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 			return
 		end
 		pedestal.Level += levels
+		PedestalService.AutoEquip(player)
 	end,
 
 	DisplayGroup = function(player, data, slotArg, relicId, mutationId)
@@ -281,7 +312,7 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 		end
 	end,
 
-	-- From the Relics menu: one spare copy goes on the unlocked pedestal where it adds the most CE/min.
+	-- From the Relics menu: one spare copy goes on the unlocked pedestal where it adds the most CE/sec.
 	EquipGroup = function(player, data, relicId, mutationId)
 		if not validGroup(relicId, mutationId) then
 			return
@@ -307,27 +338,40 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 			return
 		end
 		setDisplay(player, slot, item)
-		Notify:FireClient(player, `Placed on pedestal {slot}: +{Format.number(gain)} CE/min`)
+		Notify:FireClient(player, `Placed on pedestal {slot}: +{Format.number(gain)} CE/sec`)
 	end,
 
-	UnequipGroup = function(player, data, relicId, mutationId)
-		if not validGroup(relicId, mutationId) then
+	-- Hold E on a pedestal: take its relic (it floats and goes back to the backpack), place the
+	-- floating relic on an empty pedestal, or swap the two.
+	Grab = function(player, data, slotArg)
+		local slot = validSlot(data, slotArg)
+		if not slot then
 			return
 		end
-		local cache = displayed[player]
-		local lockedLeft = 0
-		for slot, pedestal in data.Pedestals do
-			local item = cache[slot]
-			if item and item.Id == relicId and item.Mutation == mutationId then
-				if pedestal.Locked then
-					lockedLeft += 1
-				else
-					setDisplay(player, slot, nil)
-				end
-			end
+		local pedestal = data.Pedestals[slot]
+		local current = displayed[player][slot]
+		local floating = CosmeticEquipService.FloatingItem(player)
+		if not current and not floating then
+			fail(player, "Nothing to place. Float a relic from your Backpack first.")
+			return
 		end
-		if lockedLeft > 0 then
-			fail(player, `{lockedLeft} cop{if lockedLeft == 1 then "y is" else "ies are"} on a locked pedestal. Unlock it in the Shrine first.`)
+		local before = if current then relicIncome(current) * multiplier(pedestal) else 0
+		setDisplay(player, slot, floating)
+		if current then
+			CosmeticEquipService.Float(player, current.Uid)
+		end
+		local after = if floating then relicIncome(floating) * multiplier(pedestal) else 0
+		local change = after - before
+		local rate = `{if change >= 0 then "+" else "-"}{Format.number(math.abs(change))} CE/sec`
+		if current and floating then
+			Notify:FireClient(player, `Swapped in {CosmeticEquipService.DisplayName(floating)}: {rate}`)
+		elseif current then
+			Notify:FireClient(
+				player,
+				`Took {CosmeticEquipService.DisplayName(current)} ({rate}). Hold E on an empty pedestal to place it.`
+			)
+		elseif floating then
+			Notify:FireClient(player, `Placed {CosmeticEquipService.DisplayName(floating)}: {rate}`)
 		end
 	end,
 
@@ -348,9 +392,23 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 	EquipBest = function(player, _data)
 		local gained = PedestalService.EquipBest(player)
 		if gained > 1e-9 then
-			Notify:FireClient(player, `Equipped your best relics: +{Format.number(gained)} CE/min`)
+			Notify:FireClient(player, `Equipped your best relics: +{Format.number(gained)} CE/sec`)
 		else
 			Notify:FireClient(player, "Your best relics are already equipped.")
+		end
+	end,
+
+	SetAutoEquip = function(player, data, on)
+		if type(on) ~= "boolean" then
+			return
+		end
+		if on and not GamePassService.Owns(player, "AutoEquip") then
+			fail(player, "Auto-equip is part of the Auto-equip game pass. Equip Best is free.")
+			return
+		end
+		data.Settings.AutoEquip = on
+		if on then
+			PedestalService.EquipBest(player)
 		end
 	end,
 }
@@ -371,13 +429,30 @@ function PedestalService.Init()
 
 	DataService.OnPlayerLoaded(function(player)
 		rebuild(player)
+		PedestalService.AutoEquip(player)
 		PedestalService.Refresh(player)
 	end)
 	GameEvents.On("DataReset", function(player: Player)
 		rebuild(player)
 		PedestalService.Refresh(player)
 	end)
+	GameEvents.On("Rebirthed", function(player: Player)
+		PedestalService.AutoEquip(player)
+		PedestalService.Refresh(player)
+	end)
 	GameEvents.On("PlotAssigned", function(player: Player)
+		PedestalService.Refresh(player)
+	end)
+	-- Buying the pass switches Auto-equip on straight away.
+	GameEvents.On("GamePassChanged", function(player: Player, name: string, on: boolean)
+		local data = DataService.Get(player)
+		if name ~= "AutoEquip" or not data or not displayed[player] then
+			return
+		end
+		if on then
+			data.Settings.AutoEquip = true
+			PedestalService.AutoEquip(player)
+		end
 		PedestalService.Refresh(player)
 	end)
 	GameEvents.On("MultipliersChanged", function(player: Player)

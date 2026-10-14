@@ -38,13 +38,13 @@ local states: { [Player]: State } = {}
 -- Extra interval multipliers (e.g. a Haste potion): name -> function(player) -> multiplier.
 local intervalHooks: { [string]: (Player) -> number } = {}
 
--- Free inventory slots (0 when full or not loaded).
+-- Free backpack slots (0 when full or not loaded). Relics on pedestals don't use slots.
 function ScanService.Room(player: Player): number
 	local data = DataService.Get(player)
 	if not data then
 		return 0
 	end
-	return math.max(0, Config.Inventory.Capacity - #data.Inventory)
+	return math.max(0, Config.Inventory.Capacity - DataService.BackpackCount(data))
 end
 
 function ScanService.GetInterval(player: Player): number

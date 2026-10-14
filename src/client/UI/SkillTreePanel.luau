@@ -27,6 +27,9 @@ local SkillTreePanel = {}
 local ROW_HEIGHT = 84
 local LIST_TOP = 66
 local STAGGER = 0.045
+local UPGRADE_WIDTH = 150
+-- Room the buttons take at the card's bottom right (Max, +10 and Upgrade).
+local BUTTONS_WIDTH = 8 + 46 + 6 + 46 + 6 + UPGRADE_WIDTH + 10
 
 local function percent(value: number): string
 	return `{Format.number(value * 100)}%`
@@ -80,7 +83,8 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	local rows: { [string]: RowParts } = {}
 	local popNext = false
 
-	local panel, content = UIKit.modal(screen, "SkillsMenu", "SKILLS", colors.Accent, Vector2.new(560, 620))
+	local panel, content =
+		UIKit.modal(screen, "SkillsMenu", "SKILLS", colors.Accent, Vector2.new(560, 620), "Upgrades")
 
 	local tabs = UIKit.create("Frame", {
 		BackgroundTransparency = 1,
@@ -257,18 +261,18 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			})
 			local now = effectText(node.Id, rank)
 			UIKit.label({
-				Text = if maxed then `Now: {now}` else `Now: {now}  ->  {effectText(node.Id, rank + 1)}`,
+				Text = if maxed then `Now: {now}` else `Now: {now}  \u{2192}  {effectText(node.Id, rank + 1)}`,
 				TextSize = 13,
 				TextColor3 = colors.Cyan,
 				TextTruncate = Enum.TextTruncate.AtEnd,
 				Position = UDim2.fromOffset(12, 48),
-				Size = UDim2.new(1, -240, 0, 18),
+				Size = UDim2.new(1, -(12 + BUTTONS_WIDTH), 0, 18),
 				Parent = card,
 			})
 			local track = UIKit.create("Frame", {
 				Name = "RankBar",
 				Position = UDim2.new(0, 12, 1, -13),
-				Size = UDim2.new(1, -252, 0, 5),
+				Size = UDim2.new(1, -(12 + BUTTONS_WIDTH), 0, 5),
 				BackgroundColor3 = colors.Track,
 				BorderSizePixel = 0,
 				Parent = card,
@@ -319,9 +323,16 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				end)
 				nextX -= 52
 			end
-			rowButton(card, `+1  {Format.number(cost)} CE`, 110, nextX, cost, function()
+			local upgrade = UIKit.priceButton({
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, nextX, 1, -23),
+				Size = UDim2.fromOffset(UPGRADE_WIDTH, 30),
+				TextSize = 15,
+				Parent = card,
+			}, "Upgrade", cost, function()
 				send("Buy", nodeId, 1)
 			end)
+			table.insert(costButtons, { Button = upgrade, Cost = cost })
 		end
 		popNext = false
 		refreshAffordability()

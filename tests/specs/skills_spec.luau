@@ -42,18 +42,20 @@ return {
 			for rank = 0, nodes.CoreLuck.MaxRank - 1 do
 				expect.equal(SkillConfig.cost(nodes.CoreLuck, rank), Formulas.coreLuckCost(rank), `Core Luck rank {rank}`)
 			end
-			local merchant = { 100, 180, 324, 584, 1050 }
+			local merchant = { 2000, 5000, 12500, 31250, 78125 }
 			for rank, cost in merchant do
 				expect.equal(SkillConfig.cost(nodes.SpiritMerchant, rank - 1), cost, `Spirit Merchant rank {rank}`)
 			end
-			local focus = { 400, 800, 1600, 3200, 6400 }
+			local focus = { 20000, 60000, 180000, 540000, 1600000 }
 			for rank, cost in focus do
 				expect.equal(SkillConfig.cost(nodes.FrequencyFocus, rank - 1), cost, `Frequency Focus rank {rank}`)
 			end
-			expect.equal(SkillConfig.cost(nodes.ScanSpeed, 0), 100, "Scan Speed first rank")
-			expect.equal(SkillConfig.cost(nodes.EnergyConduction, 0), 150, "Energy Conduction first rank")
-			expect.equal(SkillConfig.cost(nodes.SpiritReservoir, 0), 25000, "Spirit Reservoir rank 1")
-			expect.equal(SkillConfig.cost(nodes.SpiritReservoir, 1), 250000, "Spirit Reservoir rank 2")
+			expect.equal(SkillConfig.cost(nodes.ScanSpeed, 0), 250, "Scan Speed first rank")
+			expect.equal(SkillConfig.cost(nodes.EnergyConduction, 0), 500, "Energy Conduction first rank")
+			expect.equal(SkillConfig.cost(nodes.SpiritReservoir, 0), 1000000, "Spirit Reservoir rank 1")
+			expect.equal(SkillConfig.cost(nodes.SpiritReservoir, 1), 50000000, "Spirit Reservoir rank 2")
+			expect.equal(SkillConfig.cost(nodes.CoreLuck, 0), 100, "Core Luck first rank")
+			expect.equal(SkillConfig.cost(nodes.CoreLuck, 10), math.ceil(100 * 1.6 ^ 10 - 1e-9), "Core Luck rank 11")
 			-- Costs never go down from one rank to the next.
 			for _, node in SkillConfig.Nodes do
 				for rank = 1, node.MaxRank - 1 do
@@ -122,7 +124,7 @@ return {
 			ranks, total = SkillConfig.affordable(node, node.MaxRank, math.huge, 10)
 			expect.equal(ranks, 0, "maxed buys nothing")
 			expect.equal(total, 0, "maxed spends nothing")
-			ranks = SkillConfig.affordable(nodes.SpiritReservoir, 0, 25000 + 249999, 2)
+			ranks = SkillConfig.affordable(nodes.SpiritReservoir, 0, 1000000 + 49999999, 2)
 			expect.equal(ranks, 1, "no partial purchase")
 		end,
 	},

@@ -1,9 +1,12 @@
--- Inventory (GDD 9.2, 9.3): every relic is its own item with a unique Uid. The client sees it
--- grouped by relic + mutation, which stays small however many copies are held.
---   Favorite (per relic + mutation): pinned to the top, and auto-sell never sells new copies.
+-- Backpack (GDD 9.2, 9.3): every relic is its own item with a unique Uid. The client sees the
+-- backpack grouped by relic + mutation, which stays small however many copies are held. Relics on
+-- pedestals are not in the backpack (and don't use its slots); they come back with E on the
+-- pedestal (PedestalService "Grab") or from the Shrine menu.
+--   Favorite (per relic + mutation): pinned to the top, never auto-sold or sold by Sell all.
 --   Lock (per copy; the UI locks a whole group): the copies can't be sold at all.
--- Remotes: GetInventory (snapshot) and InventoryAction (Favorite, Lock, Sell, SetAutoSell, Carry),
--- which returns the fresh snapshot so the menu redraws from server truth.
+--   Floating: the one copy hovering beside the player (CosmeticEquipService); never sold.
+-- Remotes: GetInventory (snapshot) and InventoryAction (Favorite, Lock, Sell, SellAll,
+-- SetAutoSell, Float), which returns the fresh snapshot so the menu redraws from server truth.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -28,15 +31,48 @@ local InventoryService = {}
 export type Group = {
 	Id: string,
 	Mutation: string?,
+	-- Copies in the backpack (pedestal copies are not listed).
 	Count: number,
-	Displayed: number,
 	Locked: number,
-	-- Copies that can be sold right now (not displayed, not locked).
+	-- Copies that can be sold right now (not locked, not floating).
 	Sellable: number,
 	Favorite: boolean,
-	IncomePerMin: number,
+	-- One of the copies floats beside the player.
+	Floating: boolean,
+	IncomePerSec: number,
 	SellValue: number,
 }
+
+-- Uids the "Sell all" button would sell right now (AutoSell.sellAll).
+local function sellAllUids(player: Player, data: any): { number }
+	local copies = {}
+	for _, item in data.Inventory do
+		table.insert(copies, {
+			Uid = item.Uid,
+			Displayed = PedestalService.IsDisplayed(player, item.Uid),
+			Locked = item.Locked == true,
+			Favorite = data.Favorites[AutoSell.favoriteKey(item.Id, item.Mutation)] == true,
+			Floating = CosmeticEquipService.IsFloating(player, item.Uid),
+		})
+	end
+	return AutoSell.sellAll(copies)
+end
+
+-- Preview for the button: how many copies it sells and for how much CE.
+local function sellAllPreview(player: Player, data: any): { Count: number, Value: number }
+	local sell = {}
+	for _, uid in sellAllUids(player, data) do
+		sell[uid] = true
+	end
+	local count, value = 0, 0
+	for _, item in data.Inventory do
+		if sell[item.Uid] then
+			count += 1
+			value += SellService.SellValue(player, item)
+		end
+	end
+	return { Count = count, Value = value }
+end
 
 function InventoryService.Groups(player: Player): { Group }
 	local data = DataService.Get(player)
@@ -46,6 +82,9 @@ function InventoryService.Groups(player: Player): { Group }
 	local byKey: { [string]: Group } = {}
 	local list = {}
 	for _, item in data.Inventory do
+		if PedestalService.IsDisplayed(player, item.Uid) then
+			continue
+		end
 		local key = AutoSell.favoriteKey(item.Id, item.Mutation)
 		local group = byKey[key]
 		if not group then
@@ -53,34 +92,35 @@ function InventoryService.Groups(player: Player): { Group }
 				Id = item.Id,
 				Mutation = item.Mutation,
 				Count = 0,
-				Displayed = 0,
 				Locked = 0,
 				Sellable = 0,
 				Favorite = data.Favorites[key] == true,
-				IncomePerMin = PedestalService.RelicIncome(item),
+				Floating = false,
+				IncomePerSec = PedestalService.RelicIncome(item),
 				SellValue = SellService.SellValue(player, item),
 			}
 			byKey[key] = group
 			table.insert(list, group)
 		end
 		group.Count += 1
-		local displayed = PedestalService.IsDisplayed(player, item.Uid)
-		if displayed then
-			group.Displayed += 1
-		end
 		if item.Locked then
 			group.Locked += 1
 		end
-		if not displayed and not item.Locked then
+		if CosmeticEquipService.IsFloating(player, item.Uid) then
+			group.Floating = true
+		elseif not item.Locked then
 			group.Sellable += 1
 		end
 	end
 	table.sort(list, function(a, b)
+		if a.Floating ~= b.Floating then
+			return a.Floating
+		end
 		if a.Favorite ~= b.Favorite then
 			return a.Favorite
 		end
-		if a.IncomePerMin ~= b.IncomePerMin then
-			return a.IncomePerMin > b.IncomePerMin
+		if a.IncomePerSec ~= b.IncomePerSec then
+			return a.IncomePerSec > b.IncomePerSec
 		end
 		return AutoSell.favoriteKey(a.Id, a.Mutation) < AutoSell.favoriteKey(b.Id, b.Mutation)
 	end)
@@ -94,10 +134,10 @@ function InventoryService.State(player: Player)
 	end
 	return {
 		Groups = InventoryService.Groups(player),
-		Count = #data.Inventory,
+		Count = DataService.BackpackCount(data),
 		Capacity = Config.Inventory.Capacity,
 		AutoSell = AutoSellService.Rules(player),
-		Carry = { Key = data.Cosmetic.Key, Mode = data.Cosmetic.Mode },
+		SellAll = sellAllPreview(player, data),
 	}
 end
 
@@ -142,13 +182,26 @@ local ACTIONS: { [string]: (Player, any, ...any) -> string? } = {
 			return nil
 		end
 		local sold, earned = SellService.Sell(player, relicId, mutationId, count)
-		CosmeticEquipService.Validate(player)
 		if sold == 0 then
-			return "Nothing to sell (displayed and locked copies are kept)."
+			return "Nothing to sell (locked and floating copies are kept)."
 		end
 		local relic = RelicConfig.ById[relicId]
 		local name = if mutationId then `{mutationId} {relic.Name}` else relic.Name
 		return `Sold {sold} x {name} for {Format.number(earned)} CE`
+	end,
+
+	SellAll = function(player, data)
+		local sell = {}
+		for _, uid in sellAllUids(player, data) do
+			sell[uid] = true
+		end
+		local sold, earned = SellService.SellWhere(player, function(item)
+			return sell[item.Uid] == true
+		end)
+		if sold == 0 then
+			return "Nothing to sell (locked, favorite and floating relics are kept)."
+		end
+		return `Sold {sold} relic{if sold == 1 then "" else "s"} for {Format.number(earned)} CE`
 	end,
 
 	SetAutoSell = function(player, _data, rules)
@@ -156,9 +209,9 @@ local ACTIONS: { [string]: (Player, any, ...any) -> string? } = {
 		return "Auto-sell rules saved."
 	end,
 
-	-- mode: "Float", "Hand" or "None" (display only, GDD 9.1).
-	Carry = function(player, _data, relicId, mutationId, mode)
-		return CosmeticEquipService.Set(player, relicId, mutationId, mode)
+	-- on: float a copy beside the player, or put it away (display only, GDD 9.1).
+	Float = function(player, _data, relicId, mutationId, on)
+		return CosmeticEquipService.FloatGroup(player, relicId, mutationId, on)
 	end,
 }
 

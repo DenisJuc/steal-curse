@@ -1,9 +1,9 @@
 -- The single path every relic grant goes through (passive scans, captures, bonus rolls, debug).
 -- Stages (GDD 9.3 order):
 --   store item -> Codex discovery (base relic id) + seen mutation -> rare history
---   -> auto-sell (rules, then capacity) -> Codex milestones -> AFK log
---   -> priority save -> notify owner -> server announcement for very rare finds.
--- New finds are never put on pedestals automatically (the player uses Equip Best).
+--   -> auto-equip (Equip Best, with the AutoEquip game pass and its toggle on) -> auto-sell (rules, then capacity)
+--   -> Codex milestones -> AFK log -> priority save -> notify owner -> server announcement.
+-- Finds that auto-equip puts on a pedestal are never auto-sold.
 -- The Codex is written before auto-sell, so a first find counts even if it is sold right away.
 
 local Players = game:GetService("Players")
@@ -17,6 +17,7 @@ local AutoSellService = require(script.Parent.Services.AutoSellService)
 local CodexService = require(script.Parent.Services.CodexService)
 local DataService = require(script.Parent.Services.DataService)
 local GameEvents = require(script.Parent.Services.GameEvents)
+local PedestalService = require(script.Parent.Services.PedestalService)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local DiscoveryResult = Remotes:WaitForChild("DiscoveryResult") :: RemoteEvent
@@ -132,7 +133,16 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 		GameEvents.Fire("Discovery", player, item, first)
 	end
 
-	local sold = AutoSellService.Apply(player, items, firsts, {})
+	local shown: { [number]: boolean } = {}
+	local equipped = PedestalService.AutoEquip(player) > 1e-9
+	if equipped then
+		for _, item in items do
+			if PedestalService.IsDisplayed(player, item.Uid) then
+				shown[item.Uid] = true
+			end
+		end
+	end
+	local sold = AutoSellService.Apply(player, items, firsts, shown)
 	local afk = data.AfkLog
 	for _, result in results do
 		local sale = sold[result.Uid]
@@ -151,6 +161,9 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 
 	if codexChanged then
 		CodexService.Evaluate(player)
+	end
+	if equipped then
+		PedestalService.Refresh(player)
 	end
 	DataService.MirrorAttributes(player)
 	if needsSave then

@@ -1,6 +1,6 @@
 -- Hub plaza (GDD 4.1): obelisk (or the imported HubTemple), stone lanterns, the spawn, a signpost
--- pointing at the three wild areas, and kiosks that open the Codex, Skills, Luck, Relics and
--- Journal menus via proximity prompts (the client opens the menu named by the prompt's OpensMenu
+-- pointing at the three wild areas, and kiosks that open the Codex, Skills, Luck, Relics, Journal,
+-- Bounties and Wardrobe menus via proximity prompts (the client opens the menu named by the prompt's OpensMenu
 -- attribute).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,6 +21,8 @@ local KIOSK_COLORS = {
 	Luck = Color3.fromRGB(120, 235, 140),
 	Relics = Color3.fromRGB(190, 130, 255),
 	Journal = Color3.fromRGB(120, 190, 255),
+	Bounties = Color3.fromRGB(255, 150, 90),
+	Wardrobe = Color3.fromRGB(255, 170, 210),
 }
 local SIGNPOST_AT = Vector3.new(0, 0, -12)
 

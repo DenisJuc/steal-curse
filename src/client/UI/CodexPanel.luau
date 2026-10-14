@@ -1,6 +1,6 @@
 -- Codex menu (GDD 7, 12.1): discovery progress, milestones (essential bonuses, frequency
--- unlocks, set titles, prestige titles), earned titles and one card per relic with its 3D model.
--- Unknown relics show as a black silhouette of the model with only their tier and base odds. Seen mutations appear as colored dots
+-- unlocks, set titles, prestige titles), earned titles and one card per relic with its 3D model
+-- and, once discovered, its base income per second. Unknown relics show as a black silhouette of the model with only their tier and base odds. Seen mutations appear as colored dots
 -- on the relic's card (no separate mutation Codex).
 
 local Players = game:GetService("Players")
@@ -12,6 +12,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RelicIncome = require(ReplicatedStorage.Shared.RelicIncome)
 local Banner = require(script.Parent.Banner)
 local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
@@ -40,7 +41,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 
-	local panel, content = UIKit.modal(screen, "CodexMenu", "CODEX", colors.Accent, Vector2.new(580, 640))
+	local panel, content = UIKit.modal(screen, "CodexMenu", "CODEX", colors.Accent, Vector2.new(580, 640), "Codex")
 	local body = UIKit.scrollList(content, 6)
 	local order = 0
 	-- One render per relic, kept across refreshes; unknown relics tint it black.
@@ -146,6 +147,17 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			Size = UDim2.new(1, -8, 0, 16),
 			Parent = card,
 		})
+		if known then
+			UIKit.label({
+				Text = `+{Format.rate(RelicIncome.of(relicId))}`,
+				TextSize = 12,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextColor3 = colors.Gold,
+				Position = UDim2.fromOffset(4, 62),
+				Size = UDim2.new(1, -8, 0, 14),
+				Parent = card,
+			})
+		end
 		UIKit.label({
 			Text = `{if tier then tier.Name else relic.Tier}  {Format.odds(Odds.baseItem(relicId))}`,
 			TextSize = 11,
@@ -286,7 +298,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			Parent = body,
 		}, {
 			UIKit.create("UIGridLayout", {
-				CellSize = UDim2.fromOffset(124, 96),
+				CellSize = UDim2.fromOffset(124, 110),
 				CellPadding = UDim2.fromOffset(6, 6),
 				SortOrder = Enum.SortOrder.LayoutOrder,
 			}),

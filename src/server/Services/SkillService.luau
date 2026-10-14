@@ -40,8 +40,11 @@ end
 local function applyWalkSpeed(player: Player)
 	local character = player.Character
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.WalkSpeed = SkillConfig.walkSpeed(SkillService.Rank(player, "SwiftStep"))
+	if humanoid and character then
+		local speed = SkillConfig.walkSpeed(SkillService.Rank(player, "SwiftStep"))
+		-- The client's SprintController runs on top of this base.
+		character:SetAttribute("BaseWalkSpeed", speed)
+		humanoid.WalkSpeed = speed
 	end
 end
 
@@ -143,6 +146,10 @@ function SkillService.Init()
 	end
 	GameEvents.On("DataReset", function(player: Player)
 		applied(player, "")
+	end)
+	-- Rebirth sets every rank to 0, Scan Speed included.
+	GameEvents.On("Rebirthed", function(player: Player)
+		applied(player, "ScanSpeed")
 	end)
 end
 

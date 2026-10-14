@@ -11,6 +11,8 @@ local suites = {
 	{ Name = "data", Tests = require("./specs/data_spec") },
 	{ Name = "rarewait", Tests = require("./specs/rarewait_spec") },
 	{ Name = "economy", Tests = require("./specs/economy_spec") },
+	{ Name = "income", Tests = require("./specs/income_spec") },
+	{ Name = "rebirth", Tests = require("./specs/rebirth_spec") },
 	{ Name = "autosell", Tests = require("./specs/autosell_spec") },
 	{ Name = "codex", Tests = require("./specs/codex_spec") },
 	{ Name = "presentation", Tests = require("./specs/presentation_spec") },
@@ -22,6 +24,14 @@ local suites = {
 	{ Name = "models", Tests = require("./specs/models_spec") },
 	{ Name = "roll", Tests = require("./specs/roll_spec") },
 	{ Name = "items", Tests = require("./specs/items_spec") },
+	{ Name = "sprint", Tests = require("./specs/sprint_spec") },
+	{ Name = "terrain", Tests = require("./specs/terrain_spec") },
+	{ Name = "streak", Tests = require("./specs/streak_spec") },
+	{ Name = "zoneevents", Tests = require("./specs/zoneevents_spec") },
+	{ Name = "offerings", Tests = require("./specs/offerings_spec") },
+	{ Name = "mastery", Tests = require("./specs/mastery_spec") },
+	{ Name = "curse", Tests = require("./specs/curse_spec") },
+	{ Name = "bounties", Tests = require("./specs/bounties_spec") },
 }
 
 local passed, failed = 0, 0

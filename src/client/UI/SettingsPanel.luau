@@ -23,7 +23,8 @@ local SLIDER_WIDTH = 250
 
 function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (boolean) -> () }
 	local colors = UIKit.Colors
-	local panel, content = UIKit.modal(screen, "SettingsMenu", "SETTINGS", colors.Accent, Vector2.new(520, 600))
+	local panel, content =
+		UIKit.modal(screen, "SettingsMenu", "SETTINGS", colors.Accent, Vector2.new(520, 600), "Settings")
 	local list = UIKit.scrollList(content, 6)
 
 	local function row(order: number, label: string, help: string, controlWidth: number): Frame

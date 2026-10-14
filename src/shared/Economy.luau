@@ -1,15 +1,17 @@
 -- Pure shrine economy formulas (GDD 6). Settings are passed in (Config.Economy / Config.Offline),
--- so Lune tests and simulations use exactly the same math as the server.
+-- so Lune tests and simulations use exactly the same math as the server. Income is per second.
 
 local Economy = {}
 
 export type EconomySettings = {
-	TierIncomePerMin: { [string]: number },
+	IncomeScale: number,
+	IncomeExponent: number,
 	SlotPrices: { [number]: number },
 	PedestalMaxLevel: number,
+	LevelGrowth: number,
 	FirstUpgradeCost: number,
 	UpgradeCostGrowth: number,
-	SellFraction: number,
+	SellSeconds: number,
 }
 
 export type OfflineSettings = {
@@ -18,14 +20,39 @@ export type OfflineSettings = {
 	MinSeconds: number,
 }
 
--- Level 1 -> x1, max level -> x2, linear in between.
+-- Rounds to 2 significant figures below 10 and 3 from 10 up (5.1, 13.7, 42.6, 167, 1.67K...), so
+-- incomes read cleanly while neighbours in a tier stay different.
+local function roundIncome(value: number): number
+	if value <= 0 then
+		return 0
+	end
+	local digits = if value < 10 then 2 else 3
+	local scale = 10 ^ (math.floor(math.log10(value)) - digits + 1)
+	return math.floor(value / scale + 0.5) * scale
+end
+
+-- Base CE/sec of a relic from its base odds (1 in `oneIn` at luck 1): rarer relics earn more, also
+-- inside a tier. `bonus` is an optional per-relic factor (RelicConfig IncomeBonus).
+function Economy.relicBaseIncome(settings: EconomySettings, oneIn: number, bonus: number?): number
+	if oneIn ~= oneIn or oneIn <= 0 or oneIn == math.huge then
+		return 0
+	end
+	return roundIncome(settings.IncomeScale * oneIn ^ settings.IncomeExponent * (bonus or 1))
+end
+
+-- CE/sec of one relic before its pedestal and global multipliers.
+function Economy.relicIncome(baseIncome: number, mutationMultiplier: number): number
+	return baseIncome * mutationMultiplier
+end
+
+-- Level 1 -> x1; every level multiplies by LevelGrowth.
 function Economy.pedestalMultiplier(settings: EconomySettings, level: number): number
-	return 1 + (level - 1) / (settings.PedestalMaxLevel - 1)
+	return settings.LevelGrowth ^ (level - 1)
 end
 
 -- CE to go from `level` to `level + 1`.
 function Economy.upgradeCost(settings: EconomySettings, level: number): number
-	return settings.FirstUpgradeCost * settings.UpgradeCostGrowth ^ (level - 1)
+	return math.ceil(settings.FirstUpgradeCost * settings.UpgradeCostGrowth ^ (level - 1) - 1e-9)
 end
 
 -- Total CE to go from `fromLevel` up to `toLevel`.
@@ -51,11 +78,6 @@ function Economy.maxAffordableUpgrades(settings: EconomySettings, level: number,
 	return levels, cost
 end
 
--- Base CE/min of one relic before its pedestal and global multipliers.
-function Economy.relicIncome(settings: EconomySettings, tierId: string, mutationMultiplier: number): number
-	return (settings.TierIncomePerMin[tierId] or 0) * mutationMultiplier
-end
-
 -- contributions = relic income x pedestal multiplier for each displayed relic.
 function Economy.totalIncome(contributions: { number }, incomeMultiplier: number): number
 	local sum = 0
@@ -65,16 +87,17 @@ function Economy.totalIncome(contributions: { number }, incomeMultiplier: number
 	return sum * incomeMultiplier
 end
 
+-- Selling pays SellSeconds of the relic's own income (mutation included, pedestals not).
 function Economy.sellValue(settings: EconomySettings, relicIncome: number, merchantBonus: number): number
-	return settings.SellFraction * relicIncome * (1 + merchantBonus)
+	return settings.SellSeconds * relicIncome * (1 + merchantBonus)
 end
 
-function Economy.offlineEarnings(settings: OfflineSettings, incomePerMin: number, elapsedSeconds: number): number
-	if elapsedSeconds < settings.MinSeconds or incomePerMin <= 0 then
+function Economy.offlineEarnings(settings: OfflineSettings, incomePerSec: number, elapsedSeconds: number): number
+	if elapsedSeconds < settings.MinSeconds or incomePerSec <= 0 then
 		return 0
 	end
 	local paidSeconds = math.min(elapsedSeconds, settings.CapSeconds)
-	return settings.Rate * incomePerMin * paidSeconds / 60
+	return settings.Rate * incomePerSec * paidSeconds
 end
 
 export type SlotView = {
@@ -84,10 +107,8 @@ export type SlotView = {
 	Multiplier: number,
 }
 
--- The slot where `newIncome` raises CE/min the most (the Relics menu's Equip button, and the
--- pacing simulation, which assumes the player keeps their best relics equipped). Locked slots
--- are never touched.
--- Returns nil unless the improvement is strictly positive.
+-- The slot where `newIncome` raises CE/sec the most (the Relics menu's Equip button). Locked slots
+-- are never touched. Returns nil unless the improvement is strictly positive.
 function Economy.bestDisplaySlot(slots: { SlotView }, newIncome: number): (number?, number)
 	local bestSlot, bestGain = nil, 0
 	for index, slot in slots do
@@ -106,7 +127,7 @@ export type EquipSlot = { Locked: boolean, Multiplier: number }
 export type EquipCandidate = { Key: number, Income: number, Shown: boolean? }
 
 -- Equip Best: the highest-income candidates go on the unlocked slots, the best relic on the
--- highest pedestal multiplier, which gives the largest total CE/min. Locked slots are skipped
+-- highest pedestal multiplier, which gives the largest total CE/sec. Locked slots are skipped
 -- (their relics must not be in `candidates`). Returns [slot] = candidate Key for every unlocked
 -- slot that gets a relic; unlocked slots missing from the result stay empty.
 function Economy.equipBest(slots: { EquipSlot }, candidates: { EquipCandidate }): { [number]: number }

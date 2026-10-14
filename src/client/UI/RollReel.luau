@@ -1,8 +1,9 @@
 -- The roll animation above the bottom bar (Slice 9, restyled). Every reward is already rolled and
 -- saved by the server; the animation only plays out to it, in the style picked in Settings
 -- ("RollStyle": Omikuji, Flicker or Flame, see UI/RollStyles). Plain scan batches (up to
--- Config.Scan.MaxCatchUpScans finds) roll first and land on the rarest find; captures, bonus finds
--- and big batches skip the roll.
+-- Config.Scan.MaxCatchUpScans finds) roll first and land on the rarest find; big batches skip
+-- the roll. A hunt's batch (capture + bonus finds) waits for HuntController, which rolls it on
+-- the hunt papers (HuntRolls) after the capture animation.
 -- This module owns the DiscoveryResult connection for the feed and the reveals: they receive each
 -- batch through RollReel.OnResults once the roll has landed (right away when there is no roll).
 
@@ -29,8 +30,8 @@ local STYLES: { [string]: { new: (GuiObject) -> RollKit.Style } } = {
 }
 -- How long the result stays up after landing.
 local HOLD_SECONDS = 1.8
--- Gap between the roll and the top of the bottom bar.
-local LIFT = 8
+-- Gap between the roll and the top of the bottom bar (room for the stamina bar, SprintController).
+local LIFT = 30
 
 local roster: { ReelStrip.Entry } = {}
 for _, relic in RelicConfig.Relics do
@@ -42,12 +43,17 @@ local stripOptions = {
 	TierWeights = Config.Roll.TeaserTierWeights,
 }
 
-local listeners: { ({ any }) -> () } = {}
+-- A hunt's batch waits this long for HuntController to take it (after the capture animation)
+-- before it is shown the plain way.
+local HUNT_WAIT_SECONDS = 20
+
+local listeners: { ({ any }, boolean) -> () } = {}
 local rng = Random.new()
 local style: RollKit.Style? = nil
 local spinning = false
 local spinTicket = 0
 local enabled = true
+local pendingHunt: { any }? = nil
 
 local function nextNumber(): number
 	return rng:NextNumber()
@@ -58,10 +64,20 @@ local function tierIndex(relicId: string): number
 	return if relic then RarityConfig.IndexById[relic.Tier] or 0 else 0
 end
 
-local function dispatch(results: { any })
+-- `hunt` marks a hunt's batch that has already been rolled on the papers (HuntRolls).
+local function dispatch(results: { any }, hunt: boolean?)
 	for _, listener in listeners do
-		task.spawn(listener, results)
+		task.spawn(listener, results, hunt == true)
 	end
+end
+
+local function isHunt(results: { any }): boolean
+	for _, result in results do
+		if type(result) == "table" and result.Source == "Capture" then
+			return true
+		end
+	end
+	return false
 end
 
 local function rollSeconds(): number
@@ -126,6 +142,19 @@ local function onResults(results: any)
 	if type(results) ~= "table" then
 		return
 	end
+	if isHunt(results) then
+		if pendingHunt then
+			dispatch(pendingHunt)
+		end
+		pendingHunt = results
+		task.delay(HUNT_WAIT_SECONDS, function()
+			if pendingHunt == results then
+				pendingHunt = nil
+				dispatch(results)
+			end
+		end)
+		return
+	end
 	local target = rollTarget(results)
 	local seconds = if target and enabled and not spinning and style then rollSeconds() else 0
 	if seconds <= 0 then
@@ -146,9 +175,26 @@ function RollReel.SetEnabled(on: boolean)
 	end
 end
 
--- Runs `callback(results)` for every DiscoveryResult batch, after its roll (if any) has landed.
-function RollReel.OnResults(callback: ({ any }) -> ())
+-- Runs `callback(results, hunt)` for every DiscoveryResult batch, after its roll (if any) has
+-- landed. `hunt` is true for a hunt's batch that already rolled on the hunt papers.
+function RollReel.OnResults(callback: ({ any }, boolean) -> ())
 	table.insert(listeners, callback)
+end
+
+-- The last hunt's batch (its capture and bonus finds), waiting up to `seconds` for it to arrive.
+-- Taking it means the caller rolls it and hands it back with FinishHunt.
+function RollReel.TakeHunt(seconds: number): { any }?
+	local deadline = os.clock() + seconds
+	while not pendingHunt and os.clock() < deadline do
+		task.wait(0.05)
+	end
+	local results = pendingHunt
+	pendingHunt = nil
+	return results
+end
+
+function RollReel.FinishHunt(results: { any })
+	dispatch(results, true)
 end
 
 -- Plays a roll for `relicId` without granting anything (Studio /rolldemo).

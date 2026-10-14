@@ -85,7 +85,8 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 
-	local panel, content = UIKit.modal(screen, "LuckMenu", "LUCK, FOCUS & ODDS", colors.Accent, Vector2.new(380, 600))
+	local panel, content =
+		UIKit.modal(screen, "LuckMenu", "LUCK, FOCUS & ODDS", colors.Accent, Vector2.new(380, 600), "Luck")
 	local body = UIKit.create("ScrollingFrame", {
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,

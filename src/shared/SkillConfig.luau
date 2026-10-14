@@ -29,8 +29,9 @@ SkillConfig.Nodes = {
 		Branch = "Resonance",
 		Name = "Core Luck",
 		MaxRank = 100,
-		CostBase = 20,
-		CostGrowth = 1.12,
+		-- Costs grow faster than luck (x10 luck costs about x100 CE), so luck can't run away.
+		CostBase = 100,
+		CostGrowth = 1.6,
 		Summary = "Multiplies your luck: x10 every 10 ranks (rank 100 = 10 billion x).",
 	},
 	{
@@ -38,8 +39,8 @@ SkillConfig.Nodes = {
 		Branch = "Resonance",
 		Name = "Scan Speed",
 		MaxRank = 12,
-		CostBase = 100,
-		CostGrowth = 1.8,
+		CostBase = 250,
+		CostGrowth = 2.2,
 		Summary = "Your Spirit Resonator scans faster: 4 s down to 1 s.",
 	},
 	{
@@ -47,7 +48,7 @@ SkillConfig.Nodes = {
 		Branch = "Resonance",
 		Name = "Frequency Focus",
 		MaxRank = 5,
-		Costs = { 400, 800, 1600, 3200, 6400 },
+		Costs = { 20000, 60000, 180000, 540000, 1600000 },
 		Summary = "Your Signal Frequency pulls its family harder (x1.5 up to x3).",
 	},
 	{
@@ -55,8 +56,8 @@ SkillConfig.Nodes = {
 		Branch = "Resonance",
 		Name = "Mutation Resonance",
 		MaxRank = 5,
-		-- GDD 6.6: "set via balance config". Provisional; tuned in the balancing slice.
-		Costs = { 25000, 250000, 2500000, 25000000, 250000000 },
+		-- GDD 6.6: "set via balance config". Rank 1 around the first Rebirth, rank 5 late.
+		Costs = { 250000, 5000000, 100000000, 2000000000, 40000000000 },
 		Summary = "Unlocks mutations (one more per rank) and raises the mutation chance.",
 	},
 	{
@@ -64,8 +65,8 @@ SkillConfig.Nodes = {
 		Branch = "Sanctuary",
 		Name = "Energy Conduction",
 		MaxRank = 20,
-		CostBase = 150,
-		CostGrowth = 1.6,
+		CostBase = 500,
+		CostGrowth = 1.7,
 		Summary = "More pedestal income: +2% per rank (up to +40%).",
 	},
 	{
@@ -73,8 +74,8 @@ SkillConfig.Nodes = {
 		Branch = "Sanctuary",
 		Name = "Spirit Merchant",
 		MaxRank = 5,
-		CostBase = 100,
-		CostGrowth = 1.8,
+		CostBase = 2000,
+		CostGrowth = 2.5,
 		Summary = "Relics sell for more: +10% per rank (up to +50%).",
 	},
 	{
@@ -82,7 +83,7 @@ SkillConfig.Nodes = {
 		Branch = "Sanctuary",
 		Name = "Spirit Reservoir",
 		MaxRank = 2,
-		Costs = { 25000, 250000 },
+		Costs = { 1000000, 50000000 },
 		Summary = "Offline earnings last longer: 2 h, then 3 h, then 4 h.",
 	},
 	{
@@ -90,8 +91,8 @@ SkillConfig.Nodes = {
 		Branch = "BindingArts",
 		Name = "Spirit Sight",
 		MaxRank = 5,
-		CostBase = 300,
-		CostGrowth = 1.9,
+		CostBase = 2000,
+		CostGrowth = 2.2,
 		Summary = "See signals from farther away and pulse more often.",
 	},
 	{
@@ -99,8 +100,8 @@ SkillConfig.Nodes = {
 		Branch = "BindingArts",
 		Name = "Binding Efficiency",
 		MaxRank = 5,
-		CostBase = 500,
-		CostGrowth = 2,
+		CostBase = 3000,
+		CostGrowth = 2.4,
 		Summary = "Signals resist less: the hold to bind gets shorter.",
 	},
 	{
@@ -108,8 +109,8 @@ SkillConfig.Nodes = {
 		Branch = "BindingArts",
 		Name = "Resonant Harvest",
 		MaxRank = 5,
-		CostBase = 500,
-		CostGrowth = 2.5,
+		CostBase = 5000,
+		CostGrowth = 2.6,
 		Summary = "More bonus discoveries per capture: +10% per rank.",
 	},
 	{
@@ -117,8 +118,8 @@ SkillConfig.Nodes = {
 		Branch = "BindingArts",
 		Name = "Swift Step",
 		MaxRank = 10,
-		CostBase = 200,
-		CostGrowth = 1.7,
+		CostBase = 1000,
+		CostGrowth = 1.9,
 		Summary = "Walk faster: +4 walk speed per rank (16 up to 56).",
 	},
 } :: { Node }
@@ -138,8 +139,8 @@ SkillConfig.Effects = {
 	OfflineSecondsPerReservoirRank = 3600,
 	SightBaseRange = 90,
 	SightRangePerRank = 15,
-	PulseBaseCooldown = 3,
-	PulseCooldownPerRank = 0.3,
+	PulseBaseCooldown = 6,
+	PulseCooldownPerRank = 0.6,
 	HoldBaseSeconds = 6,
 	HoldSecondsPerRank = 0.5,
 	HarvestPerRank = 0.10,

@@ -6,7 +6,14 @@ local Showcases = {}
 
 export type Level = { Income: number, Luck: number, Cost: number? }
 export type Accessory = { Id: string, Name: string, RelicId: string }
-export type Unlock = { Kind: string, Price: number?, RelicId: string?, Milestone: string? }
+export type Unlock = {
+	Kind: string,
+	Price: number?,
+	RelicId: string?,
+	Milestone: string?,
+	Area: string?,
+	Level: number?,
+}
 export type Showcase = { Id: string, Unlock: Unlock, Accessories: { Accessory } }
 
 export type State = {
@@ -15,10 +22,12 @@ export type State = {
 	AccessoriesOff: { [string]: boolean },
 }
 
--- What a player has, for unlock checks: discovered relic ids and reached or claimed milestone ids.
+-- What a player has, for unlock checks: discovered relic ids, reached or claimed milestone ids
+-- and zone mastery levels by area id.
 export type Progress = {
 	Discovered: { [string]: any },
 	Milestones: { [string]: any },
+	Mastery: { [string]: number }?,
 }
 
 -- (income bonus, luck bonus) of the active Showcase; (0, 0) when none is active.
@@ -37,13 +46,17 @@ function Showcases.upgradeCost(levels: { Level }, level: number): number?
 	return if nextLevel then nextLevel.Cost else nil
 end
 
--- True when a relic or Codex unlock condition is met (CE unlocks are bought, never automatic).
+-- True when a relic, Codex or mastery unlock condition is met (CE unlocks are bought, never
+-- automatic).
 function Showcases.freeUnlockMet(showcase: Showcase, progress: Progress): boolean
 	local unlock = showcase.Unlock
 	if unlock.Kind == "Relic" then
 		return unlock.RelicId ~= nil and progress.Discovered[unlock.RelicId] ~= nil
 	elseif unlock.Kind == "Codex" then
 		return unlock.Milestone ~= nil and progress.Milestones[unlock.Milestone] ~= nil
+	elseif unlock.Kind == "Mastery" then
+		local levels = progress.Mastery
+		return levels ~= nil and unlock.Area ~= nil and (levels[unlock.Area] or 0) >= (unlock.Level or math.huge)
 	end
 	return false
 end

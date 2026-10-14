@@ -1,11 +1,12 @@
 -- Cursed Energy (GDD 6). One 1-second tick pays every loaded player from their displayed relics:
---   CE/min = IncomeMultiplier x sum(relic income x pedestal multiplier)   (Economy.totalIncome)
--- IncomeMultiplier is the "Income" additive stack (1 + global bonuses). CE stays fractional
--- internally so tiny amounts are never rounded away. All spending goes through TrySpend, which
--- is synchronous: two rapid purchases can never both spend the same CE.
+--   CE/sec = IncomeMultiplier x Rebirth x sum(relic income x pedestal multiplier)   (Economy.totalIncome)
+-- IncomeMultiplier is the "Income" additive stack (1 + global bonuses); Rebirth multiplies on top
+-- (Rebirth.incomeMultiplier). CE stays fractional internally so tiny amounts are never rounded
+-- away. All spending goes through TrySpend, which is synchronous: two rapid purchases can never
+-- both spend the same CE.
 --
--- Offline (GDD 2.2): every tick stores the current CE/min and time in data.Offline. On the next
--- join that snapshot pays Rate x CE/min x min(away time, cap) once. Scanning never runs offline.
+-- Offline (GDD 2.2): every tick stores the current CE/sec and time in data.Offline. On the next
+-- join that snapshot pays Rate x CE/sec x min(away time, cap) once. Scanning never runs offline.
 -- The payout is kept for AfkService's Welcome Back screen (GDD 9.4). SessionIncome counts the
 -- shrine CE produced online this session (Journal), and an active AFK log gets the CE too.
 
@@ -14,6 +15,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Economy = require(ReplicatedStorage.Shared.Economy)
+local Rebirth = require(ReplicatedStorage.Shared.Rebirth)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local DataService = require(script.Parent.DataService)
 local MultiplierService = require(script.Parent.MultiplierService)
@@ -34,8 +36,15 @@ function EconomyService.SetIncomeProvider(provider: (Player) -> { number })
 	contributionsOf = provider
 end
 
-function EconomyService.GetIncomePerMin(player: Player): number
-	return Economy.totalIncome(contributionsOf(player), MultiplierService.Get(player, "Income"))
+-- Global income multiplier: the additive bonus stack times the Rebirth multiplier.
+function EconomyService.GetIncomeMultiplier(player: Player): number
+	local data = DataService.Get(player)
+	local rebirths = if data then data.Rebirths or 0 else 0
+	return MultiplierService.Get(player, "Income") * Rebirth.incomeMultiplier(Config.Rebirth, rebirths)
+end
+
+function EconomyService.GetIncomePerSec(player: Player): number
+	return Economy.totalIncome(contributionsOf(player), EconomyService.GetIncomeMultiplier(player))
 end
 
 function EconomyService.Mirror(player: Player)
@@ -44,7 +53,7 @@ function EconomyService.Mirror(player: Player)
 		return
 	end
 	player:SetAttribute("CE", data.CE)
-	player:SetAttribute("IncomePerMin", EconomyService.GetIncomePerMin(player))
+	player:SetAttribute("IncomePerSec", EconomyService.GetIncomePerSec(player))
 end
 
 function EconomyService.Add(player: Player, amount: number)
@@ -72,11 +81,11 @@ local function tick(player: Player, seconds: number)
 	if not data then
 		return
 	end
-	local perMin = EconomyService.GetIncomePerMin(player)
-	local earned = perMin * seconds / 60
+	local perSec = EconomyService.GetIncomePerSec(player)
+	local earned = perSec * seconds
 	data.CE += earned
 	data.LifetimeCE += earned
-	data.Offline.IncomePerMin = perMin
+	data.Offline.IncomePerSec = perSec
 	data.Offline.At = os.time()
 	sessionIncome[player] = (sessionIncome[player] or 0) + earned
 	if data.AfkLog.Active then
@@ -84,7 +93,7 @@ local function tick(player: Player, seconds: number)
 		data.AfkLog.Seconds += seconds
 	end
 	player:SetAttribute("CE", data.CE)
-	player:SetAttribute("IncomePerMin", perMin)
+	player:SetAttribute("IncomePerSec", perSec)
 	player:SetAttribute("SessionIncome", sessionIncome[player])
 end
 
@@ -99,7 +108,7 @@ function EconomyService.PayOffline(player: Player): number
 	-- Spirit Reservoir extends the cap (GDD 6.6).
 	local settings = table.clone(Config.Offline)
 	settings.CapSeconds = SkillConfig.offlineCapSeconds(data.Skills.SpiritReservoir or 0)
-	local amount = Economy.offlineEarnings(settings, data.Offline.IncomePerMin, elapsed)
+	local amount = Economy.offlineEarnings(settings, data.Offline.IncomePerSec, elapsed)
 	data.Offline.At = now
 	if amount > 0 then
 		offlinePayouts[player] = {

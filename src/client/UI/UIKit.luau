@@ -2,13 +2,16 @@
 -- fonts, instance helpers, skinned panels/buttons and screen-size scaling.
 -- Style rules:
 --   * Panels: plum-to-ink gradient, gold trim with a thin inner line (skinPanel).
---   * Gold means value (CE, maxed, rewards); violet means action; vermilion means danger/refusal.
+--   * Gold means value (CE, maxed, rewards); violet means action; vermilion means danger/close.
+--   * Anything that spends CE is a jade "Buy" price button: verb, coin, amount (priceButton).
+--     When it can't be afforded it turns dark and pressing it says how much CE is missing.
 --   * Headings use TitleFont; numbers and body text use Font.
 --   * Every button is juiced by Motion (hover, press, sounds); never animate with raw Size changes.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
+local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local Motion = require(script.Parent.Motion)
@@ -30,6 +33,7 @@ UIKit.Colors = {
 	Trim = Color3.fromRGB(205, 164, 96),
 	Plum = Color3.fromRGB(46, 30, 62),
 	Cyan = Color3.fromRGB(130, 220, 255),
+	Jade = Color3.fromRGB(62, 170, 108),
 }
 
 type Props = { [string]: any }
@@ -132,6 +136,53 @@ function UIKit.label(props: Props): TextLabel
 	return UIKit.create("TextLabel", defaults)
 end
 
+-- Name of a square icon button, straddling its bottom edge with a thick dark outline so it never
+-- sits on the icon. Leave room under the button (grid padding) for the lower half.
+function UIKit.iconCaption(button: GuiObject, text: string, textSize: number?): TextLabel
+	local size = textSize or 15
+	local label = UIKit.label({
+		Name = "Caption",
+		Text = text,
+		TextSize = size,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 1, -1),
+		Size = UDim2.new(1, 20, 0, size + 2),
+		ZIndex = 4,
+		Parent = button,
+	})
+	UIKit.create("UIStroke", {
+		Color = Color3.fromRGB(18, 10, 26),
+		Thickness = 2.5,
+		ApplyStrokeMode = Enum.ApplyStrokeMode.Contextual,
+		Parent = label,
+	})
+	return label
+end
+
+-- A small value pill on an icon button's top-left corner ("x1.72", "35/92"); hide it when empty.
+function UIKit.iconChip(button: GuiObject): TextLabel
+	local chip = UIKit.label({
+		Name = "Chip",
+		Text = "",
+		TextSize = 12,
+		TextColor3 = UIKit.Colors.Gold,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		BackgroundTransparency = 0.05,
+		BackgroundColor3 = UIKit.Colors.Plum,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.fromOffset(-6, 2),
+		Size = UDim2.fromOffset(0, 18),
+		AutomaticSize = Enum.AutomaticSize.X,
+		ZIndex = 4,
+		Parent = button,
+	})
+	UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = chip })
+	UIKit.create("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 6), Parent = chip })
+	UIKit.stroke(UIKit.Colors.Trim, 1, 0.2).Parent = chip
+	return chip
+end
+
 -- Section heading inside a menu: title font in muted gold.
 function UIKit.heading(props: Props): TextLabel
 	local merged: Props = { FontFace = UIKit.TitleFont, TextColor3 = UIKit.Colors.Trim, TextSize = 14 }
@@ -227,21 +278,39 @@ function UIKit.skinCard(frame: GuiObject, edge: Color3?)
 	end
 end
 
--- Cost buttons: violet when you can pay, dark and refusing ("Need X more CE") when you can't.
+-- Cost buttons: jade when you can pay, dark and refusing ("Need X more CE") when you can't.
 function UIKit.setAffordable(button: TextButton, affordable: boolean, cost: number)
-	UIKit.skinButton(button, if affordable then "Primary" else "Dark")
-	button.TextColor3 = if affordable then UIKit.Colors.Text else UIKit.Colors.SubText
+	UIKit.skinButton(button, if affordable then "Buy" else "Dark")
+	local color = if affordable then UIKit.Colors.Text else UIKit.Colors.SubText
+	button.TextColor3 = color
+	local price = button:FindFirstChild("Price")
+	if price then
+		for _, child in price:GetDescendants() do
+			if child:IsA("TextLabel") then
+				child.TextColor3 = color
+			end
+		end
+	end
 	button:SetAttribute("Cost", cost)
 	Motion.setDisabled(button, not affordable)
 end
 
--- Button looks: "Primary" (violet action), "Gold" (rewards / claim), "Dark" (secondary).
+-- Button looks: "Primary" (violet action), "Buy" (jade, spends CE), "Gold" (rewards / claim),
+-- "Danger" (vermilion, close) and "Dark" (secondary).
 function UIKit.skinButton(button: GuiButton, kind: string)
 	local colors = UIKit.Colors
 	local stroke = button:FindFirstChildOfClass("UIStroke") or UIKit.create("UIStroke", { Parent = button })
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Thickness = 1.5
-	if kind == "Gold" then
+	if kind == "Buy" then
+		button.BackgroundColor3 = colors.Jade
+		stroke.Color = Color3.fromRGB(20, 70, 42)
+		stroke.Transparency = 0.1
+	elseif kind == "Danger" then
+		button.BackgroundColor3 = colors.Red
+		stroke.Color = Color3.fromRGB(96, 22, 18)
+		stroke.Transparency = 0.1
+	elseif kind == "Gold" then
 		button.BackgroundColor3 = colors.Gold
 		stroke.Color = Color3.fromRGB(120, 78, 26)
 		stroke.Transparency = 0.1
@@ -298,6 +367,87 @@ function UIKit.coin(size: number): Frame
 	return coin
 end
 
+local function textOutline(): UIStroke
+	return UIKit.create("UIStroke", { Color = Color3.fromRGB(14, 10, 20), Thickness = 1.5, Transparency = 0.35 })
+end
+
+local function row(parent: Instance, name: string, height: number, padding: number): Frame
+	return UIKit.create("Frame", {
+		Name = name,
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromOffset(0, height),
+		Parent = parent,
+	}, {
+		UIKit.create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
+			VerticalAlignment = Enum.VerticalAlignment.Center,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, padding),
+		}),
+	})
+end
+
+-- A coin followed by a number on one line (balances, income, prices). Returns the holder (sized to
+-- its content) and the number label.
+function UIKit.coinValue(parent: Instance, coinSize: number, textSize: number, color: Color3?): (Frame, TextLabel)
+	local holder = row(parent, "CoinValue", math.max(coinSize, textSize + 4), 5)
+	local coin = UIKit.coin(coinSize)
+	coin.LayoutOrder = 1
+	coin.Parent = holder
+	local label = UIKit.label({
+		Name = "Value",
+		TextSize = textSize,
+		TextColor3 = color or UIKit.Colors.Gold,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromScale(0, 1),
+		LayoutOrder = 2,
+		Parent = holder,
+	})
+	textOutline().Parent = label
+	return holder, label
+end
+
+-- A button that spends CE: "<verb> (coin) <amount>" centered on one line, jade. Keep it current
+-- with setPrice and setAffordable. `props.TextSize` sizes the line (default 16).
+function UIKit.priceButton(props: Props, verb: string?, cost: number, onClick: (() -> ())?): TextButton
+	local button = UIKit.button(props, onClick)
+	button.Text = ""
+	local textSize = props.TextSize or 16
+	local line = row(button, "Price", textSize + 4, 6)
+	line.AnchorPoint = Vector2.new(0.5, 0.5)
+	line.Position = UDim2.fromScale(0.5, 0.5)
+	local verbLabel = UIKit.label({
+		Name = "Verb",
+		TextSize = textSize,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Size = UDim2.fromScale(0, 1),
+		LayoutOrder = 1,
+		Parent = line,
+	})
+	textOutline().Parent = verbLabel
+	local amount, amountLabel = UIKit.coinValue(line, math.floor(textSize * 1.15), textSize, UIKit.Colors.Text)
+	amount.LayoutOrder = 2
+	amountLabel.Name = "Amount"
+	UIKit.skinButton(button, "Buy")
+	UIKit.setPrice(button, verb, cost)
+	return button
+end
+
+function UIKit.setPrice(button: GuiButton, verb: string?, cost: number)
+	local line = button:FindFirstChild("Price")
+	if not line then
+		return
+	end
+	local verbLabel = line:FindFirstChild("Verb") :: TextLabel
+	verbLabel.Text = verb or ""
+	verbLabel.Visible = verb ~= nil and verb ~= ""
+	local amount = line:FindFirstChild("Amount", true) :: TextLabel
+	amount.Text = Format.number(cost)
+	button:SetAttribute("Cost", cost)
+end
+
 function UIKit.tween(instance: Instance, seconds: number, goal: Props, style: Enum.EasingStyle?): Tween
 	local tween = TweenService:Create(
 		instance,
@@ -318,10 +468,55 @@ function UIKit.mutationColor(mutationId: string): Color3
 	return if mutation then Color3.fromHex(mutation.Color) else UIKit.Colors.Text
 end
 
+local HEADER_HEIGHT = 46
+
+-- Round emblem over the window's top-left corner holding the menu's icon (the same one as its
+-- HUD button). Returns nil when there is no icon for `iconKey`.
+local function emblem(window: Frame, iconKey: string, accent: Color3): Frame?
+	local disc = UIKit.create("Frame", {
+		Name = "Emblem",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(10, 6),
+		Size = UDim2.fromOffset(66, 66),
+		BackgroundColor3 = UIKit.Colors.Plum,
+		Parent = window,
+	}, {
+		UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		UIKit.create("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(110, 100, 125)),
+		}),
+		UIKit.stroke(accent, 3, 0),
+	})
+	-- Icons builds on UIKit, so it is loaded here rather than at the top.
+	local Icons = require(script.Parent.Icons) :: any
+	local icon = Icons.draw(disc, iconKey)
+	if not icon then
+		disc:Destroy()
+		return nil
+	end
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	local scale = icon:FindFirstChildOfClass("UIScale")
+	if scale then
+		scale.Scale = 1.05
+	end
+	return disc
+end
+
 -- Centered menu window. It fills most of a small screen (phones) and stops growing at maxSize on
 -- big screens, so text never shrinks; content that doesn't fit goes in scrolling frames.
--- Returns the window and the content area below the title bar.
-function UIKit.modal(screen: ScreenGui, name: string, title: string, accent: Color3, maxSize: Vector2): (Frame, Frame)
+-- Header: the menu's icon in an emblem over the top-left corner (`iconKey`, an Icons key), the
+-- title, and a red close button over the top-right corner.
+-- Returns the window and the content area below the header.
+function UIKit.modal(
+	screen: ScreenGui,
+	name: string,
+	title: string,
+	accent: Color3,
+	maxSize: Vector2,
+	iconKey: string?
+): (Frame, Frame)
 	local window = UIKit.create("Frame", {
 		Name = name,
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -339,20 +534,23 @@ function UIKit.modal(screen: ScreenGui, name: string, title: string, accent: Col
 	})
 	UIKit.skinPanel(window)
 	window:SetAttribute("Modal", true)
-	UIKit.label({
+	local titleX = if iconKey and emblem(window, iconKey, accent) then 54 else 6
+	local titleLabel = UIKit.label({
 		Name = "Title",
 		Text = title,
 		FontFace = UIKit.TitleFont,
 		TextColor3 = UIKit.Colors.Gold,
-		TextSize = 20,
-		Position = UDim2.fromOffset(6, 0),
-		Size = UDim2.new(1, -50, 0, 32),
+		TextScaled = true,
+		Position = UDim2.fromOffset(titleX, 4),
+		Size = UDim2.new(1, -(titleX + 40), 0, 32),
 		Parent = window,
 	})
+	UIKit.create("UITextSizeConstraint", { MaxTextSize = 26, MinTextSize = 16, Parent = titleLabel })
+	UIKit.create("UIStroke", { Color = Color3.fromRGB(14, 10, 20), Thickness = 2, Transparency = 0.2, Parent = titleLabel })
 	UIKit.create("Frame", {
 		Name = "TitleRule",
-		Position = UDim2.fromOffset(0, 35),
-		Size = UDim2.new(1, 0, 0, 2),
+		Position = UDim2.fromOffset(titleX, HEADER_HEIGHT - 6),
+		Size = UDim2.new(1, -titleX, 0, 2),
 		BackgroundColor3 = accent,
 		BorderSizePixel = 0,
 		Parent = window,
@@ -368,21 +566,21 @@ function UIKit.modal(screen: ScreenGui, name: string, title: string, accent: Col
 	local close = UIKit.button({
 		Name = "Close",
 		Text = "X",
-		TextSize = 18,
+		TextSize = 24,
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -18, 0, 16),
-		Size = UDim2.fromOffset(36, 32),
+		Position = UDim2.new(1, 8, 0, 0),
+		Size = UDim2.fromOffset(42, 42),
 		Parent = window,
 	})
-	UIKit.skinButton(close, "Dark")
+	UIKit.skinButton(close, "Danger")
 	close.Activated:Connect(function()
 		window.Visible = false
 	end)
 	local content = UIKit.create("Frame", {
 		Name = "Content",
 		BackgroundTransparency = 1,
-		Position = UDim2.fromOffset(0, 40),
-		Size = UDim2.new(1, 0, 1, -40),
+		Position = UDim2.fromOffset(0, HEADER_HEIGHT),
+		Size = UDim2.new(1, 0, 1, -HEADER_HEIGHT),
 		Parent = window,
 	})
 	return window, content

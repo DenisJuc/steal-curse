@@ -1,6 +1,7 @@
 -- Interface icons. Icons.draw / Icons.inline use the uploaded image from IconAssets when there is
--- one (tinted gold with a soft shadow); otherwise Icons.draw falls back to the placeholders below,
--- drawn from plain frames into a 48x48 box.
+-- one: a full-color painted icon as it is, or a white silhouette tinted gold, both with a soft
+-- shadow. Otherwise Icons.draw falls back to the placeholders below, drawn from plain frames into a
+-- 48x48 box.
 
 local IconAssets = require(script.Parent.IconAssets)
 local UIKit = require(script.Parent.UIKit)
@@ -197,6 +198,109 @@ function Icons.gear(parent: Instance): Frame
 	return icon
 end
 
+-- Rebirth: a jade cycle ring with an arrowhead around a rising spirit flame.
+-- Rebirth: a gold ring of two chasing arrows around a spirit flame, shaded like the gold images.
+function Icons.rebirth(parent: Instance): Frame
+	local icon = box(parent)
+	local light, dark = Color3.fromRGB(255, 240, 200), Color3.fromRGB(215, 160, 75)
+	local function shade(): UIGradient
+		return UIKit.create("UIGradient", { Rotation = 90, Color = ColorSequence.new(light, dark) })
+	end
+	local ringShadow = UIKit.stroke(Color3.new(0, 0, 0), 5, 0.55)
+	UIKit.create("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(25, 26),
+		Size = UDim2.fromOffset(38, 38),
+		BackgroundTransparency = 1,
+		Parent = icon,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }), ringShadow })
+	local ringStroke = UIKit.stroke(Color3.new(1, 1, 1), 5, 0)
+	shade().Parent = ringStroke
+	UIKit.create("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(24, 24),
+		Size = UDim2.fromOffset(38, 38),
+		BackgroundTransparency = 1,
+		Parent = icon,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }), ringStroke })
+	-- Arrowheads on the ring at top-right and bottom-left, pointing clockwise: half of a square
+	-- (cut along its diagonal by the gradient) whose right-angle corner is the tip.
+	for _, spot in { { 38, 9, 180 }, { 10, 39, 0 } } do
+		UIKit.create("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromOffset(spot[1], spot[2]),
+			Size = UDim2.fromOffset(16, 16),
+			Rotation = spot[3],
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			BorderSizePixel = 0,
+			Parent = icon,
+		}, {
+			UIKit.create("UIGradient", {
+				Rotation = 45,
+				Color = ColorSequence.new(light, dark),
+				Transparency = NumberSequence.new({
+					NumberSequenceKeypoint.new(0, 0),
+					NumberSequenceKeypoint.new(0.5, 0),
+					NumberSequenceKeypoint.new(0.501, 1),
+					NumberSequenceKeypoint.new(1, 1),
+				}),
+			}),
+		})
+	end
+	local flame = UIKit.create("Frame", {
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromOffset(24, 26),
+		Size = UDim2.fromOffset(14, 19),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BorderSizePixel = 0,
+		Parent = icon,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }), shade() })
+	rect(flame, 4, 8, 6, 8, Color3.fromRGB(255, 252, 235), 3)
+	return icon
+end
+
+-- Padlock centered in `parent`, `size` pixels square; `open` lifts the shackle to one side.
+function Icons.padlock(parent: Instance, size: number, color: Color3, open: boolean?): Frame
+	local icon = UIKit.create("Frame", {
+		Name = "Padlock",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(size, size),
+		BackgroundTransparency = 1,
+		Parent = parent,
+	})
+	UIKit.create("Frame", {
+		Name = "Shackle",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.fromScale(if open then 0.66 else 0.5, if open then -0.1 else 0.02),
+		Size = UDim2.fromScale(0.52, 0.62),
+		BackgroundTransparency = 1,
+		Parent = icon,
+	}, {
+		UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		UIKit.stroke(color, math.max(2, math.floor(size * 0.12)), 0),
+	})
+	local body = UIKit.create("Frame", {
+		Name = "Body",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.fromScale(0.5, 1),
+		Size = UDim2.fromScale(0.8, 0.56),
+		BackgroundColor3 = color,
+		BorderSizePixel = 0,
+		Parent = icon,
+	}, { UIKit.corner(math.max(2, math.floor(size * 0.14))) })
+	UIKit.create("Frame", {
+		Name = "Keyhole",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.48),
+		Size = UDim2.fromScale(0.16, 0.36),
+		BackgroundColor3 = UIKit.Colors.Panel,
+		BorderSizePixel = 0,
+		Parent = body,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	return icon
+end
+
 local DRAWN: { [string]: (Instance) -> Frame } = {
 	Shrine = Icons.pedestal,
 	Luck = Icons.cursedFlower,
@@ -205,11 +309,38 @@ local DRAWN: { [string]: (Instance) -> Frame } = {
 	Settings = Icons.gear,
 	Backpack = Icons.chest,
 	Upgrades = Icons.runeTree,
+	Rebirth = Icons.rebirth,
 }
 
-local function imageId(key: string): string?
-	local id = IconAssets[key]
-	return if id and id ~= "" then id else nil
+-- The image for `key` and whether it is a full-color one (IconAssets.Color) rather than gold.
+local function imageId(key: string): (string?, boolean)
+	local color = IconAssets.Color[key]
+	if color and color ~= "" then
+		return color, true
+	end
+	local gold = IconAssets.Gold[key]
+	return if gold and gold ~= "" then gold else nil, false
+end
+
+-- Full-color image as it is, over a soft dark shadow, filling `parent`.
+local function colorImage(parent: GuiObject, id: string)
+	UIKit.create("ImageLabel", {
+		Name = "Shadow",
+		Image = id,
+		ImageColor3 = Color3.new(0, 0, 0),
+		ImageTransparency = 0.55,
+		BackgroundTransparency = 1,
+		Position = UDim2.fromOffset(0, 3),
+		Size = UDim2.fromScale(1, 1),
+		Parent = parent,
+	})
+	UIKit.create("ImageLabel", {
+		Name = "Image",
+		Image = id,
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Parent = parent,
+	})
 end
 
 -- Gold image with a dark drop shadow, filling `parent`.
@@ -245,10 +376,16 @@ end
 
 -- The icon of a square button (top part; the caption sits below it).
 function Icons.draw(parent: Instance, key: string): Frame?
-	local id = imageId(key)
+	local id, colored = imageId(key)
 	if id then
 		local icon = box(parent)
-		tintedImage(icon, id)
+		if colored then
+			-- Painted icons carry their own outline, so they can fill more of the button.
+			(icon:FindFirstChildOfClass("UIScale") :: UIScale).Scale = 1.05
+			colorImage(icon, id)
+		else
+			tintedImage(icon, id)
+		end
 		return icon
 	end
 	local drawn = DRAWN[key]
@@ -257,7 +394,7 @@ end
 
 -- A small icon left of a text button's label (only when an image is set).
 function Icons.inline(button: TextButton, key: string, size: number?): Frame?
-	local id = imageId(key)
+	local id, colored = imageId(key)
 	if not id then
 		return nil
 	end
@@ -274,7 +411,11 @@ function Icons.inline(button: TextButton, key: string, size: number?): Frame?
 		Size = UDim2.fromOffset(pixels, pixels),
 		Parent = button,
 	})
-	tintedImage(icon, id)
+	if colored then
+		colorImage(icon, id)
+	else
+		tintedImage(icon, id)
+	end
 	return icon
 end
 

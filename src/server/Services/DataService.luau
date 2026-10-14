@@ -135,6 +135,21 @@ function DataService.Increment(player: Player, key: string, amount: number)
 	DataService.MirrorAttributes(player)
 end
 
+-- Relics in the backpack: everything held except the ones on pedestals (those don't use slots).
+function DataService.BackpackCount(data: any): number
+	local held = {}
+	for _, item in data.Inventory do
+		held[item.Uid] = true
+	end
+	local onPedestals = 0
+	for _, pedestal in data.Pedestals do
+		if pedestal.Uid and held[pedestal.Uid] then
+			onPedestals += 1
+		end
+	end
+	return #data.Inventory - onPedestals
+end
+
 function DataService.MirrorAttributes(player: Player)
 	local data = DataService.Get(player)
 	if not data then
@@ -146,7 +161,7 @@ function DataService.MirrorAttributes(player: Player)
 	end
 	player:SetAttribute("TotalScans", data.TotalScans)
 	player:SetAttribute("TotalCaptures", data.TotalCaptures)
-	player:SetAttribute("InventoryCount", #data.Inventory)
+	player:SetAttribute("InventoryCount", DataService.BackpackCount(data))
 	player:SetAttribute("DiscoveredCount", discovered)
 end
 

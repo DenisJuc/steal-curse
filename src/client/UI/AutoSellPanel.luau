@@ -5,12 +5,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AutoSell = require(ReplicatedStorage.Shared.AutoSell)
-local Config = require(ReplicatedStorage.Shared.Config)
-local Economy = require(ReplicatedStorage.Shared.Economy)
 local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RelicIncome = require(ReplicatedStorage.Shared.RelicIncome)
 local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
 
@@ -39,7 +38,8 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 	local state: any = nil
 	local discovered: { [string]: number } = {}
 
-	local panel, content = UIKit.modal(screen, "AutoSellMenu", "AUTO-SELL RULES", colors.Accent, Vector2.new(540, 640))
+	local panel, content =
+		UIKit.modal(screen, "AutoSellMenu", "AUTO-SELL RULES", colors.Accent, Vector2.new(540, 640), "Backpack")
 	local body = UIKit.scrollList(content, 6)
 	local order = 0
 
@@ -136,13 +136,13 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 
 	local function previewRow(relic: RelicConfig.Relic)
 		local rules = state.AutoSell
-		local plainIncome = Economy.relicIncome(Config.Economy, relic.Tier, 1)
-		local mutatedIncome = Economy.relicIncome(Config.Economy, relic.Tier, PREVIEW_MUTATION.IncomeMultiplier)
+		local plainIncome = RelicIncome.of(relic.Id)
+		local mutatedIncome = RelicIncome.of(relic.Id, PREVIEW_MUTATION.Id)
 		local bestHeld = -1
 		local favorites = {}
 		for _, group in state.Groups do
 			if group.Id == relic.Id then
-				bestHeld = math.max(bestHeld, group.IncomePerMin)
+				bestHeld = math.max(bestHeld, group.IncomePerSec)
 				if group.Favorite then
 					favorites[AutoSell.favoriteKey(group.Id, group.Mutation)] = true
 				end

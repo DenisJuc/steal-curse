@@ -1,12 +1,13 @@
 -- Selling (GDD 6.5): a small CE drip, never the main income.
---   sale = SellFraction x relic income (mutation included) x (1 + sell bonus)
--- The "Sell" additive multiplier is where Spirit Merchant plugs in later. Displayed and locked
--- copies are never sold, whichever path asks (manual sell, auto-sell, full inventory).
+--   sale = SellSeconds x relic CE/sec (mutation included) x (1 + sell bonus)
+-- The "Sell" additive multiplier is where Spirit Merchant plugs in later. Displayed, locked and
+-- floating copies are never sold, whichever path asks (manual sell, auto-sell, full inventory).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local Economy = require(ReplicatedStorage.Shared.Economy)
+local CosmeticEquipService = require(script.Parent.CosmeticEquipService)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local MultiplierService = require(script.Parent.MultiplierService)
@@ -20,7 +21,9 @@ function SellService.SellValue(player: Player, item: any): number
 end
 
 function SellService.IsSellable(player: Player, item: any): boolean
-	return item.Locked ~= true and not PedestalService.IsDisplayed(player, item.Uid)
+	return item.Locked ~= true
+		and not PedestalService.IsDisplayed(player, item.Uid)
+		and not CosmeticEquipService.IsFloating(player, item.Uid)
 end
 
 -- Sells every sellable item the predicate accepts, in inventory order, as one CE payment.

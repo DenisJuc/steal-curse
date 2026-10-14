@@ -1,5 +1,5 @@
 -- Hunt VFX meshes from ReplicatedStorage.HuntModels (synced from assets/HuntModels/<Name>.rbxm):
--- SignalCore, OfudaTalisman, ChainLink and SealJar. Each is cloned as one anchored decor part,
+-- SignalCore, OfudaTalisman, ChainLink, SealJar and LostOne. Each is cloned as one anchored decor part,
 -- scaled so its longest side is `size`. Callers fall back to primitives when a model is missing.
 -- Optional attributes on a model: DisplayScale (number) and DisplayRotation (Vector3, degrees).
 
@@ -25,6 +25,26 @@ end
 
 function HuntModels.has(name: string): boolean
 	return template(name) ~= nil
+end
+
+-- The imported part's own size, before build() rescales it (attachments inside keep positions
+-- for this size).
+function HuntModels.sourceSize(name: string): Vector3?
+	local source = template(name)
+	return source and source.Size
+end
+
+-- An attribute set on the imported model (or nil).
+function HuntModels.attribute(name: string, key: string): any
+	local found = asset(name)
+	return found and found:GetAttribute(key)
+end
+
+-- The imported part's rotation as saved (imported meshes often carry one; build() returns the
+-- part unrotated).
+function HuntModels.sourceRotation(name: string): CFrame?
+	local source = template(name)
+	return source and source.CFrame.Rotation
 end
 
 -- Rotation that turns the part's longest side along Z and its thinnest along Y (chain links lie

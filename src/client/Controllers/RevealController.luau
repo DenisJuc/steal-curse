@@ -1,10 +1,11 @@
 -- Reveal presentation (GDD 3.2). Every reward is already granted and saved by the server; this
 -- only shows it. Small finds: spectral projection + soft tick (the feed line is DiscoveryFeed).
 -- Medium/Large finds: an overlay card with the relic model, rarity flash and sound; Large adds a
--- dim backdrop, light rays and a camera zoom, and can be skipped. A mutation is revealed as a
+-- dim backdrop, light rays and a camera zoom. Any click or tap skips the reveal on screen. A mutation is revealed as a
 -- second stage after the base relic. Overlays queue in arrival order (Presentation queue); extra
 -- ones are coalesced into "+N more in your Journal". Nothing here touches scanning or movement.
--- Scan finds arrive through RollReel once the roll reel has landed on them.
+-- Scan finds arrive through RollReel once the roll reel has landed on them. A hunt's finds arrive
+-- after the hunt papers (HuntRolls): only the new ones get a reveal then.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -57,6 +58,7 @@ local ui: Ui
 local queue = Presentation.newQueue(Config.Reveal.MaxQueued)
 local running = false
 local skipRequested = false
+local showing = false
 local showingLarge = false
 local holdUntil = 0
 local model: BasePart? = nil
@@ -284,6 +286,7 @@ local function play(entry: Presentation.Entry, dropped: number)
 	local low = Settings.LowEffects()
 
 	skipRequested = false
+	showing = true
 	showingLarge = large
 	setModel(relic.Id)
 	ui.TierLabel.Text = string.upper(if tier then tier.Name else relic.Tier)
@@ -298,7 +301,7 @@ local function play(entry: Presentation.Entry, dropped: number)
 		note = `+{dropped} more rare find{if dropped == 1 then "" else "s"} in your Journal`
 	end
 	ui.NoteLabel.Text = note
-	ui.SkipButton.Visible = large
+	ui.SkipButton.Visible = true
 	ui.Rays.Visible = large and not low
 	for _, ray in ui.Rays:GetChildren() do
 		if ray:IsA("Frame") then
@@ -349,12 +352,16 @@ local function play(entry: Presentation.Entry, dropped: number)
 		UIKit.tween(camera, 0.5, { FieldOfView = baseFov })
 	end
 	showingLarge = false
+	showing = false
 	ui.SkipButton.Visible = false
-	UIKit.tween(ui.Card, 0.18, { BackgroundTransparency = 1, Size = UDim2.fromOffset(CARD_SIZE.X * 0.9, CARD_SIZE.Y * 0.9) })
-	if large then
-		UIKit.tween(ui.Dim, 0.25, { BackgroundTransparency = 1 })
+	-- A skipped reveal vanishes at once; a finished one fades out.
+	if not skipRequested then
+		UIKit.tween(ui.Card, 0.18, { BackgroundTransparency = 1, Size = UDim2.fromOffset(CARD_SIZE.X * 0.9, CARD_SIZE.Y * 0.9) })
+		if large then
+			UIKit.tween(ui.Dim, 0.25, { BackgroundTransparency = 1 })
+		end
+		task.wait(0.2)
 	end
-	task.wait(0.2)
 	ui.Card.Visible = false
 	ui.Dim.Visible = false
 	ui.Flash.Visible = false
@@ -377,6 +384,7 @@ local function runQueue()
 			local ok, err = pcall(play, entry, dropped)
 			if not ok then
 				warn(`[RevealController] {err}`)
+				showing = false
 				ui.Card.Visible = false
 				ui.Dim.Visible = false
 			end
@@ -385,7 +393,7 @@ local function runQueue()
 	end)
 end
 
-local function onResults(results: { any })
+local function onResults(results: { any }, hunt: boolean)
 	if type(results) ~= "table" then
 		return
 	end
@@ -397,7 +405,21 @@ local function onResults(results: { any })
 			continue
 		end
 		local index = tierIndex(result.Id)
-		local category = Presentation.applyMode(Presentation.category(index, MEDIUM_INDEX, LARGE_INDEX), mode)
+		local isNew = result.First == true or result.NewVariant == true
+		local category = Presentation.category(index, MEDIUM_INDEX, LARGE_INDEX, isNew)
+		if hunt then
+			-- The hunt papers already showed every find: only new ones get their reveal, one by one.
+			if not isNew then
+				continue
+			end
+			if category == "Small" then
+				category = "Medium"
+			end
+		end
+		category = Presentation.applyMode(category, mode)
+		if hunt and category == "Small" then
+			continue
+		end
 		if category == "Small" then
 			-- One projection per batch is enough (bind batches can hold dozens of finds). While a
 			-- capture plays, its own animation and summary are the presentation.
@@ -428,8 +450,9 @@ function RevealController.Release()
 	holdUntil = 0
 end
 
+-- Ends the reveal on screen right away (Skip button, any click or tap, Enter, gamepad B).
 function RevealController.Skip()
-	if showingLarge then
+	if showing then
 		skipRequested = true
 	end
 end
@@ -457,7 +480,9 @@ function RevealController.Start(screen: ScreenGui)
 
 	UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		local enter = input.KeyCode == Enum.KeyCode.Return and not gameProcessed
-		if enter or input.KeyCode == Enum.KeyCode.ButtonB then
+		local click = input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		if enter or click or input.KeyCode == Enum.KeyCode.ButtonB then
 			RevealController.Skip()
 		end
 	end)

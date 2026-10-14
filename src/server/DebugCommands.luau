@@ -28,10 +28,19 @@
 --   /afksim [minutes]  simulate an AFK stretch with anti-AFK hops (scans + shrine CE), then show
 --                      Welcome Back as if you just came back (default 30)
 --   /pedlevel <slot> <level>   set a pedestal level directly
+--   /rebirths <n>      set your Rebirth count (income and luck multipliers) without resetting anything
+--   /gamepass <name> [on|off]   pretend you own (or don't own) a game pass, e.g. /gamepass autoequip
 --   /give <relicId> [mutation|none] [count]   grant exact copies through the full pipeline (auto-sell included)
 --   /codexfill [n]     mark the first n relics (rarity order, default all) as discovered, without items
 --   /potion <luck|haste|fortune|all> [count]   give potions
 --   /clearbuffs        end every active potion buff
+--   /streak <x|reset>  set your Hunt Streak multiplier (in the wild) or end it
+--   /zoneevent <bloodmoon|spiritstorm|starfall|off>   start a zone event now, or end it
+--   /strike [here]     lightning near you now (here = right in front of you)
+--   /lightning         charge Lightning Luck as if you captured a struck spirit
+--   /lostone [gift|false]   the Lost One near you (forced to give a gift / be the False Watcher)
+--   /falsewatcher [now]     a False Watcher on its last hop (walk up to it); now = it lunges at once
+--   /facepitch <deg|auto>   tip the jumpscare mask back this many degrees (tuning a new model)
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,12 +61,14 @@ local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local ShowcaseConfig = require(ReplicatedStorage.Shared.ShowcaseConfig)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local Stats = require(ReplicatedStorage.Shared.Stats)
+local WildLayout = require(ReplicatedStorage.Shared.WildLayout)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local AfkService = require(script.Parent.Services.AfkService)
 local BindService = require(script.Parent.Services.BindService)
 local CodexService = require(script.Parent.Services.CodexService)
 local DataService = require(script.Parent.Services.DataService)
 local EconomyService = require(script.Parent.Services.EconomyService)
+local GamePassService = require(script.Parent.Services.GamePassService)
 local ItemService = require(script.Parent.Services.ItemService)
 local MultiplierService = require(script.Parent.Services.MultiplierService)
 local PedestalService = require(script.Parent.Services.PedestalService)
@@ -67,6 +78,14 @@ local SettingsService = require(script.Parent.Services.SettingsService)
 local ShowcaseService = require(script.Parent.Services.ShowcaseService)
 local SignalService = require(script.Parent.Services.SignalService)
 local SkillService = require(script.Parent.Services.SkillService)
+local StreakService = require(script.Parent.Services.StreakService)
+local ZoneEventService = require(script.Parent.Services.ZoneEventService)
+local WildFindsService = require(script.Parent.Services.WildFindsService)
+local LightningService = require(script.Parent.Services.LightningService)
+local LanternService = require(script.Parent.Services.LanternService)
+local MasteryService = require(script.Parent.Services.MasteryService)
+local CurseService = require(script.Parent.Services.CurseService)
+local BountyService = require(script.Parent.Services.BountyService)
 local DiscoveryPipeline = require(script.Parent.DiscoveryPipeline)
 local PersistenceTests = require(script.Parent.Tests.PersistenceTests)
 local MapProps = require(script.Parent.World.MapProps)
@@ -422,11 +441,11 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				reply(player, "Usage: /offline <seconds>, e.g. /offline 3600")
 				return
 			end
-			data.Offline.IncomePerMin = EconomyService.GetIncomePerMin(player)
+			data.Offline.IncomePerSec = EconomyService.GetIncomePerSec(player)
 			data.Offline.At = os.time() - math.floor(seconds)
 			local paid = EconomyService.PayOffline(player)
 			if paid <= 0 then
-				local why = if data.Offline.IncomePerMin <= 0
+				local why = if data.Offline.IncomePerSec <= 0
 					then "nothing is displayed"
 					else `under {Config.Offline.MinSeconds}s pays nothing`
 				reply(player, `No offline earnings ({why}).`)
@@ -447,7 +466,7 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			local seconds = math.floor(minutes * 60)
 			local scans = math.min(math.floor(seconds / ScanService.GetInterval(player)), Config.Afk.SimMaxScans)
 			local ran = ScanService.ForceScans(player, scans, "Scan")
-			local income = EconomyService.GetIncomePerMin(player) * minutes
+			local income = EconomyService.GetIncomePerSec(player) * seconds
 			EconomyService.Add(player, income)
 			log.CE += income
 			log.Seconds += seconds
@@ -459,10 +478,45 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 		pedlevel = function(player, args)
 			local slot, level = tonumber(args[1]), tonumber(args[2])
 			if not slot or not level or not PedestalService.SetLevel(player, slot, level) then
-				reply(player, "Usage: /pedlevel <owned slot> <level 1-10>")
+				reply(player, `Usage: /pedlevel <owned slot> <level 1-{Config.Economy.PedestalMaxLevel}>`)
 				return
 			end
 			reply(player, `Pedestal {slot} is now level {math.clamp(math.floor(level), 1, Config.Economy.PedestalMaxLevel)}.`)
+		end,
+
+		rebirths = function(player, args)
+			local data = DataService.Get(player)
+			local count = tonumber(args[1])
+			if not data or not count or count < 0 then
+				reply(player, "Usage: /rebirths <n>, e.g. /rebirths 3")
+				return
+			end
+			data.Rebirths = math.floor(count)
+			player:SetAttribute("Rebirths", data.Rebirths)
+			MultiplierService.Refresh(player)
+			PedestalService.Refresh(player)
+			reply(player, `Rebirths set to {data.Rebirths}.`)
+		end,
+
+		gamepass = function(player, args)
+			local wanted = string.lower(args[1] or "")
+			local name = nil
+			for passName in Config.GamePasses do
+				if string.lower(passName) == wanted then
+					name = passName
+				end
+			end
+			if not name then
+				local names = {}
+				for passName in Config.GamePasses do
+					table.insert(names, string.lower(passName))
+				end
+				reply(player, `Usage: /gamepass <{table.concat(names, "|")}> [on|off]`)
+				return
+			end
+			local on = string.lower(args[2] or "on") ~= "off"
+			GamePassService.SetOwned(player, name, on)
+			reply(player, `Game pass {name}: {if on then "owned" else "not owned"} (this session).`)
 		end,
 
 		give = function(player, args)
@@ -751,6 +805,183 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				BindService.SetHoldOverride(player, seconds)
 			end
 			reply(player, `Hold to Bind now takes {Format.seconds(BindService.GetHoldSeconds(player))}.`)
+		end,
+
+		streak = function(player, args)
+			local argument = args[1]
+			if argument == "reset" then
+				StreakService.Reset(player)
+				reply(player, "Hunt Streak ended.")
+				return
+			end
+			local value = tonumber(argument)
+			if not value then
+				reply(player, `Usage: /streak <1-{Config.HuntStreak.Max}> or /streak reset`)
+				return
+			end
+			StreakService.Set(player, value)
+			reply(player, `Hunt Streak x{Format.multiplier(StreakService.Get(player))}.`)
+		end,
+
+		zoneevent = function(player, args)
+			local wanted = string.lower(args[1] or "")
+			local id = if wanted == "off" then "off" else nil
+			for _, event in Config.ZoneEvents.Events do
+				if string.lower(event.Id) == wanted then
+					id = event.Id
+				end
+			end
+			if not id or not ZoneEventService.Force(id) then
+				local ids = {}
+				for _, event in Config.ZoneEvents.Events do
+					table.insert(ids, string.lower(event.Id))
+				end
+				reply(player, `Usage: /zoneevent <{table.concat(ids, "|")}|off>`)
+				return
+			end
+			reply(player, if id == "off" then "Zone event ending." else `Zone event {id} started.`)
+		end,
+
+		strike = function(player, args)
+			local root = rootOf(player)
+			if not root then
+				return
+			end
+			local at = nil
+			if args[1] == "here" then
+				local forward = root.CFrame.LookVector * Vector3.new(1, 0, 1)
+				forward = if forward.Magnitude > 0.01 then forward.Unit else Vector3.zAxis
+				local spot = root.Position + forward * 12
+				local ray = workspace:Raycast(spot + Vector3.new(0, 40, 0), Vector3.new(0, -120, 0))
+				at = if ray then ray.Position else spot
+			end
+			local hit = WildFindsService.Strike(player, at)
+			reply(player, if hit then "Lightning struck." else "No spot for lightning (go into the wild).")
+		end,
+
+		offering = function(player, args)
+			local root = rootOf(player)
+			if not root then
+				return
+			end
+			local at = nil
+			if args[1] == "here" then
+				local spot = root.Position + root.CFrame.LookVector * Vector3.new(1, 0, 1) * 15
+				local ray = workspace:Raycast(spot + Vector3.new(0, 40, 0), Vector3.new(0, -120, 0))
+				at = if ray then ray.Position else spot
+			end
+			local hit = WildFindsService.SpawnOffering(player, at)
+			reply(player, if hit then "An offering box is hidden nearby - listen for it." else "No spot (go into the wild).")
+		end,
+
+		lostone = function(player, args)
+			local kind = string.lower(args[1] or "")
+			local isFalse = if kind == "false" then true elseif kind == "gift" then false else nil
+			local hit = WildFindsService.SpawnLostOne(player, { False = isFalse })
+			reply(player, if hit then "The Lost One appeared nearby." else "No spot (go into the wild).")
+		end,
+
+		falsewatcher = function(player, args)
+			local now = string.lower(args[1] or "") == "now"
+			local hit = WildFindsService.SpawnLostOne(player, {
+				False = true,
+				Blinks = Config.WildFinds.LostOne.Hops,
+				Now = now,
+			})
+			if not hit then
+				reply(player, "No spot (go into the wild).")
+			elseif now then
+				reply(player, "The False Watcher lunges.")
+			else
+				reply(player, "A False Watcher is on its last hop nearby - walk up to it.")
+			end
+		end,
+
+		facepitch = function(player, args)
+			local degrees = tonumber(args[1])
+			player:SetAttribute("DebugFacePitch", degrees)
+			reply(
+				player,
+				if degrees
+					then `Jumpscare mask tilt set to {degrees} degrees - try /falsewatcher now.`
+					else "Jumpscare mask tilt back to the model's own."
+			)
+		end,
+
+		lightning = function(player)
+			local factor, untilTime = LightningService.Charge(player)
+			reply(player, `Lightning Luck x{Format.multiplier(factor)} for {math.ceil(untilTime - workspace:GetServerTimeNow())}s.`)
+		end,
+
+		mastery = function(player, args)
+			local wanted = string.lower(args[1] or "")
+			local level = tonumber(args[2])
+			local areas = {}
+			for _, area in Config.Areas do
+				if wanted == "all" or string.find(string.lower(area.Id), wanted, 1, true) then
+					table.insert(areas, area.Id)
+				end
+			end
+			if wanted == "" or #areas == 0 or not level then
+				reply(player, "Usage: /mastery <forest|village|ruins|all> <level 0-10>")
+				return
+			end
+			local levels = Config.Mastery.Levels
+			local index = math.clamp(math.floor(level), 0, #levels)
+			for _, area in areas do
+				MasteryService.SetXp(player, area, if index == 0 then 0 else levels[index])
+			end
+			reply(player, `Mastery set to level {index} in {table.concat(areas, ", ")}.`)
+		end,
+
+		cleanse = function(player, args)
+			local wanted = string.lower(args[1] or "")
+			if wanted == "reset" then
+				CurseService.Reset(player)
+				reply(player, "Every Cursed Shrine is cursed again.")
+				return
+			end
+			local done = {}
+			for _, shrine in WildLayout.CursedShrines do
+				local id = string.lower(shrine.Id)
+				local matches = wanted == "all" or id == wanted or (wanted ~= "" and string.find(string.lower(shrine.Area), wanted, 1, true) ~= nil)
+				if matches and CurseService.Cleanse(player, shrine.Id) then
+					table.insert(done, shrine.Id)
+				end
+			end
+			if wanted == "" then
+				reply(player, "Usage: /cleanse <shrine id (forest1..ruins5)|forest|village|ruins|all|reset>")
+				return
+			end
+			reply(player, if #done > 0 then `Cleansed {table.concat(done, ", ")}.` else "Nothing to cleanse.")
+		end,
+
+		bounty = function(player, args)
+			local what = string.lower(args[1] or "")
+			if not BountyService.Debug(player, what) then
+				reply(player, "Usage: /bounty <complete|reset|nextday>")
+				return
+			end
+			reply(player, `Bounties: {what} done.`)
+		end,
+
+		lantern = function(player, args)
+			local wanted = string.lower(args[1] or "")
+			for _, lantern in Config.Lanterns.List do
+				if string.lower(lantern.Id) == wanted then
+					LanternService.Grant(player, lantern.Id, "debug")
+					reply(player, `Granted lantern {lantern.Id}.`)
+					return
+				end
+			end
+			if wanted == "all" then
+				for _, lantern in Config.Lanterns.List do
+					LanternService.Grant(player, lantern.Id, "debug")
+				end
+				reply(player, "Granted every lantern.")
+				return
+			end
+			reply(player, "Usage: /lantern <id|all>")
 		end,
 
 		huntstats = function(player)

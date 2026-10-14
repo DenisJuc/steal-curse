@@ -1,6 +1,8 @@
 -- Top-left column: the Spirit Resonator box (totals; the charge lives on the ROLL button), then
--- the Cursed Energy coin counter, then the Shrine (pedestal), Luck (cursed lucky flower), Codex
--- (book), Journal (scroll) and Settings (gear) buttons, one under the other. Backpack and Upgrades
+-- the Cursed Energy coin counter, then the Shrine (pedestal), Luck (cursed lucky flower), Rebirth
+-- (cycle ring; shines once affordable), Codex (book), Journal (scroll) and Settings (gear)
+-- buttons, one under the other: names hang on each button's bottom edge, values (luck, Rebirths,
+-- Codex count) sit in a corner chip. Backpack and Upgrades
 -- sit in the bottom RollBar. On small (phone) screens the buttons wrap into rows of three. Reads
 -- player attributes only; one UIScale keeps the whole column readable on phones.
 -- CE rolls up instead of jumping; a windfall (more than a few seconds of passive income at once,
@@ -11,7 +13,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local Rebirth = require(ReplicatedStorage.Shared.Rebirth)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
@@ -21,6 +25,7 @@ local HUD = {}
 export type Callbacks = {
 	OnShrine: () -> (),
 	OnLuck: () -> (),
+	OnRebirth: () -> (),
 	OnCodex: () -> (),
 	OnJournal: () -> (),
 	OnSettings: () -> (),
@@ -28,12 +33,22 @@ export type Callbacks = {
 
 local ICON_BUTTON_SIZE = 64
 local ICON_GAP = 6
+-- Rows also leave room for the caption hanging under each button.
+local ROW_GAP = 16
 local COMPACT_PER_ROW = 3
 local CE_HEIGHT = 44
 -- A CE gain bigger than this many seconds of passive income counts as a windfall.
 local WINDFALL_SECONDS = 5
 
-local function iconButton(parent: Instance, name: string, order: number, caption: string): (TextButton, TextLabel)
+-- Square button: the icon fills it, the name straddles its bottom edge, and a value (if any)
+-- goes in a chip on the top-left corner, so no text sits on the icon.
+local function iconButton(
+	parent: Instance,
+	name: string,
+	order: number,
+	caption: string,
+	iconKey: string
+): (TextButton, TextLabel, TextLabel)
 	local slot = UIKit.slot(parent, name .. "Slot", UDim2.fromOffset(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE), order)
 	local button = UIKit.create("TextButton", {
 		Name = name,
@@ -44,19 +59,19 @@ local function iconButton(parent: Instance, name: string, order: number, caption
 	UIKit.fill(button)
 	UIKit.skinPanel(button)
 	Motion.button(button)
-	local label = UIKit.label({
-		Name = "Caption",
-		Text = caption,
-		TextSize = 12,
-		TextStrokeTransparency = 0.5,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -2),
-		Size = UDim2.new(1, -4, 0, 14),
-		ZIndex = 2,
-		Parent = button,
-	})
-	return button, label
+	local icon = Icons.draw(button, iconKey)
+	if icon then
+		icon.AnchorPoint = Vector2.new(0.5, 0.5)
+		icon.Position = UDim2.new(0.5, 0, 0.5, -3)
+		local scale = icon:FindFirstChildOfClass("UIScale")
+		if scale and scale.Scale < 1 then
+			scale.Scale = 1
+		end
+	end
+	local label = UIKit.iconCaption(button, caption, 14)
+	local chip = UIKit.iconChip(button)
+	chip.Visible = false
+	return button, label, chip
 end
 
 function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (boolean) -> () }
@@ -163,7 +178,7 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 			return
 		end
 		local gain = ce - before
-		local perSecond = (player:GetAttribute("IncomePerMin") or 0) / 60
+		local perSecond = player:GetAttribute("IncomePerSec") or 0
 		if gain > math.max(1, perSecond * WINDFALL_SECONDS) then
 			windfall(gain, ce)
 		else
@@ -180,48 +195,69 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local grid = UIKit.create("UIGridLayout", {
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		CellSize = UDim2.fromOffset(ICON_BUTTON_SIZE, ICON_BUTTON_SIZE),
-		CellPadding = UDim2.fromOffset(ICON_GAP, ICON_GAP),
+		CellPadding = UDim2.fromOffset(ICON_GAP + 6, ROW_GAP),
 		FillDirection = Enum.FillDirection.Horizontal,
 		Parent = buttons,
 	})
 
-	local shrineButton = iconButton(buttons, "ShrineButton", 3, "Shrine")
-	Icons.draw(shrineButton, "Shrine")
+	local shrineButton = iconButton(buttons, "ShrineButton", 3, "Shrine", "Shrine")
 	shrineButton.Activated:Connect(callbacks.OnShrine)
 
-	local luckButton, luckCaption = iconButton(buttons, "LuckButton", 4, "Luck")
-	Icons.draw(luckButton, "Luck")
+	local luckButton, _, luckChip = iconButton(buttons, "LuckButton", 4, "Luck", "Luck")
 	luckButton.Activated:Connect(callbacks.OnLuck)
+	luckChip.Visible = true
 	local function refreshLuck()
-		luckCaption.Text = `Luck {Format.number(player:GetAttribute("EffectiveLuck") or 1)}x`
+		luckChip.Text = `x{Format.number(player:GetAttribute("EffectiveLuck") or 1)}`
 	end
 	player:GetAttributeChangedSignal("EffectiveLuck"):Connect(refreshLuck)
 	refreshLuck()
 
-	local codexButton, codexCaption = iconButton(buttons, "CodexButton", 7, "Codex")
-	Icons.draw(codexButton, "Codex")
-	codexButton.Activated:Connect(callbacks.OnCodex)
+	-- Rebirth: shines and turns jade once the next Rebirth is affordable; the chip counts Rebirths.
+	local rebirthButton, rebirthCaption, rebirthChip = iconButton(buttons, "RebirthButton", 5, "Rebirth", "Rebirth")
+	rebirthButton.Activated:Connect(callbacks.OnRebirth)
+	local rebirthStroke = rebirthButton:FindFirstChildOfClass("UIStroke")
+	local rebirthReady = false
+	Motion.shineLoop(rebirthButton, 2.4, function()
+		return rebirthReady
+	end)
+	local function refreshRebirth()
+		local count = player:GetAttribute("Rebirths") or 0
+		local cost = Rebirth.cost(Config.Rebirth, count)
+		rebirthReady = (player:GetAttribute("CE") or 0) + 1e-9 >= cost
+		rebirthChip.Visible = count > 0
+		rebirthChip.Text = tostring(count)
+		rebirthCaption.TextColor3 = if rebirthReady then colors.Jade else colors.Text
+		if rebirthStroke then
+			rebirthStroke.Color = if rebirthReady then colors.Jade else colors.Trim
+			rebirthStroke.Thickness = if rebirthReady then 3 else 2
+		end
+	end
+	player:GetAttributeChangedSignal("Rebirths"):Connect(refreshRebirth)
+	player:GetAttributeChangedSignal("CE"):Connect(refreshRebirth)
+	refreshRebirth()
 
-	local journalButton = iconButton(buttons, "JournalButton", 8, "Journal")
-	Icons.draw(journalButton, "Journal")
+	local codexButton, _, codexChip = iconButton(buttons, "CodexButton", 7, "Codex", "Codex")
+	codexButton.Activated:Connect(callbacks.OnCodex)
+	codexChip.Visible = true
+
+	local journalButton = iconButton(buttons, "JournalButton", 8, "Journal", "Journal")
 	journalButton.Activated:Connect(callbacks.OnJournal)
 
-	local settingsButton = iconButton(buttons, "SettingsButton", 9, "Settings")
-	Icons.draw(settingsButton, "Settings")
+	local settingsButton = iconButton(buttons, "SettingsButton", 9, "Settings", "Settings")
 	settingsButton.Activated:Connect(callbacks.OnSettings)
 
-	local buttonCount = 5
+	local buttonCount = 6
 	UIKit.watchCompact(function(compact: boolean)
 		local perRow = if compact then COMPACT_PER_ROW else 1
 		local rows = math.ceil(buttonCount / perRow)
 		grid.FillDirectionMaxCells = perRow
 		buttons.Size = UDim2.fromOffset(
-			perRow * ICON_BUTTON_SIZE + (perRow - 1) * ICON_GAP,
-			rows * ICON_BUTTON_SIZE + (rows - 1) * ICON_GAP
+			perRow * ICON_BUTTON_SIZE + (perRow - 1) * (ICON_GAP + 6),
+			rows * ICON_BUTTON_SIZE + (rows - 1) * ROW_GAP + ROW_GAP / 2
 		)
 	end)
 	local function refreshCodex()
-		codexCaption.Text = `Codex {player:GetAttribute("DiscoveredCount") or 0}/{#CodexBook.AllIds}`
+		codexChip.Text = `{player:GetAttribute("DiscoveredCount") or 0}/{#CodexBook.AllIds}`
 	end
 	player:GetAttributeChangedSignal("DiscoveredCount"):Connect(refreshCodex)
 	refreshCodex()

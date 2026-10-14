@@ -27,7 +27,16 @@ return {
 				Cosmic = "Large",
 			}
 			for index, tier in RarityConfig.Tiers do
-				expect.equal(Presentation.category(index, MEDIUM, LARGE), expected[tier.Id], tier.Id)
+				expect.equal(Presentation.category(index, MEDIUM, LARGE, true), expected[tier.Id], tier.Id)
+			end
+		end,
+	},
+	{
+		Name = "repeat finds only get the centre reveal at the Large tiers",
+		Run = function()
+			for index, tier in RarityConfig.Tiers do
+				local expected = if index >= LARGE then "Large" else "Small"
+				expect.equal(Presentation.category(index, MEDIUM, LARGE, false), expected, tier.Id)
 			end
 		end,
 	},

@@ -1,11 +1,14 @@
--- Home / Hub / Wild quick travel. The client only names a destination; the server picks the spot,
--- applies the cooldown and refuses while a bind is in progress (a capture must be walked to).
+-- Home / Hub / Wild quick travel, plus "Shrine:<id>" for Cursed Shrines the player has cleansed.
+-- The client only names a destination; the server picks the spot, applies the cooldown and
+-- refuses while a bind or a cleansing is in progress (a capture must be walked to).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local WildLayout = require(ReplicatedStorage.Shared.WildLayout)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
+local CurseService = require(script.Parent.CurseService)
 local PlotService = require(script.Parent.PlotService)
 local RemoteGuard = require(script.Parent.RemoteGuard)
 
@@ -42,12 +45,28 @@ local function destination(player: Player, character: Model, root: BasePart, whe
 		local position = Vector3.new(x, groundAt(x, z, { character }) + 4, z)
 		local outward = Vector3.new(x * 2, position.Y, z * 2)
 		return CFrame.lookAt(position, outward), nil
+	elseif string.sub(where, 1, 7) == "Shrine:" then
+		local id = string.sub(where, 8)
+		local shrine = WildLayout.ShrineById[id]
+		if not shrine or not CurseService.IsCleansed(player, id) then
+			return nil, "Cleanse that shrine first."
+		end
+		-- In front of the shrine, on the side facing the hub.
+		local sx, sz = WildLayout.shrinePosition(shrine)
+		local inward = Vector3.new(-sx, 0, -sz).Unit
+		local spot = Vector3.new(sx, 0, sz) + inward * (WildLayout.ShrineSize / 2 + 5)
+		local position = Vector3.new(spot.X, groundAt(spot.X, spot.Z, { character }) + 4, spot.Z)
+		return CFrame.lookAt(position, Vector3.new(sx, position.Y, sz)), nil
 	end
 	return nil, nil
 end
 
 local function onTeleport(player: Player, where: unknown)
-	if where ~= "Home" and where ~= "Hub" and where ~= "Wild" then
+	if type(where) ~= "string" or (where ~= "Home" and where ~= "Hub" and where ~= "Wild" and string.sub(where, 1, 7) ~= "Shrine:") then
+		return
+	end
+	if player:GetAttribute("CleanseShrine") ~= nil then
+		Notify:FireClient(player, "Finish or cancel the cleansing before traveling.", "Error")
 		return
 	end
 	local character = player.Character

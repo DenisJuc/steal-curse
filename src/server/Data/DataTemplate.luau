@@ -4,7 +4,7 @@
 
 local DataTemplate = {}
 
-DataTemplate.Version = 4
+DataTemplate.Version = 6
 
 export type Item = {
 	Uid: number,
@@ -43,9 +43,11 @@ export type Data = {
 	Pedestals: { Pedestal },
 	-- Income snapshot refreshed every economy tick; pays offline earnings on the next join.
 	Offline: {
-		IncomePerMin: number,
+		IncomePerSec: number,
 		At: number,
 	},
+	-- Rebirths done (Shared/Rebirth): permanent income and luck multipliers.
+	Rebirths: number,
 	-- Codex discovery keyed by BASE relic id (mutations never create separate entries).
 	Discovered: { [string]: number },
 	-- Mutations seen per base relic id (item-detail flags, prestige titles): [id][mutation] = time.
@@ -76,6 +78,8 @@ export type Data = {
 		Frequency: string,
 		-- Fire each full ROLL charge automatically (AFK players always auto-roll).
 		AutoRoll: boolean,
+		-- Run Equip Best after new finds, slot purchases and upgrades (locked pedestals are kept).
+		AutoEquip: boolean,
 		AutoSell: {
 			Tiers: { [string]: string },
 			SellAllDuplicates: boolean,
@@ -94,11 +98,11 @@ export type Data = {
 		Owned: { [string]: number },
 		AccessoriesOff: { [string]: boolean },
 	},
-	-- The one relic carried for show (GDD 9.1): Key = "<relicId>|<mutation>" ("" = none),
-	-- Mode = "Float" or "Hand". Display only; it stays in the inventory and on pedestals.
+	-- The one relic floating beside the player (GDD 9.1): Uid of a backpack copy (0 = none).
+	-- Display only. Taken from a pedestal with E, or floated from the Backpack; never sold or
+	-- auto-equipped while floating, and placing it on a pedestal stops the float.
 	Cosmetic: {
-		Key: string,
-		Mode: string,
+		Uid: number,
 	},
 	-- Potions owned by ItemConfig id.
 	Items: { [string]: number },
@@ -106,6 +110,29 @@ export type Data = {
 	Buffs: { [string]: number },
 	-- One-time item rewards already given (e.g. "FirstRare") = time.
 	ItemRewards: { [string]: number },
+	-- Offering boxes opened in a row below the second reward tier (Offerings pity).
+	OfferingPity: number,
+	-- Title shown over the player's head: an earned title, "Auto" (best earned) or "Off".
+	TitleChoice: string,
+	-- Spirit lantern colours (Config.Lanterns): owned ids and the one shown ("" = default).
+	Lanterns: {
+		Owned: { [string]: number },
+		Active: string,
+	},
+	-- Zone mastery XP by area id (ZoneMastery).
+	Mastery: { [string]: number },
+	-- Cursed Shrines cleansed: [shrineId] = time.
+	Cleansed: { [string]: number },
+	-- Daily bounties (Bounties module).
+	Bounties: {
+		-- UTC day number the daily slots belong to.
+		Day: number,
+		Slots: { { Id: string, Progress: number, Claimed: boolean } },
+		Rerolled: boolean,
+		Weekly: { Week: number, Id: string, Progress: number, Claimed: boolean },
+		-- Days in a row with every daily claimed.
+		Streak: { Count: number, LastDay: number },
+	},
 }
 
 DataTemplate.Template = {
@@ -122,9 +149,10 @@ DataTemplate.Template = {
 		{ Level = 1, Locked = false },
 	},
 	Offline = {
-		IncomePerMin = 0,
+		IncomePerSec = 0,
 		At = 0,
 	},
+	Rebirths = 0,
 	Discovered = {},
 	CodexMutations = {},
 	CodexReady = {},
@@ -146,6 +174,8 @@ DataTemplate.Template = {
 		RarityFocus = "MaxLuck",
 		Frequency = "All",
 		AutoRoll = true,
+		-- Only used with the AutoEquip game pass (switched on when it is bought).
+		AutoEquip = false,
 		-- Must equal AutoSell.defaults() (checked by a Lune test).
 		AutoSell = {
 			Tiers = {
@@ -196,12 +226,26 @@ DataTemplate.Template = {
 		AccessoriesOff = {},
 	},
 	Cosmetic = {
-		Key = "",
-		Mode = "Float",
+		Uid = 0,
 	},
 	Items = {},
 	Buffs = {},
 	ItemRewards = {},
+	OfferingPity = 0,
+	TitleChoice = "Auto",
+	Lanterns = {
+		Owned = {},
+		Active = "",
+	},
+	Mastery = {},
+	Cleansed = {},
+	Bounties = {
+		Day = 0,
+		Slots = {},
+		Rerolled = false,
+		Weekly = { Week = 0, Id = "", Progress = 0, Claimed = false },
+		Streak = { Count = 0, LastDay = 0 },
+	},
 } :: Data
 
 function DataTemplate.deepCopy<T>(value: T): T

@@ -1,22 +1,22 @@
 -- Compact hunt HUD: Spirit Sight toggle, Pulse and Hold-to-Bind buttons (mouse/touch),
--- signal counter, hint line, bind progress meter and the capture summary card.
+-- signal counter, hint line, bind progress meter and the Lightning Luck card (a capture's finds
+-- roll on the hunt papers, HuntRolls).
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local CaptureSummary = require(ReplicatedStorage.Shared.CaptureSummary)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
-local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
-local MutationVFX = require(script.Parent.Parent.Effects.MutationVFX)
+local Sounds = require(script.Parent.Parent.Sounds)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
-local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
 
 local HuntHUD = {}
+
+local LIGHTNING_COLOR = Color3.fromRGB(255, 228, 120)
 
 export type Callbacks = {
 	OnToggleSight: () -> (),
@@ -32,7 +32,7 @@ export type Hud = {
 	SetProgress: (progress: number?) -> (),
 	SetSignalInfo: (text: string) -> (),
 	ShowHint: (text: string, seconds: number?) -> (),
-	ShowSummary: (summary: CaptureSummary.Summary, onClosed: () -> ()) -> (),
+	ShowLightning: (factor: number, seconds: number, onClosed: () -> ()) -> (),
 }
 
 local function keyHint(key: string): string
@@ -191,6 +191,75 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 	})
 	UIKit.scaler(signalInfo)
 
+	-- Hunt Streak readout (top center while a streak is going): the multiplier and the time left
+	-- before it ends.
+	local streakBox = UIKit.create("Frame", {
+		Name = "HuntStreak",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 64),
+		Size = UDim2.fromOffset(240, 58),
+		BackgroundTransparency = 1,
+		Visible = false,
+		Parent = screen,
+	})
+	UIKit.scaler(streakBox)
+	local streakLabel = UIKit.label({
+		Name = "Value",
+		Size = UDim2.new(1, 0, 0, 36),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextSize = 30,
+		TextColor3 = colors.Gold,
+		TextStrokeTransparency = 0.2,
+		Parent = streakBox,
+	})
+	local streakTrack = UIKit.create("Frame", {
+		Name = "Timer",
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, 40),
+		Size = UDim2.new(0.8, 0, 0, 8),
+		BackgroundColor3 = colors.Track,
+		Parent = streakBox,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	local streakFill = UIKit.create("Frame", {
+		Name = "Fill",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = colors.Gold,
+		Parent = streakTrack,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	local player = Players.LocalPlayer
+	local shownStreak = 1
+	local function refreshStreak()
+		local value = player:GetAttribute("HuntStreak")
+		local active = type(value) == "number" and value > 1
+		streakBox.Visible = active
+		if not active then
+			shownStreak = 1
+			return
+		end
+		streakLabel.Text = `STREAK x{Format.multiplier(value)}`
+		if value > shownStreak then
+			Motion.punch(streakLabel, 1.6)
+			Sounds.Play("StreakUp", nil, 0.9 + (value - 1) * 0.3)
+		end
+		shownStreak = value
+	end
+	player:GetAttributeChangedSignal("HuntStreak"):Connect(refreshStreak)
+	refreshStreak()
+	RunService.Heartbeat:Connect(function()
+		if not streakBox.Visible then
+			return
+		end
+		local endsAt = player:GetAttribute("HuntStreakEndsAt")
+		local idle = player:GetAttribute("HuntStreakIdle")
+		if type(endsAt) == "number" and type(idle) == "number" and idle > 0 then
+			local left = math.clamp((endsAt - workspace:GetServerTimeNow()) / idle, 0, 1)
+			streakFill.Size = UDim2.fromScale(left, 1)
+			streakFill.BackgroundColor3 = if left < 0.25 then Color3.fromRGB(255, 110, 90) else colors.Gold
+		else
+			streakFill.BackgroundColor3 = colors.SubText
+		end
+	end)
+
 	-- Capture summary (GDD 4.3 step 6): model, name, base odds, mutation, bonus count, notable finds.
 	local cardHolder = UIKit.create("Frame", {
 		Name = "CaptureSummary",
@@ -219,7 +288,7 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		props.Parent = card
 		return UIKit.label(props)
 	end
-	cardLabel({
+	local cardHeader = cardLabel({
 		Name = "Header",
 		Text = "SEALED",
 		FontFace = UIKit.TitleFont,
@@ -310,12 +379,25 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		end
 	end)
 
-	local function relicColor(relicId: string, mutation: string?): Color3
-		local relic = RelicConfig.ById[relicId]
-		if mutation then
-			return UIKit.mutationColor(mutation)
+	local function openCard(model: BasePart?, onClosed: () -> ())
+		if model then
+			model.Parent = viewport
+			cardModel = model
 		end
-		return if relic then UIKit.tierColor(relic.Tier) else colors.Text
+		onCardClosed = onClosed
+		local token = cardToken
+		cardHolder.Visible = true
+		Motion.pop(card, 0, 0.5)
+		task.delay(0.2, function()
+			if cardToken == token then
+				Motion.shine(card, 0.8)
+			end
+		end)
+		task.delay(Config.Hunt.SummarySeconds, function()
+			if cardToken == token and cardHolder.Visible then
+				closeCard()
+			end
+		end)
 	end
 
 	local hud = {}
@@ -391,66 +473,38 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		end
 	end
 
-	function hud.ShowSummary(summary: CaptureSummary.Summary, onClosed: () -> ())
-		local relic = RelicConfig.ById[summary.CapturedId]
-		if not relic then
-			onClosed()
-			return
-		end
-		-- A newer capture replaces the card without running the old card's close callback.
+	-- A lightning-struck capture: nothing was rolled, the reward is Lightning Luck.
+	function hud.ShowLightning(factor: number, seconds: number, onClosed: () -> ())
 		onCardClosed = nil
 		closeCard()
-		local mutation = summary.CapturedMutation
-		local color = relicColor(relic.Id, mutation)
-		cardName.Text = (if summary.CapturedFirst then "NEW! " else "") .. Odds.displayName(relic.Id, mutation)
-		cardName.TextColor3 = color
-		cardStroke.Color = color
-		cardOdds.Text = Odds.describe(relic.Id, mutation)
-		cardOdds.TextColor3 = color
-		cardBonus.Text = `+{summary.BonusCount} bonus discoveries`
-
+		cardHeader.Text = "LIGHTNING-STRUCK SPIRIT"
+		cardHeader.TextColor3 = LIGHTNING_COLOR
+		cardName.Text = "Lightning Luck!"
+		cardName.TextColor3 = LIGHTNING_COLOR
+		cardStroke.Color = LIGHTNING_COLOR
+		cardOdds.Text = `Luck x{Format.multiplier(factor)} on every roll`
+		cardOdds.TextColor3 = colors.Text
+		cardBonus.Text = `for {Format.duration(seconds)}`
+		cardBonus.TextColor3 = LIGHTNING_COLOR
+		local lines = {
+			"  No relic from this one - the storm charged you instead.",
+			"  Scan and capture now: every discovery rolls luckier.",
+			"  More struck spirits add time.",
+		}
 		for index, line in notableLines do
-			local notable = summary.Notable[index]
-			line.Visible = notable ~= nil
-			if notable then
-				local tag = if notable.First then "  NEW!" elseif notable.NewVariant then "  NEW VARIANT" else ""
-				line.Text = `  {Odds.displayName(notable.Id, notable.Mutation)}  ({Format.odds(Odds.baseItem(notable.Id))}){tag}`
-				line.TextColor3 = relicColor(notable.Id, notable.Mutation)
-			end
+			line.Visible = lines[index] ~= nil
+			line.Text = lines[index] or ""
+			line.TextColor3 = colors.SubText
 		end
-		local footer = {}
-		if summary.NewCount > 0 then
-			table.insert(footer, `{summary.NewCount} new to your Codex`)
-		end
-		if summary.SoldCount > 0 then
-			table.insert(footer, `{summary.SoldCount} auto-sold (+{Format.number(summary.SoldCE)} CE)`)
-		end
-		table.insert(footer, "Tap to close")
-		cardFooter.Text = table.concat(footer, "   |   ")
+		cardFooter.Text = "Tap to close"
 
-		local part = RelicModels.build(relic.Id, CFrame.new(), 1.15)
-		if part then
-			if mutation then
-				MutationVFX.Apply(part, mutation, { Highlight = false, Particles = false })
-			end
-			part.Parent = viewport
-			cardModel = part
-		end
-
-		onCardClosed = onClosed
-		local token = cardToken
-		cardHolder.Visible = true
-		Motion.pop(card, 0, 0.5)
-		task.delay(0.2, function()
-			if cardToken == token then
-				Motion.shine(card, 0.8)
-			end
-		end)
-		task.delay(Config.Hunt.SummarySeconds, function()
-			if cardToken == token and cardHolder.Visible then
-				closeCard()
-			end
-		end)
+		local orb = Instance.new("Part")
+		orb.Shape = Enum.PartType.Ball
+		orb.Size = Vector3.one * 2.2
+		orb.Material = Enum.Material.Neon
+		orb.Color = LIGHTNING_COLOR
+		orb.Anchored = true
+		openCard(orb, onClosed)
 	end
 
 	return hud :: Hud

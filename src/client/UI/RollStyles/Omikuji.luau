@@ -1,5 +1,6 @@
 -- "Omikuji" roll (the default): a shrine fortune box rattles, a slip shoots out and a paper fortune
--- unrolls, all in about a third of a second. Then relics flicker on the paper (quick at first,
+-- unrolls, all in about a third of a second. The box is the ROLL button's own (OmikujiBox launcher)
+-- when it is showing; with Auto Roll on the roll draws its own. Then relics flicker on the paper (quick at first,
 -- slowing, with a rising tick; rare teasers often flash by just before the end) until the result
 -- sticks and a seal in its tier color stamps down.
 
@@ -8,6 +9,7 @@ local TweenService = game:GetService("TweenService")
 
 local Sounds = require(script.Parent.Parent.Parent.Sounds)
 local Motion = require(script.Parent.Parent.Motion)
+local OmikujiBox = require(script.Parent.Parent.OmikujiBox)
 local RollKit = require(script.Parent.RollKit)
 local UIKit = require(script.Parent.Parent.UIKit)
 
@@ -20,18 +22,49 @@ local SHAKES = 3
 -- The draw (rattle, slip, unroll) before the flicker starts; shorter on fast rolls.
 local INTRO_SECONDS = 0.32
 local FLICKS_PER_SECOND = 9
--- The paper's center, measured up from the bottom of the roll.
-local PAPER_CENTER_Y = -BOX_SIZE.Y + 18 - PAPER_HEIGHT / 2
+-- How far the paper's bottom sits above the bottom of the roll: over its own box, or just above
+-- the bar when the slip comes out of the ROLL button's box.
+local OWN_BOX_LIFT = BOX_SIZE.Y - 18
+local LAUNCHER_LIFT = 4
+-- The slip grows out of the top of the ROLL button's box up to the paper.
+local LAUNCH_SLIP = UDim2.fromOffset(10, 40)
 
 local PAPER = Color3.fromRGB(244, 234, 212)
 local INK = Color3.fromRGB(48, 32, 28)
-local LACQUER = Color3.fromRGB(120, 36, 30)
 local WOOD = Color3.fromRGB(70, 44, 30)
 local BLACK = Color3.new(0, 0, 0)
 
 -- Ink version of a tier color, readable on the paper.
 local function ink(color: Color3): Color3
 	return color:Lerp(BLACK, 0.35)
+end
+
+-- The slip that grows out of the top of the ROLL button's box (made once per box).
+local function launcherSlip(launcher: GuiObject): Frame
+	local existing = launcher:FindFirstChild("Slip")
+	if existing and existing:IsA("Frame") then
+		return existing
+	end
+	local slip = UIKit.create("Frame", {
+		Name = "Slip",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 0, 4),
+		Size = UDim2.fromOffset(10, 0),
+		BackgroundColor3 = PAPER,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 4,
+		Parent = launcher,
+	})
+	UIKit.create("Frame", {
+		Name = "Tip",
+		Size = UDim2.new(1, 0, 0, 10),
+		BackgroundColor3 = UIKit.Colors.Red,
+		BorderSizePixel = 0,
+		ZIndex = 4,
+		Parent = slip,
+	})
+	return slip
 end
 
 function Omikuji.new(holder: GuiObject): RollKit.Style
@@ -46,42 +79,9 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 		Parent = holder,
 	}, { UIKit.create("UIScale", { Name = "Juice" }) })
 
-	local box = UIKit.create("Frame", {
-		Name = "Box",
-		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.fromScale(0.5, 1),
-		Size = UDim2.fromOffset(BOX_SIZE.X, BOX_SIZE.Y),
-		BackgroundColor3 = LACQUER,
-		ZIndex = 3,
-		Parent = root,
-	}, {
-		UIKit.corner(8),
-		UIKit.stroke(colors.Gold, 2, 0.1),
-		UIKit.create("UIGradient", {
-			Rotation = 90,
-			Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(120, 110, 110)),
-		}),
-	})
-	UIKit.create("Frame", {
-		Name = "Band",
-		Position = UDim2.fromOffset(0, 12),
-		Size = UDim2.new(1, 0, 0, 5),
-		BackgroundColor3 = colors.Gold,
-		BorderSizePixel = 0,
-		ZIndex = 4,
-		Parent = box,
-	})
-	UIKit.label({
-		Name = "Mark",
-		Text = "御\n籤",
-		TextSize = 20,
-		TextColor3 = colors.Gold,
-		TextXAlignment = Enum.TextXAlignment.Center,
-		Position = UDim2.fromOffset(0, 22),
-		Size = UDim2.new(1, 0, 1, -26),
-		ZIndex = 4,
-		Parent = box,
-	})
+	local box = OmikujiBox.draw(root, BOX_SIZE, 3)
+	box.AnchorPoint = Vector2.new(0.5, 1)
+	box.Position = UDim2.fromScale(0.5, 1)
 
 	-- The slip hides inside the box until it shoots out of the top.
 	local slipHidden = UDim2.new(0.5, 0, 1, -12)
@@ -108,7 +108,6 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 	local paper = UIKit.create("Frame", {
 		Name = "Paper",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -BOX_SIZE.Y + 18),
 		Size = UDim2.fromOffset(0, PAPER_HEIGHT),
 		BackgroundColor3 = PAPER,
 		ClipsDescendants = true,
@@ -181,7 +180,6 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 	local seal = UIKit.create("Frame", {
 		Name = "Seal",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, PAPER_WIDTH / 2 - 38, 1, -BOX_SIZE.Y + 18 - PAPER_HEIGHT / 2),
 		Size = UDim2.fromOffset(48, 48),
 		Rotation = -12,
 		Visible = false,
@@ -208,7 +206,6 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 	local aura = UIKit.create("Frame", {
 		Name = "Aura",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 1, PAPER_CENTER_Y),
 		Size = UDim2.fromOffset(PAPER_WIDTH + 26, PAPER_HEIGHT + 26),
 		BackgroundTransparency = 1,
 		Visible = false,
@@ -219,12 +216,25 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 	local raysAnchor = UIKit.create("Frame", {
 		Name = "RaysAnchor",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 1, PAPER_CENTER_Y),
 		Size = UDim2.fromOffset(PAPER_WIDTH, PAPER_HEIGHT),
 		BackgroundTransparency = 1,
 		ZIndex = 1,
 		Parent = root,
 	})
+
+	-- The box this roll rattles (its own, or the ROLL button's) and the slip that comes out of it.
+	local shaker: GuiObject = box
+	local activeSlip: Frame = slip
+
+	-- Puts the paper (and everything lined up with it) `lift` pixels above the roll's bottom.
+	local function placePaper(lift: number)
+		local centerY = -lift - PAPER_HEIGHT / 2
+		paper.Position = UDim2.new(0.5, 0, 1, -lift)
+		seal.Position = UDim2.new(0.5, PAPER_WIDTH / 2 - 38, 1, centerY)
+		aura.Position = UDim2.new(0.5, 0, 1, centerY)
+		raysAnchor.Position = UDim2.new(0.5, 0, 1, centerY)
+	end
+	placePaper(OWN_BOX_LIFT)
 
 	local ticket = 0
 	local cancels: { () -> () } = {}
@@ -252,6 +262,9 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 		end
 		table.clear(cancels)
 		endHush()
+		if activeSlip ~= slip then
+			activeSlip.Visible = false
+		end
 	end
 
 	-- Runs `callback` after `seconds` unless a newer roll (or Hide) came first.
@@ -324,7 +337,7 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 		Motion.punch(paper, 1.6 + result.TierIndex * 0.25)
 		Motion.punch(art, 3)
 		Motion.flash(paper, result.Color, 0.4)
-		Motion.shake(box, 60 + result.TierIndex * 10)
+		Motion.shake(shaker, 60 + result.TierIndex * 10)
 		RollKit.impact(result, seal, raysAnchor, paper)
 	end
 
@@ -345,26 +358,35 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 			paper.Visible = false
 			paper.Size = UDim2.fromOffset(0, PAPER_HEIGHT)
 			seal.Visible = false
-			slip.Position = slipHidden
-			slip.Visible = true
+			local launcher = OmikujiBox.Launcher()
+			box.Visible = launcher == nil
+			shaker = launcher or box
+			placePaper(if launcher then LAUNCHER_LIFT else OWN_BOX_LIFT)
+			activeSlip = if launcher then launcherSlip(launcher) else slip
+			if launcher then
+				activeSlip.Size = UDim2.fromOffset(10, 0)
+			else
+				slip.Position = slipHidden
+			end
+			activeSlip.Visible = true
 			RollKit.appear(root)
 
 			table.insert(
 				cancels,
 				RollKit.steps(SHAKES, intro * 0.5, function(step)
-					Motion.shake(box, 60 + step * 30)
+					Motion.shake(shaker, 60 + step * 30)
 					RollKit.tick(step / SHAKES, 0.7)
 				end)
 			)
 			at(intro * 0.45, function()
 				TweenService:Create(
-					slip,
+					activeSlip,
 					TweenInfo.new(intro * 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
-					{ Position = slipOut }
+					if activeSlip == slip then { Position = slipOut } else { Size = LAUNCH_SLIP }
 				):Play()
 			end)
 			at(intro * 0.7, function()
-				slip.Visible = false
+				activeSlip.Visible = false
 				paper.Visible = true
 				TweenService:Create(
 					paper,

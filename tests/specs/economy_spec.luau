@@ -1,110 +1,125 @@
 -- Shrine economy formulas (GDD 6): pedestal costs and multipliers, income, selling, offline pay,
--- and the Equip Best assignment.
+-- the Equip Best assignment, and the pacing targets of the progression sim (tests/lib/economySim).
 
 local Config = require("../../src/shared/Config")
 local Economy = require("../../src/shared/Economy")
-local MutationConfig = require("../../src/shared/MutationConfig")
-local RarityConfig = require("../../src/shared/RarityConfig")
 local expect = require("../lib/expect")
 local EconomySim = require("../lib/economySim")
 
 local settings = Config.Economy
 
+-- The sim is deterministic per seed; three seeds cover a lucky, a typical and a slow start.
+local SEEDS = { 1, 2, 3 }
+local simResults: { [number]: EconomySim.Result } = {}
+local function sim(seed: number): EconomySim.Result
+	if not simResults[seed] then
+		simResults[seed] = EconomySim.run({ Seed = seed, Hours = 2 })
+	end
+	return simResults[seed]
+end
+
+local function snapshotAt(result: EconomySim.Result, minute: number): EconomySim.Snapshot
+	for _, snapshot in result.Snapshots do
+		if snapshot.Minute == minute then
+			return snapshot
+		end
+	end
+	error(`no snapshot at {minute} min`)
+end
+
 return {
 	{
-		Name = "pedestal upgrades cost 500 doubling to 128K, 255,500 CE per max pedestal",
+		Name = "pedestal upgrades: 50 levels, whole-CE costs growing by UpgradeCostGrowth",
 		Run = function()
-			local expected = { 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000, 128000 }
-			for level, cost in expected do
-				expect.equal(Economy.upgradeCost(settings, level), cost, `level {level} -> {level + 1}`)
+			expect.equal(settings.PedestalMaxLevel, 50, "max level")
+			expect.equal(Economy.upgradeCost(settings, 1), settings.FirstUpgradeCost, "level 1 -> 2")
+			for level = 2, settings.PedestalMaxLevel - 1 do
+				local cost = Economy.upgradeCost(settings, level)
+				local previous = Economy.upgradeCost(settings, level - 1)
+				expect.equal(cost, math.floor(cost), `level {level} cost is whole`)
+				expect.truthy(cost > previous, `level {level} costs more`)
+				expect.near(cost / previous, settings.UpgradeCostGrowth, 0.05, `level {level} growth`)
 			end
-			expect.equal(Economy.upgradeCostRange(settings, 1, settings.PedestalMaxLevel), 255500, "total")
+			local total = Economy.upgradeCostRange(settings, 1, settings.PedestalMaxLevel)
+			expect.truthy(total > 1e6 and total < 1e9, `full pedestal costs {total}`)
 		end,
 	},
 	{
-		Name = "pedestal multiplier is x1 at level 1, x2 at level 10, rising every level",
+		Name = "pedestal multiplier is x1 at level 1 and multiplies by LevelGrowth every level",
 		Run = function()
 			expect.equal(Economy.pedestalMultiplier(settings, 1), 1, "level 1")
-			expect.near(Economy.pedestalMultiplier(settings, 10), 2, 1e-12, "level 10")
-			for level = 2, 10 do
-				expect.truthy(
-					Economy.pedestalMultiplier(settings, level) > Economy.pedestalMultiplier(settings, level - 1),
-					`level {level} rises`
+			for level = 2, settings.PedestalMaxLevel do
+				expect.near(
+					Economy.pedestalMultiplier(settings, level) / Economy.pedestalMultiplier(settings, level - 1),
+					settings.LevelGrowth,
+					1e-9,
+					`level {level}`
 				)
 			end
+			local top = Economy.pedestalMultiplier(settings, settings.PedestalMaxLevel)
+			expect.truthy(top > 50 and top < 200, `level 50 is about x100 (got x{top})`)
 		end,
 	},
 	{
 		Name = "max-buy checks every intermediate cost",
 		Run = function()
-			local levels, cost = Economy.maxAffordableUpgrades(settings, 1, 1499)
-			expect.equal(levels, 1, "1499 buys one level")
-			expect.equal(cost, 500, "1499 cost")
-			levels, cost = Economy.maxAffordableUpgrades(settings, 1, 1500)
-			expect.equal(levels, 2, "1500 buys two levels")
-			expect.equal(cost, 1500, "1500 cost")
-			levels, cost = Economy.maxAffordableUpgrades(settings, 1, 1e12)
-			expect.equal(levels, 9, "huge budget stops at max level")
-			expect.equal(cost, 255500, "full cost")
-			levels = Economy.maxAffordableUpgrades(settings, 10, 1e12)
+			local first, second = Economy.upgradeCost(settings, 1), Economy.upgradeCost(settings, 2)
+			local levels, cost = Economy.maxAffordableUpgrades(settings, 1, first + second - 1)
+			expect.equal(levels, 1, "one CE short of two levels")
+			expect.equal(cost, first, "one level cost")
+			levels, cost = Economy.maxAffordableUpgrades(settings, 1, first + second)
+			expect.equal(levels, 2, "exact budget buys two")
+			expect.equal(cost, first + second, "two levels cost")
+			levels, cost = Economy.maxAffordableUpgrades(settings, 1, 1e30)
+			expect.equal(levels, settings.PedestalMaxLevel - 1, "huge budget stops at max level")
+			expect.equal(cost, Economy.upgradeCostRange(settings, 1, settings.PedestalMaxLevel), "full cost")
+			levels = Economy.maxAffordableUpgrades(settings, settings.PedestalMaxLevel, 1e30)
 			expect.equal(levels, 0, "already max")
 			levels = Economy.maxAffordableUpgrades(settings, 3, 0)
 			expect.equal(levels, 0, "no CE")
 		end,
 	},
 	{
-		Name = "slot prices are 500 / 15K / 250K and only slots 4-6 cost anything",
+		Name = "only slots 4-6 cost anything, each much more than the last",
 		Run = function()
-			expect.equal(settings.SlotPrices[4], 500, "slot 4")
-			expect.equal(settings.SlotPrices[5], 15000, "slot 5")
-			expect.equal(settings.SlotPrices[6], 250000, "slot 6")
 			for slot = 1, Config.Plots.StartingPedestals do
 				expect.equal(settings.SlotPrices[slot], nil, `slot {slot} is free`)
 			end
 			expect.equal(Config.Plots.MaxPedestals, 6, "six pedestals max")
+			for slot = Config.Plots.StartingPedestals + 2, Config.Plots.MaxPedestals do
+				expect.truthy(settings.SlotPrices[slot] >= 10 * settings.SlotPrices[slot - 1], `slot {slot} price jump`)
+			end
 		end,
 	},
 	{
-		Name = "income uses tier band x mutation x pedestal, then one global multiplier",
+		Name = "income: relic x mutation x pedestal, summed, then one global multiplier",
 		Run = function()
-			for index = 2, #RarityConfig.Tiers do
-				local tier, lower = RarityConfig.Tiers[index], RarityConfig.Tiers[index - 1]
-				expect.truthy(
-					settings.TierIncomePerMin[tier.Id] > settings.TierIncomePerMin[lower.Id],
-					`{tier.Id} earns more than {lower.Id}`
-				)
-			end
-			local abyssal = MutationConfig.ById.Abyssal.IncomeMultiplier
-			local cosmic = Economy.relicIncome(settings, "Cosmic", abyssal)
-			expect.equal(cosmic, 80000, "Abyssal Cosmic base")
+			expect.equal(Economy.relicIncome(42, 1), 42, "plain")
+			expect.equal(Economy.relicIncome(42, 3), 126, "mutated")
 			local contributions = {
-				cosmic * Economy.pedestalMultiplier(settings, 10),
-				Economy.relicIncome(settings, "Common", 1) * Economy.pedestalMultiplier(settings, 1),
+				Economy.relicIncome(100, 2) * Economy.pedestalMultiplier(settings, 1),
+				Economy.relicIncome(5, 1) * Economy.pedestalMultiplier(settings, 1),
 			}
-			expect.near(Economy.totalIncome(contributions, 1), 160010, 1e-9, "no global bonus")
-			expect.near(Economy.totalIncome(contributions, 1.25), 200012.5, 1e-9, "+25% global")
+			expect.near(Economy.totalIncome(contributions, 1), 205, 1e-9, "no global bonus")
+			expect.near(Economy.totalIncome(contributions, 1.2), 246, 1e-9, "+20% global")
 			expect.equal(Economy.totalIncome({}, 2), 0, "nothing displayed")
 		end,
 	},
 	{
-		Name = "selling pays 1% of a minute of income and keeps fractions",
+		Name = "selling pays SellSeconds of the relic's income and keeps fractions",
 		Run = function()
-			local common = Economy.sellValue(settings, Economy.relicIncome(settings, "Common", 1), 0)
-			expect.near(common, 0.1, 1e-12, "Common sells for 0.1")
-			local total = 0
-			for _ = 1, 10 do
-				total += common
-			end
-			expect.near(total, 1, 1e-9, "ten Commons add up to 1 CE")
-			expect.near(Economy.sellValue(settings, 600, 0.5), 9, 1e-12, "Legendary with +50% merchant")
+			expect.equal(settings.SellSeconds, 30, "30 seconds")
+			expect.near(Economy.sellValue(settings, 5.1, 0), 153, 1e-9, "Common at 5.1/s")
+			expect.near(Economy.sellValue(settings, 0.05, 0), 1.5, 1e-12, "fractions kept")
+			expect.near(Economy.sellValue(settings, 100, 0.5), 4500, 1e-9, "+50% merchant")
 		end,
 	},
 	{
-		Name = "offline pays 25% of the snapshot, capped at 2 hours, nothing under a minute",
+		Name = "offline pays 25% of the per-second snapshot, capped at 2 hours, nothing under a minute",
 		Run = function()
 			local offline = Config.Offline
-			expect.near(Economy.offlineEarnings(offline, 30, 3600), 0.25 * 30 * 60, 1e-9, "1 hour")
-			expect.near(Economy.offlineEarnings(offline, 30, 36000), 0.25 * 30 * 120, 1e-9, "10 hours capped")
+			expect.near(Economy.offlineEarnings(offline, 30, 3600), 0.25 * 30 * 3600, 1e-9, "1 hour")
+			expect.near(Economy.offlineEarnings(offline, 30, 36000), 0.25 * 30 * 7200, 1e-9, "10 hours capped")
 			expect.equal(Economy.offlineEarnings(offline, 30, 59), 0, "under a minute")
 			expect.equal(Economy.offlineEarnings(offline, 30, -500), 0, "clock went backwards")
 			expect.equal(Economy.offlineEarnings(offline, 0, 3600), 0, "nothing displayed")
@@ -163,19 +178,50 @@ return {
 				{ Locked = false, Income = 10, Multiplier = 2 },
 			}
 			slot = Economy.bestDisplaySlot(upgraded, 200)
-			expect.equal(slot, 2, "prefers the higher-level pedestal when that raises CE/min more")
+			expect.equal(slot, 2, "prefers the higher-level pedestal when that raises CE/sec more")
 
 			local allLocked = { { Locked = true, Income = 0, Multiplier = 1 } }
 			expect.equal(Economy.bestDisplaySlot(allLocked, 1e9), nil, "locked slots are never replaced")
 		end,
 	},
 	{
-		Name = "base pacing: pedestal 4 is reachable early (GDD 6.8: about 10-15 min)",
+		Name = "pacing: luck stays modest early and pedestal 4 comes within a few minutes",
 		Run = function()
-			local result = EconomySim.run({ Seed = 7, ScanSeconds = Config.Scan.BaseIntervalSeconds, Hours = 1 })
-			local slot4 = result.SlotBoughtAt[4]
-			expect.truthy(slot4 ~= nil, "pedestal 4 bought within the first hour")
-			expect.truthy(slot4 <= 20 * 60, `pedestal 4 took {slot4 / 60} min`)
+			expect.truthy(EconomySim.allPriced(), "every relic has an income")
+			for _, seed in SEEDS do
+				local result = sim(seed)
+				local five = snapshotAt(result, 5)
+				expect.truthy(five.Luck <= 20, `seed {seed}: luck x{five.Luck} at 5 min`)
+				local slot4 = result.SlotBoughtAt[4]
+				expect.truthy(slot4 ~= nil and slot4 <= 10 * 60, `seed {seed}: pedestal 4 at {(slot4 or 0) / 60} min`)
+			end
+		end,
+	},
+	{
+		Name = "pacing: millions by 20 min, first Rebirth in 20-45 min, billions by 1 h, 100B+ by 2 h",
+		Run = function()
+			for _, seed in SEEDS do
+				local result = sim(seed)
+				local twenty = snapshotAt(result, 20)
+				expect.truthy(twenty.LifetimeCE >= 1e6, `seed {seed}: {twenty.LifetimeCE} CE by 20 min`)
+				local first = result.FirstRebirthAt
+				expect.truthy(first ~= nil, `seed {seed}: no Rebirth in 2 hours`)
+				expect.truthy(
+					(first :: number) >= 20 * 60 and (first :: number) <= 45 * 60,
+					`seed {seed}: first Rebirth at {(first :: number) / 60} min`
+				)
+				expect.truthy(snapshotAt(result, 60).LifetimeCE >= 1e9, `seed {seed}: billions by 1 h`)
+				expect.truthy(snapshotAt(result, 120).LifetimeCE >= 1e11, `seed {seed}: 100B+ by 2 h`)
+			end
+		end,
+	},
+	{
+		Name = "pacing: selling is a drip, far below pedestal income",
+		Run = function()
+			for _, seed in SEEDS do
+				local result = sim(seed)
+				expect.truthy(result.SoldCE < 0.05 * result.PedestalCE, `seed {seed}: sold {result.SoldCE}`)
+			end
 		end,
 	},
 }

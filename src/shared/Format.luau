@@ -48,6 +48,11 @@ function Format.odds(probability: number): string
 	return "1 in " .. Format.number(1 / probability)
 end
 
+-- A multiplier without the "x": 1.6 -> "1.6", 2 -> "2", 1.25 -> "1.25".
+function Format.multiplier(value: number): string
+	return trimZeros(string.format("%.2f", value))
+end
+
 function Format.seconds(seconds: number): string
 	return trimZeros(string.format("%.1f", seconds)) .. "s"
 end
@@ -63,6 +68,11 @@ function Format.duration(seconds: number): string
 		return `{minutes}m`
 	end
 	return `{total}s`
+end
+
+-- Income per second: "42/s", "5.1/s", "1.67K/s".
+function Format.rate(perSecond: number): string
+	return Format.number(perSecond) .. "/s"
 end
 
 -- CE is fractional internally; players see whole CE.

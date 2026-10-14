@@ -1,7 +1,7 @@
 -- Reveal presentation rules (GDD 3.2) and the reveal queue. Pure: tier indexes and timings are
 -- passed in, so Lune can test it.
 --   Small  (Common..Rare)       spectral projection + feed line, about 0.5 s
---   Medium (Epic..Mythic)       enlarged model, rarity flash, sound, 1-2 s
+--   Medium (Epic..Mythic, new)  enlarged model, rarity flash, sound, 1-2 s (repeat finds: Small)
 --   Large  (Celestial..Cosmic)  dramatic overlay, camera/audio, 3-5 s, skippable
 -- The tier decides the category; a mutation adds a second stage (base relic first, mutation second).
 -- Rewards are already granted when a reveal starts; reveals only ever show them.
@@ -34,10 +34,12 @@ export type Queue = {
 	NextSeq: number,
 }
 
-function Presentation.category(tierIndex: number, mediumIndex: number, largeIndex: number): Category
+-- `isNew`: a first discovery or a newly seen mutation. Repeat finds below the Large tiers stay Small
+-- (a centre-screen reveal for a duplicate Epic gets tiring fast).
+function Presentation.category(tierIndex: number, mediumIndex: number, largeIndex: number, isNew: boolean): Category
 	if tierIndex >= largeIndex then
 		return "Large"
-	elseif tierIndex >= mediumIndex then
+	elseif tierIndex >= mediumIndex and isNew then
 		return "Medium"
 	end
 	return "Small"

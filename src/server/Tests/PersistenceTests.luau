@@ -141,8 +141,9 @@ local TESTS: { { Name: string, Run: () -> () } } = {
 			data.Settings.Client.InterfaceSize = "Big"
 			data.AfkLog.Active = true
 			data.AfkLog.Discoveries = 42
-			data.Offline.IncomePerMin = 321
+			data.Offline.IncomePerSec = 321
 			data.Offline.At = 1700000000
+			data.Rebirths = 2
 			local reloaded = endAndReopen(profile, key)
 			local after = reloaded.Data
 			check(math.abs(after.CE - 1234.56) < 1e-9, `CE lost fractions: {after.CE}`)
@@ -151,7 +152,8 @@ local TESTS: { { Name: string, Run: () -> () } } = {
 			check(fourth.Level == 7 and fourth.Locked == true and fourth.Uid == item.Uid, "pedestal 4 not restored")
 			check(after.Settings.Client.Effects == "Low" and after.Settings.Client.InterfaceSize == "Big", "Settings lost")
 			check(after.AfkLog.Active == true and after.AfkLog.Discoveries == 42, "AFK log lost")
-			check(after.Offline.IncomePerMin == 321 and after.Offline.At == 1700000000, "offline snapshot lost")
+			check(after.Offline.IncomePerSec == 321 and after.Offline.At == 1700000000, "offline snapshot lost")
+			check(after.Rebirths == 2, "rebirths lost")
 			reloaded:EndSession()
 		end,
 	},

@@ -12,11 +12,16 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local RevealController = require(script.Parent.Parent.Controllers.RevealController)
+local Ambience = require(script.Parent.Parent.Effects.Ambience)
 local BindEffects = require(script.Parent.Parent.Effects.BindEffects)
 local CaptureAnimation = require(script.Parent.Parent.Effects.CaptureAnimation)
+local CursedShrines = require(script.Parent.Parent.Effects.CursedShrines)
+local HuntFX = require(script.Parent.Parent.Effects.HuntFX)
 local SealBurst = require(script.Parent.Parent.Effects.SealBurst)
 local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
 local HuntHUD = require(script.Parent.Parent.UI.HuntHUD)
+local HuntRolls = require(script.Parent.Parent.UI.HuntRolls)
+local RollReel = require(script.Parent.Parent.UI.RollReel)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
 
@@ -62,6 +67,11 @@ local holdingReveals = false
 local captureToken = 0
 -- Seconds the camera keeps watching the jar seal after a capture.
 local SEAL_VIEW_SECONDS = SealBurst.RevealAt + 0.8
+-- Longest the hunt papers may keep rare-find reveals waiting (they release them when done).
+local HUNT_ROLLS_HOLD = 60
+-- A struck capture has no jar to watch: the Lightning Luck card follows the flash.
+local LIGHTNING_LEAD = 0.9
+local LIGHTNING_COLOR = Color3.fromRGB(255, 228, 120)
 local sealViewUntil = 0
 local sealViewToken = 0
 local hud: HuntHUD.Hud
@@ -124,13 +134,13 @@ local function resetBind()
 end
 
 -- After a capture: movement stays locked and the UI hidden while the camera watches the seal.
-local function holdSealView()
+local function holdSealView(seconds: number)
 	sealViewToken += 1
 	local token = sealViewToken
-	sealViewUntil = os.clock() + SEAL_VIEW_SECONDS
+	sealViewUntil = os.clock() + seconds
 	lockMovement()
 	options.SetSealing(true)
-	task.delay(SEAL_VIEW_SECONDS, function()
+	task.delay(seconds, function()
 		if token ~= sealViewToken or state ~= "Idle" then
 			return
 		end
@@ -156,6 +166,9 @@ end
 
 local function startHold()
 	if not SpiritSight.IsEnabled() or state ~= "Idle" or os.clock() < sealViewUntil then
+		return
+	end
+	if CursedShrines.PromptShown() then
 		return
 	end
 	local id = nearestInRange()
@@ -238,8 +251,8 @@ local function stopHoldingReveals()
 	end
 end
 
--- The jar seal, the family animation rising out of it, then the summary card; overlays for rare
--- finds wait until the card closes (tap or timeout).
+-- The jar seal, the family animation rising out of it, then the hunt's finds roll on papers
+-- (HuntRolls); reveals for new finds wait until the papers are done (or skipped).
 local function presentCapture(result: { [string]: any }, position: Vector3?)
 	local relicId = result.CapturedId
 	local relic = type(relicId) == "string" and RelicConfig.ById[relicId]
@@ -259,7 +272,7 @@ local function presentCapture(result: { [string]: any }, position: Vector3?)
 	local mutation = if type(result.CapturedMutation) == "string" then result.CapturedMutation else nil
 	local family = CaptureFamilies.forObjectType(relic.ObjectType)
 	local lead = if position then SealBurst.RevealAt + CaptureFamilies.totalSeconds(family) else 0
-	RevealController.Hold(lead + Config.Hunt.SummarySeconds + 1)
+	RevealController.Hold(lead + HUNT_ROLLS_HOLD)
 	if position then
 		local low = Settings.LowEffects()
 		SealBurst.Play(position, relic.Id, { Low = low, Personal = true })
@@ -271,16 +284,62 @@ local function presentCapture(result: { [string]: any }, position: Vector3?)
 	end
 	local summary = result.Summary
 	task.delay(lead, function()
-		if type(summary) == "table" and type(summary.CapturedId) == "string" then
-			hud.ShowSummary(summary, release)
-		else
+		local results = RollReel.TakeHunt(1.5)
+		if not results then
 			release()
+			return
 		end
+		HuntRolls.Play(results, if type(summary) == "table" then summary else nil, function()
+			RollReel.FinishHunt(results)
+			release()
+		end)
+	end)
+end
+
+-- A lightning-struck capture rolls nothing: a crack of lightning on the jar, then the Lightning
+-- Luck card.
+local function presentLightning(result: { [string]: any }, position: Vector3?)
+	holdingReveals = false
+	captureToken += 1
+	local token = captureToken
+	local function release()
+		if captureToken == token then
+			RevealController.Release()
+		end
+	end
+	local factor = if type(result.LuckFactor) == "number" then result.LuckFactor else 1
+	local untilTime = if type(result.LuckUntil) == "number" then result.LuckUntil else 0
+	local lead = if position then LIGHTNING_LEAD else 0
+	RevealController.Hold(lead + Config.Hunt.SummarySeconds + 1)
+	if position then
+		local low = Settings.LowEffects()
+		Ambience.Lightning(15)
+		HuntFX.burst(position, LIGHTNING_COLOR, if low then 14 else 50, 18)
+		HuntFX.shockwave(position, LIGHTNING_COLOR, 22, 0.7)
+		HuntFX.shake(0.5, 0.45)
+		Sounds.Play("Shine", nil, 1.15)
+	end
+	task.delay(lead, function()
+		hud.ShowLightning(factor, math.max(0, untilTime - workspace:GetServerTimeNow()), release)
 	end)
 end
 
 local function onBindResult(result: { [string]: any })
 	if type(result) ~= "table" then
+		return
+	end
+	if result.Ok and result.Struck then
+		local position = bindPosition
+		local capturedId = activeId
+		BindEffects.Stop(LIGHTNING_LEAD)
+		resetBind()
+		holdSealView(LIGHTNING_LEAD)
+		if capturedId then
+			signals[capturedId] = nil
+			SpiritSight.Remove(capturedId)
+		end
+		hud.ShowHint("")
+		presentLightning(result, position)
 		return
 	end
 	if result.Ok then
@@ -290,7 +349,7 @@ local function onBindResult(result: { [string]: any })
 		-- stays put and the UI hidden until then.
 		BindEffects.Stop(SEAL_VIEW_SECONDS)
 		resetBind()
-		holdSealView()
+		holdSealView(SEAL_VIEW_SECONDS)
 		-- The jar swallows this spirit now; the server's signal update follows.
 		if capturedId then
 			signals[capturedId] = nil
