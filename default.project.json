@@ -13,6 +13,9 @@
       "HuntModels": {
         "$path": "assets/HuntModels"
       },
+      "VFX": {
+        "$path": "assets/VFX"
+      },
       "Remotes": {
         "$className": "Folder",
         "DiscoveryResult": {
