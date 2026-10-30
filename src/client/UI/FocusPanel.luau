@@ -20,6 +20,9 @@ local CollectionAction = Remotes:FindFirstChild("CollectionAction") :: RemoteFun
 
 local FocusPanel = {}
 
+local LOCK = "\u{1F512}"
+local ODDS_ROW = 26
+
 type Option = { Id: string, Label: string }
 
 local FOCUS_OPTIONS: { Option } = { { Id = "MaxLuck", Label = "Max Luck" } }
@@ -100,63 +103,73 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		BackgroundTransparency = 1,
 		BorderSizePixel = 0,
 		Size = UDim2.fromScale(1, 1),
-		CanvasSize = UDim2.fromOffset(0, 520),
+		CanvasSize = UDim2.fromOffset(0, 680),
 		ScrollingDirection = Enum.ScrollingDirection.Y,
 		ScrollBarThickness = 6,
 		Parent = content,
 	})
 
 	local luckLabel = UIKit.label({
-		TextSize = 14,
+		FontFace = UIKit.TitleFont,
+		TextSize = 30,
+		TextColor3 = colors.Gold,
+		Size = UDim2.new(1, -8, 0, 34),
+		Parent = body,
+	})
+	local focusCapLabel = UIKit.label({
+		TextSize = 13,
 		TextColor3 = colors.SubText,
-		Size = UDim2.new(1, -8, 0, 18),
+		Position = UDim2.fromOffset(0, 34),
+		Size = UDim2.new(1, -8, 0, 16),
 		Parent = body,
 	})
 
-	sectionLabel(body, "Rarity Focus (caps luck so that tier keeps appearing)", 26)
-	local focusChips = makeChips(chipGrid(body, 46, 3), FOCUS_OPTIONS, function(id)
+	sectionLabel(body, "Focus", 56)
+	local focusChips = makeChips(chipGrid(body, 76, 3), FOCUS_OPTIONS, function(id)
 		SetRarityFocus:FireServer(id)
 	end)
 
-	sectionLabel(body, "Signal Frequency (favors a family inside each tier)", 164)
-	local frequencyChips = makeChips(chipGrid(body, 184, 2), FREQUENCY_OPTIONS, function(id)
+	sectionLabel(body, "Family", 196)
+	local frequencyChips = makeChips(chipGrid(body, 216, 2), FREQUENCY_OPTIONS, function(id)
 		SetFrequency:FireServer(id)
 	end)
 
-	sectionLabel(body, "Your chance per discovery", 272)
+	sectionLabel(body, "Odds", 298)
 	local tierRows: { [string]: TextLabel } = {}
 	for index, tier in RarityConfig.Tiers do
-		local y = 292 + (index - 1) * 22
+		local y = 318 + (index - 1) * ODDS_ROW
 		UIKit.label({
 			Text = tier.Name,
-			TextSize = 15,
+			TextSize = 18,
 			TextColor3 = UIKit.tierColor(tier.Id),
 			Position = UDim2.fromOffset(0, y),
-			Size = UDim2.new(0.45, 0, 0, 22),
+			Size = UDim2.new(0.45, 0, 0, ODDS_ROW),
 			Parent = body,
 		})
 		tierRows[tier.Id] = UIKit.label({
-			TextSize = 15,
+			TextSize = 18,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			Position = UDim2.new(0.45, 0, 0, y),
-			Size = UDim2.new(0.55, -12, 0, 22),
+			Size = UDim2.new(0.55, -12, 0, ODDS_ROW),
 			Parent = body,
 		})
 	end
 
-	sectionLabel(body, "Attune (Codex soft-lock / collection)", 474)
+	local oddsBottom = 318 + #RarityConfig.Tiers * ODDS_ROW
+	sectionLabel(body, "Attune", oddsBottom + 12)
 	local attuneStatus = UIKit.label({
 		TextSize = 13,
 		TextColor3 = colors.SubText,
-		Position = UDim2.fromOffset(0, 494),
+		Position = UDim2.fromOffset(0, oddsBottom + 32),
 		Size = UDim2.new(1, -12, 0, 18),
 		Parent = body,
 	})
+	local attuneButtonsY = oddsBottom + 54
 	UIKit.button({
 		Name = "ActivateAttune",
 		Text = "Use Attune (Focus Common)",
 		TextSize = 14,
-		Position = UDim2.fromOffset(0, 516),
+		Position = UDim2.fromOffset(0, attuneButtonsY),
 		Size = UDim2.new(0.48, -4, 0, 32),
 		Parent = body,
 	}, function()
@@ -171,7 +184,7 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		Name = "FocusCommon",
 		Text = "Focus Common now",
 		TextSize = 14,
-		Position = UDim2.new(0.52, 0, 0, 516),
+		Position = UDim2.new(0.52, 0, 0, attuneButtonsY),
 		Size = UDim2.new(0.48, -4, 0, 32),
 		Parent = body,
 	}, function()
@@ -183,11 +196,11 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextColor3 = colors.SubText,
-		Position = UDim2.fromOffset(0, 560),
+		Position = UDim2.fromOffset(0, attuneButtonsY + 44),
 		Size = UDim2.new(1, -12, 0, 40),
 		Parent = body,
 	})
-	body.CanvasSize = UDim2.fromOffset(0, 620)
+	body.CanvasSize = UDim2.fromOffset(0, attuneButtonsY + 100)
 
 	local function refresh()
 		local ctx = Odds.current()
@@ -195,11 +208,17 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		local focus = player:GetAttribute("RarityFocus") or "MaxLuck"
 		local frequency = player:GetAttribute("Frequency") or "All"
 		local attuneLeft = player:GetAttribute("AttuneScansLeft") or 0
-		local capped = if ctx.Luck < fullLuck then "  (capped by focus)" else ""
-		luckLabel.Text = `Luck {Format.number(fullLuck)}x  |  used {Format.number(ctx.Luck)}x{capped}`
+		luckLabel.Text = `Luck x{Format.number(fullLuck)}`
+		if ctx.Luck < fullLuck then
+			local tier = RarityConfig.Get(focus)
+			local focusName = if tier then tier.Name else tostring(focus)
+			focusCapLabel.Text = `Focus: {focusName} (capped at x{Format.number(ctx.Luck)})`
+		else
+			focusCapLabel.Text = ""
+		end
 		attuneStatus.Text = if attuneLeft > 0
 			then `Attune active: {attuneLeft} Focused Common scans left`
-			else "High luck erases Commons — Focus Common or spend an Attune ticket."
+			else ""
 		highlight(focusChips, focus)
 		highlight(frequencyChips, frequency)
 		local unlocked = {}
@@ -209,8 +228,8 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		for _, option in FREQUENCY_OPTIONS do
 			local isLocked = option.Id ~= "All" and not unlocked[option.Id]
 			local chip = frequencyChips[option.Id]
-			chip.Text = if isLocked then `{option.Label}\nlocked (Codex)` else option.Label
-			chip.TextSize = if isLocked then 12 else 14
+			chip.Text = if isLocked then `{LOCK} {option.Label}` else option.Label
+			chip.TextSize = 14
 			chip.TextColor3 = if isLocked then colors.SubText else colors.Text
 		end
 
@@ -221,7 +240,7 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 
 		local mutationOdds = RollMath.mutationProbabilities(ctx)
 		if ctx.MutationRank <= 0 then
-			mutationLabel.Text = "Mutations: locked (Mutation Resonance rank 0)"
+			mutationLabel.Text = ""
 		else
 			local parts = {}
 			for _, mutation in MutationConfig.Mutations do
