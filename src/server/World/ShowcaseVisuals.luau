@@ -9,7 +9,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local ShowcaseConfig = require(ReplicatedStorage.Shared.ShowcaseConfig)
+local MapPropConfig = require(ReplicatedStorage.Shared.MapPropConfig)
 local BuildUtil = require(script.Parent.BuildUtil)
+local MapProps = require(script.Parent.MapProps)
 
 local ShowcaseVisuals = {}
 
@@ -20,8 +22,8 @@ export type View = {
 }
 
 -- Height of the dais top above the plot Base part's centre (see PlotBuilder: FLOOR_TOP 1.2,
--- dais 1.2 tall, Base centre at 0.5).
-local DAIS_TOP = 1.2 + 1.2 - 0.5
+-- dais 1.2 tall plus its 0.2 rim cap, Base centre at 0.5).
+local DAIS_TOP = 1.2 + 1.4 - 0.5
 
 local ACCENT = {
 	Stance = Color3.fromRGB(150, 210, 255),
@@ -34,6 +36,11 @@ local POSE_TEXT = {
 	Throne = "Sit on the throne",
 	Guardian = "Stand guard",
 }
+
+-- Sealing chamber materials (match PlotBuilder).
+local BASALT = Color3.fromRGB(66, 60, 76)
+local PAPER = Color3.fromRGB(228, 216, 184)
+local ROPE = Color3.fromRGB(176, 146, 98)
 
 type At = (x: number, y: number, z: number) -> CFrame
 
@@ -48,49 +55,87 @@ local function neon(parent: Instance, name: string, size: Vector3, cframe: CFram
 	}))
 end
 
-local function buildStance(model: Model, at: At, accent: Color3)
-	BuildUtil.decor(BuildUtil.cylinder(model, at(0, 0.03, 0), 0.06, 9, {
-		Name = "Circle",
-		Material = Enum.Material.Neon,
-		Color = accent,
-		Transparency = 0.35,
-	}))
-	BuildUtil.decor(BuildUtil.cylinder(model, at(0, 0.05, 0), 0.06, 8.2, {
-		Name = "CircleInner",
-		Material = Enum.Material.Marble,
-		Color = Color3.fromRGB(205, 200, 215),
-	}))
-	for index = 0, 3 do
-		local angle = math.rad(45 + 90 * index)
-		local x, z = math.cos(angle) * 6, math.sin(angle) * 6
-		BuildUtil.part(model, {
-			Name = "Post",
-			Size = Vector3.new(0.9, 2.6, 0.9),
-			CFrame = at(x, 1.3, z),
-			Material = Enum.Material.Slate,
-			Color = Color3.fromRGB(80, 78, 92),
-		})
-		neon(model, "PostTip", Vector3.new(0.6, 0.6, 0.6), at(x, 2.9, z) * CFrame.Angles(0, math.rad(45), math.rad(45)), accent)
+local function stone(parent: Instance, name: string, size: Vector3, cframe: CFrame)
+	return BuildUtil.part(parent, {
+		Name = name,
+		Size = size,
+		CFrame = cframe,
+		Material = Enum.Material.Slate,
+		Color = BASALT,
+	})
+end
+
+-- A ring of short glowing segments lying flat at height `y` (a flat neon disc reads as plastic).
+local function segmentRing(
+	parent: Instance,
+	at: At,
+	name: string,
+	radius: number,
+	count: number,
+	width: number,
+	y: number,
+	color: Color3,
+	transparency: number
+)
+	local length = 2 * math.pi * radius / count - 0.08
+	for i = 1, count do
+		local angle = (i - 0.5) / count * math.pi * 2
+		neon(
+			parent,
+			name,
+			Vector3.new(length, 0.08, width),
+			at(math.cos(angle) * radius, y, math.sin(angle) * radius) * CFrame.Angles(0, -angle + math.pi / 2, 0),
+			color,
+			transparency
+		)
 	end
 end
 
+-- A paper seal whose ink glows in `ink` (SurfaceGui ignores lighting), on both faces.
+local function ofuda(parent: Instance, name: string, size: Vector3, cframe: CFrame, ink: Color3)
+	local paper = BuildUtil.decor(BuildUtil.part(parent, {
+		Name = name,
+		Size = size,
+		CFrame = cframe,
+		Material = Enum.Material.Fabric,
+		Color = PAPER,
+	}))
+	for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+		local label = BuildUtil.surfaceText(paper, face, "封", ink)
+		label.Font = Enum.Font.Arial
+	end
+	return paper
+end
+
+-- Binding circle: a glowing sigil on the dais ringed by four sealed stone posts.
+local function buildStance(model: Model, at: At, accent: Color3)
+	segmentRing(model, at, "Circle", 4.2, 24, 0.35, 0.06, accent, 0.2)
+	segmentRing(model, at, "CircleInner", 3.3, 18, 0.15, 0.06, accent, 0.5)
+	local center = at(0, 2.1, 0).Position
+	for index = 0, 3 do
+		local angle = math.rad(45 + 90 * index)
+		local x, z = math.cos(angle) * 5.8, math.sin(angle) * 5.8
+		stone(model, "Post", Vector3.new(1.1, 3.4, 1.1), at(x, 1.7, z))
+		stone(model, "PostCap", Vector3.new(1.5, 0.35, 1.5), at(x, 3.55, z))
+		neon(model, "PostTip", Vector3.new(0.5, 0.5, 0.5), at(x, 4.05, z) * CFrame.Angles(0, math.rad(45), math.rad(45)), accent)
+		-- Seal on the post's inner face, looking at the circle.
+		local post = at(x, 2.1, z).Position
+		local inward = (center - post).Unit
+		ofuda(model, "PostSeal", Vector3.new(0.7, 1.5, 0.05), CFrame.lookAt(post + inward * 0.58, center), accent)
+	end
+end
+
+-- Cursed throne: dark stone, a crimson seat, thin glowing inlays, horns and a sacred rope.
 local function buildThrone(model: Model, at: At, accent: Color3)
-	local iron = Color3.fromRGB(60, 30, 34)
-	BuildUtil.part(model, {
-		Name = "ThroneBase",
-		Size = Vector3.new(4.4, 1.4, 4.4),
-		CFrame = at(0, 0.7, 1.5),
-		Material = Enum.Material.Metal,
-		Color = iron,
-	})
+	stone(model, "ThroneBase", Vector3.new(4.8, 1.4, 4.4), at(0, 0.7, 1.5))
 	local seat = Instance.new("Seat")
 	seat.Name = "ThroneSeat"
 	seat.Anchored = true
 	seat.Disabled = true
-	seat.Size = Vector3.new(4, 0.6, 4)
-	seat.CFrame = at(0, 1.7, 1.5)
+	seat.Size = Vector3.new(4, 0.6, 3.8)
+	seat.CFrame = at(0, 1.7, 1.4)
 	seat.Material = Enum.Material.Fabric
-	seat.Color = accent
+	seat.Color = Color3.fromRGB(110, 18, 26)
 	seat.TopSurface = Enum.SurfaceType.Smooth
 	seat.BottomSurface = Enum.SurfaceType.Smooth
 	-- Only the pose prompt seats anyone (enabled just for that); visitors can't sit by touch.
@@ -100,57 +145,54 @@ local function buildThrone(model: Model, at: At, accent: Color3)
 		end
 	end)
 	seat.Parent = model
-	BuildUtil.part(model, {
-		Name = "Backrest",
-		Size = Vector3.new(4.4, 6.5, 0.8),
-		CFrame = at(0, 4.6, 3.6),
-		Material = Enum.Material.Metal,
-		Color = iron,
-	})
-	neon(model, "BackrestInlay", Vector3.new(2.6, 4.6, 0.2), at(0, 4.4, 3.15), accent, 0.15)
+	stone(model, "Backrest", Vector3.new(4.8, 6.5, 0.9), at(0, 4.6, 3.6))
 	for _, side in { -1, 1 } do
-		BuildUtil.part(model, {
-			Name = "Armrest",
-			Size = Vector3.new(0.8, 1.2, 4),
-			CFrame = at(side * 2.4, 2.6, 1.6),
-			Material = Enum.Material.Metal,
-			Color = iron,
-		})
+		stone(model, "Armrest", Vector3.new(0.8, 1.2, 4), at(side * 2.4, 2.6, 1.6))
+		neon(model, "Inlay", Vector3.new(0.14, 5, 0.1), at(side * 1.6, 4.6, 3.12), accent, 0.1)
+		local horn = at(side * 2.1, 8.3, 3.6) * CFrame.Angles(0, 0, math.rad(-side * 28))
+		stone(model, "Horn", Vector3.new(0.6, 2.4, 0.6), horn)
+		neon(model, "HornTip", Vector3.new(0.45, 0.45, 0.45), horn * CFrame.new(0, 1.35, 0), accent)
 	end
+	neon(model, "Sigil", Vector3.new(1.1, 1.1, 0.1), at(0, 6.6, 3.12) * CFrame.Angles(0, 0, math.rad(45)), accent, 0.05)
+	-- Horizontal rope across the backrest (BuildUtil.cylinder stands cylinders up; turn it back).
+	BuildUtil.decor(BuildUtil.cylinder(model, at(0, 7.5, 3.0) * CFrame.Angles(0, 0, math.rad(-90)), 5.4, 0.5, {
+		Name = "Shimenawa",
+		Material = Enum.Material.Fabric,
+		Color = ROPE,
+	}))
 	for index = -1, 1 do
-		local height = if index == 0 then 2.2 else 1.5
-		neon(model, "Spike", Vector3.new(0.6, height, 0.6), at(index * 1.5, 7.85 + height / 2, 3.6), accent)
+		BuildUtil.decor(BuildUtil.part(model, {
+			Name = "Shide",
+			Size = Vector3.new(0.4, 1.2, 0.04),
+			CFrame = at(index * 1.6, 6.75, 2.95),
+			Material = Enum.Material.Fabric,
+			Color = PAPER,
+		}))
 	end
 end
 
+-- Stone guardian (the Jizo statue, scaled up) on a plinth with a glowing halo behind its head.
 local function buildGuardian(model: Model, at: At, accent: Color3)
-	BuildUtil.part(model, {
-		Name = "GuardianPlinth",
-		Size = Vector3.new(3.4, 1, 3),
-		CFrame = at(0, 0.5, 5.4),
-		Material = Enum.Material.Marble,
-		Color = Color3.fromRGB(230, 215, 170),
-	})
-	local spirit = { Size = Vector3.zero, Material = Enum.Material.Neon, Color = accent, Transparency = 0.3 }
-	local function piece(name: string, size: Vector3, cframe: CFrame, shape: Enum.PartType?)
-		local props = table.clone(spirit)
-		props.Name = name
-		props.Size = size
-		props.CFrame = cframe
-		local part = BuildUtil.decor(BuildUtil.part(model, props))
-		if shape then
-			part.Shape = shape
-			part.Size = size
-		end
-		return part
+	local plinthTop = 1.2
+	stone(model, "GuardianPlinth", Vector3.new(3.8, plinthTop, 3.4), at(0, plinthTop / 2, 5.4))
+	neon(model, "PlinthTrim", Vector3.new(3.9, 0.12, 3.5), at(0, plinthTop - 0.1, 5.4), accent, 0.2)
+	local scale = 2
+	MapProps.build(model, "JizoStatue", at(0, plinthTop, 5.4), scale)
+	local _, height = MapPropConfig.size("JizoStatue")
+	local haloY = plinthTop + height * scale * 0.8
+	local count = 20
+	local radius = 1.9
+	for i = 1, count do
+		local angle = (i - 0.5) / count * math.pi * 2
+		neon(
+			model,
+			"Halo",
+			Vector3.new(2 * math.pi * radius / count - 0.06, 0.18, 0.12),
+			at(math.cos(angle) * radius, haloY + math.sin(angle) * radius, 6.7) * CFrame.Angles(0, 0, angle + math.pi / 2),
+			accent,
+			0.1
+		)
 	end
-	piece("Body", Vector3.new(2.8, 4.6, 1.6), at(0, 3.3, 5.4))
-	piece("Head", Vector3.new(1.9, 1.9, 1.9), at(0, 6.6, 5.4), Enum.PartType.Ball)
-	for _, side in { -1, 1 } do
-		piece("Wing", Vector3.new(0.3, 5.2, 2.6), at(side * 2.3, 5, 6.1) * CFrame.Angles(0, 0, math.rad(-side * 25)))
-	end
-	piece("Spear", Vector3.new(0.3, 8.5, 0.3), at(2, 4.6, 4.8))
-	piece("SpearTip", Vector3.new(0.7, 1.2, 0.7), at(2, 9.3, 4.8) * CFrame.Angles(0, math.rad(45), 0))
 end
 
 local ACCESSORY_BUILDERS: { [string]: (Model, At) -> () } = {
@@ -206,12 +248,7 @@ local function buildLevelEffects(model: Model, at: At, level: number, accent: Co
 	if level < 2 then
 		return
 	end
-	BuildUtil.decor(BuildUtil.cylinder(model, at(0, 0.08, 0), 0.12, 15.4, {
-		Name = "AuraRing",
-		Material = Enum.Material.Neon,
-		Color = accent,
-		Transparency = 0.55,
-	}))
+	segmentRing(model, at, "AuraRing", 7.4, 36, 0.4, 0.1, accent, 0.35)
 	local core = BuildUtil.decor(BuildUtil.part(model, {
 		Name = "AuraCore",
 		Size = Vector3.new(0.2, 0.2, 0.2),
@@ -227,6 +264,7 @@ local function buildLevelEffects(model: Model, at: At, level: number, accent: Co
 	sparkles.Name = "ShowcaseSparkles"
 	sparkles.SpreadAngle = Vector2.new(60, 60)
 
+	-- Floating seals circle the showcase (ShowcaseLOD spins the Ornaments model).
 	local ornaments = Instance.new("Model")
 	ornaments.Name = "Ornaments"
 	local center = BuildUtil.decor(BuildUtil.part(ornaments, {
@@ -236,20 +274,21 @@ local function buildLevelEffects(model: Model, at: At, level: number, accent: Co
 		Transparency = 1,
 	}))
 	ornaments.PrimaryPart = center
-	for index = 0, 2 do
-		local angle = math.rad(120 * index)
-		neon(ornaments, "Ornament", Vector3.new(0.8, 1.4, 0.8), at(math.cos(angle) * 6.2, 6, math.sin(angle) * 6.2), accent, 0.1)
-	end
-	if level >= 4 then
-		for index = 0, 2 do
-			local angle = math.rad(60 + 120 * index)
-			neon(ornaments, "BigOrnament", Vector3.new(1.4, 2.6, 1.4), at(math.cos(angle) * 7, 8.5, math.sin(angle) * 7) * CFrame.Angles(0, math.rad(45), 0), accent, 0.05)
+	local function seals(count: number, radius: number, y: number, size: Vector3, offset: number)
+		for index = 0, count - 1 do
+			local angle = math.rad(offset + 360 / count * index)
+			local position = at(math.cos(angle) * radius, y, math.sin(angle) * radius).Position
+			ofuda(ornaments, "Ornament", size, CFrame.lookAt(position, at(0, y, 0).Position), accent)
 		end
-		BuildUtil.decor(BuildUtil.cylinder(model, at(0, 18, 0), 36, 11, {
+	end
+	seals(3, 6.2, 6, Vector3.new(0.9, 1.8, 0.06), 0)
+	if level >= 4 then
+		seals(3, 7, 8.5, Vector3.new(1.3, 2.6, 0.06), 60)
+		BuildUtil.decor(BuildUtil.cylinder(model, at(0, 18, 0), 36, 7, {
 			Name = "LightPillar",
 			Material = Enum.Material.Neon,
 			Color = accent,
-			Transparency = 0.86,
+			Transparency = 0.9,
 		}))
 	end
 	ornaments.Parent = model
@@ -268,6 +307,12 @@ function ShowcaseVisuals.Apply(plot: Model?, view: View?, ownerUserId: number?, 
 		return
 	end
 	podium:SetAttribute("ShownKey", key)
+	-- The podium's "Showcase" label only marks an empty podium; a display speaks for itself.
+	local dais = podium:FindFirstChild("Dais")
+	local label = dais and dais:FindFirstChildOfClass("BillboardGui")
+	if label then
+		label.Enabled = view == nil
+	end
 	local old = podium:FindFirstChild("Display")
 	if old then
 		old:Destroy()

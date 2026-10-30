@@ -143,13 +143,13 @@ local function buildShowcasePodium(parent: Instance, at: (number, number, number
 		Color = WALL_PILLAR,
 	})
 	-- Warm rim only: neon disc tucked under a slightly smaller basalt plate.
-	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + 1.25, z), 0.1, 16.4, {
+	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + 1.25, z), 0.1, 16.2, {
 		Name = "Edge",
 		Material = Enum.Material.Neon,
 		Color = WARM,
-		Transparency = 0.35,
+		Transparency = 0.5,
 	}))
-	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + 1.35, z), 0.1, 15.6, {
+	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + 1.35, z), 0.1, 15.8, {
 		Name = "Cap",
 		Material = Enum.Material.Basalt,
 		Color = WALL_PILLAR,
