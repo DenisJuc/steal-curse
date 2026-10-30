@@ -50,24 +50,24 @@ local POSE_TEXT = {
 type Vfx = { Template: string, At: { number }, Scale: number, Level: number }
 local VFX: { [string]: { Vfx } } = {
 	SimpleStance = {
-		{ Template = "Aura_P019", At = { 0, 5.5, 0 }, Scale = 1.1, Level = 1 },
-		{ Template = "Aura_P017", At = { 0, 1, 0 }, Scale = 1.6, Level = 3 },
+		{ Template = "Aura_P017", At = { 0, 1, 0 }, Scale = 1.6, Level = 1 },
 	},
 	CrimsonThrone = {
 		{ Template = "Aura_P067", At = { 0, 3.5, 1.5 }, Scale = 1.5, Level = 1 },
 		{ Template = "Aura_P027", At = { 0, 0.5, 2.5 }, Scale = 1.4, Level = 3 },
 	},
 	GoldenGuardian = {
-		{ Template = "Aura_P072", At = { 0, 4, 5.4 }, Scale = 1.5, Level = 1 },
+		{ Template = "Aura_P072", At = { 0, 4, 5.4 }, Scale = 1.2, Level = 1 },
 		{ Template = "Aura_P142", At = { 0, 9, 6 }, Scale = 1.2, Level = 3 },
 	},
 	ForestGrove = {
-		{ Template = "Aura_P064", At = { 0, 3, 4 }, Scale = 2, Level = 1 },
-		{ Template = "Aura_P016", At = { 0, 0.5, 0 }, Scale = 1.8, Level = 3 },
+		{ Template = "Aura_P016", At = { 0, 0.5, 0 }, Scale = 1.8, Level = 1 },
+		{ Template = "Aura_P088", At = { 0, 4, 5.5 }, Scale = 2.2, Level = 3 },
 	},
+	-- One warm bronze theme: the bell glows, and at level 3 a gold ring pulses out like its toll.
 	BellWatch = {
-		{ Template = "Aura_P038", At = { 0, 0.5, 4.5 }, Scale = 1.6, Level = 1 },
-		{ Template = "Aura_P091", At = { 0, 6, 4.5 }, Scale = 1.6, Level = 3 },
+		{ Template = "Aura_P085", At = { 0, 6.2, 4 }, Scale = 1.3, Level = 1 },
+		{ Template = "Aura_P052", At = { 0, 6.2, 4 }, Scale = 1.6, Level = 3 },
 	},
 	StarCircle = {
 		{ Template = "Aura_P071", At = { 0, 4, 0 }, Scale = 1.4, Level = 1 },
@@ -277,25 +277,96 @@ local function buildGrove(model: Model, at: At, accent: Color3)
 	end
 end
 
--- Village bell watch: a bell tower behind a raised wooden deck with a cushion to sit on and two
--- paper lanterns.
+-- Temple bell watch: a dark timber bell house (shoro) with a hanging bronze bell and its striker
+-- log on ropes, a cushion before it to sit on, and two stone lanterns at the front.
 local function buildBell(model: Model, at: At, accent: Color3)
-	MapProps.build(model, "BellTower", at(0, 0, 6), 0.42)
+	local timber = Color3.fromRGB(46, 30, 26)
+	local bronze = Color3.fromRGB(122, 86, 44)
+	local z = 4
+	for _, x in { -3.4, 3.4 } do
+		for _, dz in { -1.6, 1.6 } do
+			BuildUtil.part(model, {
+				Name = "BellPost",
+				Size = Vector3.new(0.6, 9, 0.6),
+				CFrame = at(x, 4.5, z + dz),
+				Material = Enum.Material.Wood,
+				Color = timber,
+			})
+		end
+		BuildUtil.part(model, {
+			Name = "BellSill",
+			Size = Vector3.new(0.7, 0.5, 4),
+			CFrame = at(x, 8.6, z),
+			Material = Enum.Material.Wood,
+			Color = timber,
+		})
+	end
 	BuildUtil.part(model, {
-		Name = "WatchDeck",
-		Size = Vector3.new(6, 0.8, 5),
-		CFrame = at(0, 0.4, 1.5),
-		Material = Enum.Material.WoodPlanks,
-		Color = Color3.fromRGB(70, 48, 38),
+		Name = "BellBeam",
+		Size = Vector3.new(8, 0.6, 0.7),
+		CFrame = at(0, 8.9, z),
+		Material = Enum.Material.Wood,
+		Color = timber,
 	})
+	for _, side in { -1, 1 } do
+		BuildUtil.wedge(model, {
+			Name = "BellRoof",
+			Size = Vector3.new(9.4, 1.6, 3),
+			CFrame = at(0, 10, z + side * 1.5) * CFrame.Angles(0, if side < 0 then 0 else math.pi, 0),
+			Material = Enum.Material.Slate,
+			Color = Color3.fromRGB(34, 32, 40),
+		})
+	end
+	-- The bell: a bronze body with a flared lip, a crown loop and a glowing striking boss.
+	BuildUtil.part(model, {
+		Name = "BellLoop",
+		Size = Vector3.new(0.8, 0.8, 0.3),
+		CFrame = at(0, 8.3, z),
+		Material = Enum.Material.Metal,
+		Color = bronze,
+	})
+	BuildUtil.cylinder(model, at(0, 6.5, z), 3, 2.8, {
+		Name = "BellBody",
+		Material = Enum.Material.Metal,
+		Color = bronze,
+	})
+	BuildUtil.cylinder(model, at(0, 5.05, z), 0.3, 3.2, {
+		Name = "BellLip",
+		Material = Enum.Material.Metal,
+		Color = bronze,
+	})
+	BuildUtil.cylinder(model, at(0, 8.05, z), 0.3, 2.2, {
+		Name = "BellCrown",
+		Material = Enum.Material.Metal,
+		Color = bronze,
+	})
+	local boss = neon(model, "BellBoss", Vector3.new(0.7, 0.7, 0.2), at(0, 6, z - 1.45), accent, 0.1)
+	local light = BuildUtil.light(boss, accent, 16, 1.4)
+	light.Name = "ShowcaseLight"
+	-- Striker log hanging on two ropes beside the bell.
+	BuildUtil.decor(BuildUtil.cylinder(model, at(-2.2, 6.2, z) * CFrame.Angles(0, 0, math.rad(90)), 3, 0.5, {
+		Name = "BellStriker",
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(96, 70, 50),
+	}))
+	for _, dx in { -3.2, -1.2 } do
+		BuildUtil.decor(BuildUtil.part(model, {
+			Name = "StrikerRope",
+			Size = Vector3.new(0.08, 2.5, 0.08),
+			CFrame = at(dx, 7.6, z),
+			Material = Enum.Material.Fabric,
+			Color = ROPE,
+		}))
+	end
+	-- Cushion before the bell (the pose seat).
 	local seat = Instance.new("Seat")
 	seat.Name = "ShowcaseSeat"
 	seat.Anchored = true
 	seat.Disabled = true
-	seat.Size = Vector3.new(3, 0.5, 3)
-	seat.CFrame = at(0, 1.05, 1.5)
+	seat.Size = Vector3.new(2.6, 0.5, 2.6)
+	seat.CFrame = at(0, 0.25, 0.5)
 	seat.Material = Enum.Material.Fabric
-	seat.Color = Color3.fromRGB(120, 34, 40)
+	seat.Color = Color3.fromRGB(110, 30, 34)
 	seat.TopSurface = Enum.SurfaceType.Smooth
 	seat.BottomSurface = Enum.SurfaceType.Smooth
 	-- Only the pose prompt seats anyone (enabled just for that); visitors can't sit by touch.
@@ -306,27 +377,7 @@ local function buildBell(model: Model, at: At, accent: Color3)
 	end)
 	seat.Parent = model
 	for _, side in { -1, 1 } do
-		BuildUtil.part(model, {
-			Name = "LanternPost",
-			Size = Vector3.new(0.35, 4.5, 0.35),
-			CFrame = at(side * 3.6, 2.25, 0),
-			Material = Enum.Material.Wood,
-			Color = Color3.fromRGB(40, 30, 28),
-		})
-		local lantern = BuildUtil.decor(BuildUtil.part(model, {
-			Name = "PaperLantern",
-			Shape = Enum.PartType.Ball,
-			Size = Vector3.new(1.3, 1.3, 1.3),
-			CFrame = at(side * 3.6, 4.9, 0),
-			Material = Enum.Material.Neon,
-			Color = accent,
-			Transparency = 0.1,
-		}))
-		lantern.Size = Vector3.new(1.3, 1.6, 1.3)
-		if side == 1 then
-			local light = BuildUtil.light(lantern, accent, 18, 1.4)
-			light.Name = "ShowcaseLight"
-		end
+		MapProps.build(model, "StoneLantern", at(side * 5.6, 0, -1.5) * CFrame.Angles(0, math.pi, 0), 0.75)
 	end
 end
 
