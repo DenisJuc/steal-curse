@@ -251,7 +251,9 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 			showNotable(list, notable[i])
 		end
 		local hidden = (#exceptional - showExc) + (#notable - showNot)
-		if plan.RoutineSummaryTitle and plan.RoutineSummarySubtitle then
+		-- Kept-only common duplicates get no line: the roll card already showed them, and a line
+		-- every scan was just noise. Sold ones still show the CE they earned.
+		if plan.RoutineSummaryTitle and plan.RoutineSummarySubtitle and plan.RoutineSoldCE > 0 then
 			local subtitle = plan.RoutineSummarySubtitle
 			if hidden > 0 then
 				subtitle ..= `  ·  +{hidden} other`
