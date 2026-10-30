@@ -100,6 +100,9 @@ function MenuMotion.Start(screen: ScreenGui)
 			return
 		end
 		local window = child :: GuiObject
+		-- An inactive Frame lets clicks fall through to the backdrop button, which closes every
+		-- menu; an active window sinks them, so only clicks outside it close it.
+		window.Active = true
 		local juice = window:FindFirstChild("Juice") :: UIScale?
 		if not juice then
 			local created = Instance.new("UIScale")
