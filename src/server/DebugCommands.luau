@@ -20,6 +20,8 @@
 --   /skill <node> <n>  set any skill rank, e.g. /skill mutationresonance 3
 --   /grantshowcase <id|all>          unlock a Showcase (level 1), e.g. /grantshowcase crimsonthrone
 --   /showcaselevel <id> <level>      set an owned Showcase's level 1..4
+--   /allshowcases      own every Showcase at the base level (1; 0 means not owned) to watch each
+--                      upgrade stage; add CE with /ce to buy the upgrades in the menu
 --   /focus <tier|max>  set Rarity Focus
 --   /freq <family|all> set Signal Frequency
 --   /savestatus        save mode, last save time and counts
@@ -372,6 +374,14 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				return
 			end
 			reply(player, `Granted {if id == "all" then "every Showcase" else id}. {describeLuck(player)}`)
+		end,
+
+		allshowcases = function(player)
+			ShowcaseService.Grant(player, "all")
+			for _, showcase in ShowcaseConfig.Showcases do
+				ShowcaseService.SetLevel(player, showcase.Id, 1)
+			end
+			reply(player, "Every Showcase is yours at level 1. Upgrade them in the Showcases menu (/ce 3000000000 covers every level), or jump a level with /showcaselevel.")
 		end,
 
 		showcaselevel = function(player, args)
