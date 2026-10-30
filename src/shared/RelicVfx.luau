@@ -108,6 +108,80 @@ RelicVfx.shiftHue = shiftHue
 
 export type Relic = { Id: string, Tier: string, Vfx: string? }
 
+-- Hand-picked primary effect per modelled relic, matched to its theme and tier and never reused
+-- (relicvfx_spec checks that). Aura_P<id> are harvested from the +150 VFX pack
+-- (tools/vfx/pack150_to_rbxmx.py) and judged in Studio; the rest are the aura-pack picks.
+-- These keep their own colours, so the tint is only a light nudge.
+RelicVfx.Assigned = {
+	-- Common: small, quiet
+	Kunay = "Aura_Sparkle",
+	VivraCard = "Aura_P066", -- white sparkles
+	SealScroll = "Aura_P064", -- green spirit sparks
+	SenzoBean = "Aura_P012", -- floating heart
+	SlaughterDaemon = "Aura_P092",
+	DragonsBone = "Aura_P037", -- small blue flames
+	-- Uncommon
+	YutosRing = "Aura_P016", -- teal smoke
+	BuraBuraFruit = "Aura_P031", -- soft pink glow
+	HannaHannaFruit = "Aura_Rise",
+	SonaSonaFruit = "Aura_P091", -- orange grit sparks
+	-- Rare
+	HiiHiiFruit = "Aura_P018", -- cyan frost sparkle
+	MochyMochyFruit = "Aura_P019", -- white halo
+	PlayfullCloud = "Aura_Wind",
+	-- Epic
+	MaraMaraFruit = "Aura_P023", -- fire spikes
+	GumoGumoFruit = "Aura_P032", -- yellow-green flame ring
+	-- Legendary
+	KubikiriCleaver = "Aura_P027", -- demon flames
+	StendArrow = "Aura_P142", -- golden ring
+	SoulSplitKatana = "Aura_P088", -- green orbit ring
+	GoraGoraFruit = "Aura_P083", -- blue storm smoke
+	PekaPekaFruit = "Aura_P030", -- spirits under a gold beam
+	Enmah = "Aura_P022", -- purple ground vortex
+	BashosanFan = "Aura_P017", -- blue wind swirl
+	KohakoJar = "Aura_P028", -- white wings
+	QuinsyMedallion = "Aura_P094", -- streak with gold rings
+	DemonDestroyingSword = "Aura_P121", -- red shards
+	ScarlettEyes = "Aura_P141", -- crimson shards
+	-- Mythic
+	HolloMask = "Aura_P087", -- white spikes
+	SukanasFinger = "Aura_Mythic", -- red spiked aura
+	DeathPaintWomb = "Aura_P020", -- toxic green splatter
+	InverseSpearOfHeaven = "Aura_P029", -- purple sigil screens
+	OpiOpiFruit = "Aura_Epic", -- purple flame
+	YamuYamuFruit = "Aura_P098", -- purple storm
+	Yorru = "Aura_P015", -- violet wings
+	SaintsCorpsePiece = "Aura_Legendary", -- golden swirl
+	ToryToryPhoenixFruit = "Aura_P021", -- fire rings and crown
+	BenihisagaGourd = "Aura_P038", -- ember flame
+	-- Celestial
+	Hogyuku = "Aura_Celestial", -- blue ring
+	BeetleStendArrow = "Aura_P052", -- gold ring
+	Kamutoki = "Aura_P089", -- blue lightning
+	PrizonRealm = "Aura_P093", -- violet burst
+	ShichiseiBlade = "Aura_P071", -- white star aura
+	UwoUwoDragonFruit = "Aura_P070", -- violet dragon aura
+	BlueSpidderLily = "Aura_Rays",
+	-- Cosmic
+	RedStoneOfAia = "Aura_P067", -- crimson aura
+	GurraGurraFruit = "Aura_P072", -- golden aura
+	PentaLeafGrimoire = "Aura_Cosmic", -- violet ring
+	AncientSunriseBlade = "Aura_P085", -- dawn aura
+} :: { [string]: string }
+
+-- Big character auras from the pack, shrunk to sit on a relic instead of a whole avatar.
+RelicVfx.TemplateScale = {
+	Aura_P021 = 0.6,
+	Aura_P067 = 0.35,
+	Aura_P070 = 0.35,
+	Aura_P071 = 0.35,
+	Aura_P072 = 0.35,
+	Aura_P085 = 0.35,
+	Aura_P093 = 0.45,
+	Aura_P098 = 0.6,
+} :: { [string]: number }
+
 -- The layers for one relic at one size. `index` is the relic's position among modelled relics of
 -- its tier (so a tier's relics walk through the pool in order); nil falls back to the hash.
 function RelicVfx.layers(relic: Relic, size: string?, index: number?): { Layer }
@@ -118,8 +192,16 @@ function RelicVfx.layers(relic: Relic, size: string?, index: number?): { Layer }
 	local base = RelicVfx.Colors[relic.Vfx or ""]
 	local tint = if base then shiftHue(base, seed) else nil
 	local boost = RelicVfx.SizeBoost[size or ""] or 1
+	local assigned = RelicVfx.Assigned[relic.Id]
+	local primary = assigned or pool[pick]
 	local layers: { Layer } = {
-		{ Template = pool[pick], Tint = tint, TintStrength = look.Tint, Boost = look.Boost * boost, Density = look.Density },
+		{
+			Template = primary,
+			Tint = tint,
+			TintStrength = if assigned then 0.15 else look.Tint,
+			Boost = look.Boost * boost * (RelicVfx.TemplateScale[primary] or 1),
+			Density = look.Density,
+		},
 	}
 	for extra = 2, look.Layers do
 		local accent = RelicVfx.Accents[((seed // 7 + extra) % #RelicVfx.Accents) + 1]

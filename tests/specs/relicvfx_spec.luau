@@ -63,4 +63,17 @@ return {
 			end
 		end,
 	},
+	{
+		Name = "hand-picked primaries are unique, installed and only on real relics",
+		Run = function()
+			local fs = require("@lune/fs")
+			local used = {}
+			for id, template in RelicVfx.Assigned do
+				expect.equal(RelicConfig.ById[id] ~= nil, true, `{id} is a relic`)
+				expect.equal(used[template], nil, `{template} used by {id} and {used[template]}`)
+				used[template] = id
+				expect.equal(fs.isFile(`assets/VFX/Auras/{template}.rbxmx`), true, `{template} installed`)
+			end
+		end,
+	},
 }

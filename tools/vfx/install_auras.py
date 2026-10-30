@@ -67,6 +67,23 @@ def install(name, number, tint, strength):
     print(f"{name} <- {source.name}" + (f" tinted {tint} x{strength}" if tint else ""))
 
 
+# Effects harvested from +150VFX.rbxl (tools/vfx/pack150_to_rbxmx.py), used as per-relic primaries
+# by src/shared/RelicVfx.luau. Installed untinted as Aura_P<id>.
+PACK150 = SOURCE.parent / "Pack150"
+PACK150_IDS = ["012", "015", "016", "017", "018", "019", "020", "021", "022", "023", "027", "028", "029", "030", "032",
+               "031", "037", "038", "052", "064", "066", "067", "070", "071", "072", "083", "085", "087", "088",
+               "089", "091", "092", "093", "094", "098", "121", "141", "142"]
+
+
+def install_pack150(number):
+    source = next(PACK150.glob(f"P{number}_*.rbxmx"))
+    text = source.read_text(encoding="utf-8").replace(f'<string name="Name">P{number}</string>', f'<string name="Name">Aura_P{number}</string>', 1)
+    (TARGET / f"Aura_P{number}.rbxmx").write_text(text, encoding="utf-8")
+
+
 if __name__ == "__main__":
     for game_name, (num, hexcode, k) in CHOICES.items():
         install(game_name, num, hexcode, k)
+    for number in PACK150_IDS:
+        install_pack150(number)
+    print(f"installed {len(PACK150_IDS)} pack150 auras")
