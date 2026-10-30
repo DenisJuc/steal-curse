@@ -43,6 +43,9 @@ local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mut
 		return
 	end
 	part.Name = "RelicDisplay"
+	-- Read by the client's PedestalAuras.
+	part:SetAttribute("RelicId", relicId)
+	part:SetAttribute("Size", SizeConfig.normalize(sizeId))
 	part.Parent = pedestal
 
 	local mutation = mutationId and MutationConfig.ById[mutationId]

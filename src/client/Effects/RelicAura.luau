@@ -20,6 +20,8 @@ export type Options = {
 export type Handle = { Destroy: (Handle) -> () }
 
 local LOW_RATE = 0.4
+-- Pack emitters go as high as 1e4/s; a pedestal loop never needs more than this per emitter.
+local MAX_RATE = 60
 local MIN_SCALE = 0.25
 
 function RelicAura.template(name: string): Instance?
@@ -41,16 +43,15 @@ local function scaleEffect(item: Instance, s: number, low: boolean)
 		item.Size = scaleSequence(item.Size, s)
 		item.Speed = NumberRange.new(item.Speed.Min * s, item.Speed.Max * s)
 		item.Acceleration *= s
-		if low then
-			item.Rate *= LOW_RATE
-		end
+		item.Rate = math.min(item.Rate, MAX_RATE) * (if low then LOW_RATE else 1)
 	elseif item:IsA("Beam") then
 		item.Width0 *= s
 		item.Width1 *= s
 		item.CurveSize0 *= s
 		item.CurveSize1 *= s
 	elseif item:IsA("Attachment") then
-		item.Position *= s
+		local offset = item.CFrame
+		item.CFrame = offset - offset.Position + offset.Position * s
 	elseif item:IsA("Light") then
 		(item :: any).Range *= s
 	end
