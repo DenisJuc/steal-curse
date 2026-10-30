@@ -735,18 +735,23 @@ Config.Ambience = {
 		-- the wild's outer edge.
 		LidBeyond = 80,
 	},
+	-- The town shares the wild's night (thinner fog, a little more light) so the shrines read as
+	-- the same cursed world; relics are lit by their pedestal rim lights (PedestalVisuals).
 	Town = {
-		Atmosphere = { Density = 0.32, Offset = 0.1, Haze = 1.6, Color = { 200, 175, 230 }, Decay = { 110, 80, 150 } },
+		Atmosphere = { Density = 0.42, Offset = 0.2, Haze = 2.2, Color = { 44, 40, 66 }, Decay = { 18, 14, 30 } },
 		Lighting = {
-			ClockTime = 17.6,
-			Brightness = 2.5,
-			Ambient = { 70, 60, 95 },
-			OutdoorAmbient = { 115, 105, 145 },
-			Exposure = 0,
+			ClockTime = 0,
+			Brightness = 1.5,
+			Ambient = { 90, 80, 120 },
+			OutdoorAmbient = { 100, 92, 135 },
+			Exposure = 0.1,
 		},
-		Tint = { 255, 255, 255 },
-		Saturation = 0,
-		Particles = {},
+		Tint = { 240, 232, 255 },
+		Saturation = -0.05,
+		Particles = {
+			{ Name = "Motes", Texture = FIREFLY, Color = { 190, 150, 255 }, Rate = 6, Size = 0.3, Lifetime = 6, Speed = 0.5, LightEmission = 1, Drift = { 0, 0.3, 0 } },
+			{ Name = "Mist", Texture = SMOKE, Color = { 150, 140, 185 }, Rate = 2, Size = 9, Lifetime = 10, Speed = 0.4, LightEmission = 0, Transparency = 0.88, Low = true },
+		},
 		SoundId = "",
 	},
 	Areas = {

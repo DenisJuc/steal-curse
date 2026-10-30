@@ -25,10 +25,11 @@ local function setupLighting()
 			child:Destroy()
 		end
 	end
-	Lighting.ClockTime = 17.6
-	Lighting.Brightness = 2.5
-	Lighting.Ambient = Color3.fromRGB(70, 60, 95)
-	Lighting.OutdoorAmbient = Color3.fromRGB(115, 105, 145)
+	-- Matches Config.Ambience.Town (the client blends from there).
+	Lighting.ClockTime = 0
+	Lighting.Brightness = 1.5
+	Lighting.Ambient = Color3.fromRGB(90, 80, 120)
+	Lighting.OutdoorAmbient = Color3.fromRGB(100, 92, 135)
 	Lighting.ColorShift_Top = Color3.fromRGB(255, 205, 170)
 	Lighting.EnvironmentDiffuseScale = 1
 	Lighting.EnvironmentSpecularScale = 1
@@ -38,12 +39,12 @@ local function setupLighting()
 	Instance.new("Sky").Parent = Lighting
 
 	local atmosphere = Instance.new("Atmosphere")
-	atmosphere.Density = 0.32
-	atmosphere.Offset = 0.1
-	atmosphere.Color = Color3.fromRGB(200, 175, 230)
-	atmosphere.Decay = Color3.fromRGB(110, 80, 150)
+	atmosphere.Density = 0.42
+	atmosphere.Offset = 0.2
+	atmosphere.Color = Color3.fromRGB(44, 40, 66)
+	atmosphere.Decay = Color3.fromRGB(18, 14, 30)
 	atmosphere.Glare = 0.2
-	atmosphere.Haze = 1.6
+	atmosphere.Haze = 2.2
 	atmosphere.Parent = Lighting
 
 	local bloom = Instance.new("BloomEffect")

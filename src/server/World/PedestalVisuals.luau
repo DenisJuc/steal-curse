@@ -21,6 +21,11 @@ local WHITE = Color3.fromRGB(245, 240, 255)
 local GREY = Color3.fromRGB(182, 170, 158)
 local GOLD = Color3.fromRGB(240, 194, 104)
 local INK = Color3.fromRGB(17, 13, 24)
+local RIM_COLOR = Color3.fromRGB(190, 215, 255)
+local KEY_COLOR = Color3.fromRGB(255, 225, 190)
+-- Pedestal-top local offsets (studs) of the rim light (behind) and the key light (gate side).
+local RIM_OFFSET = Vector3.new(0, 5, 5)
+local KEY_OFFSET = Vector3.new(2, 8, -5)
 
 export type SlotState = {
 	Slot: number,
@@ -35,6 +40,41 @@ export type SlotState = {
 	IsNext: boolean?,
 }
 
+-- A spot on an attachment of `part`, placed at `offset` in the plot's axes and aimed at the relic.
+local function addSpot(part: BasePart, frame: CFrame, name: string, offset: Vector3, color: Color3, brightness: number)
+	local holder = Instance.new("Attachment")
+	holder.Name = name
+	holder.Parent = part
+	holder.WorldCFrame = CFrame.lookAt(frame:PointToWorldSpace(offset), part.Position)
+	local spot = Instance.new("SpotLight")
+	spot.Face = Enum.NormalId.Front
+	spot.Color = color
+	spot.Brightness = brightness
+	spot.Range = 16
+	spot.Angle = 40
+	spot.Shadows = false
+	spot.Parent = holder
+end
+
+-- Night shrine lighting: a warm key from the gate side, a cool rim from behind (plot +Z) that
+-- edges the relic against the dark, and a tier-coloured glow pooling on the pedestal and floor.
+local function addRimLight(part: BasePart, top: BasePart, relicId: string)
+	-- Top is a cylinder (BuildUtil.cylinder rolls it 90 degrees); unroll to get the plot's axes.
+	local frame = top.CFrame * CFrame.Angles(0, 0, math.rad(-90))
+	addSpot(part, frame, "KeyLight", KEY_OFFSET, KEY_COLOR, 4)
+	addSpot(part, frame, "RimLight", RIM_OFFSET, RIM_COLOR, 10)
+
+	local relic = RelicConfig.ById[relicId]
+	local tier = relic and RarityConfig.Get(relic.Tier)
+	local glow = Instance.new("PointLight")
+	glow.Name = "TierGlow"
+	glow.Color = if tier then Color3.fromHex(tier.Color) else WHITE
+	glow.Brightness = 2
+	glow.Range = 8
+	glow.Shadows = false
+	glow.Parent = part
+end
+
 local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mutationId: string?, sizeId: string?)
 	local scale = SizeConfig.scaleOf(sizeId)
 	local yLift = 2.4 + (scale - 1) * 0.9
@@ -47,6 +87,7 @@ local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mut
 	part:SetAttribute("RelicId", relicId)
 	part:SetAttribute("Size", SizeConfig.normalize(sizeId))
 	part.Parent = pedestal
+	addRimLight(part, top, relicId)
 
 	local mutation = mutationId and MutationConfig.ById[mutationId]
 	if mutation then
