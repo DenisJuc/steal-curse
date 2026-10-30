@@ -14,6 +14,8 @@ local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
 local RollReel = require(script.Parent.Parent.UI.RollReel)
+local PedestalAuras = require(script.Parent.PedestalAuras)
+local RelicAura = require(script.Parent.RelicAura)
 
 local ScanSeal = {}
 
@@ -32,6 +34,9 @@ local SPIN = 2.2
 local MIN_GAP = 0.7
 local GROUND_OFFSET = 0.2
 local CHEST_LIFT = 1.2
+-- Epic and better: the tier's relic aura flares around the player for a moment.
+local FLARE_SECONDS = { Epic = 1.2, Legendary = 1.6, Mythic = 2, Celestial = 2.2, Cosmic = 2.4 }
+local BODY_HEIGHT = 5
 
 local RARE = RarityConfig.IndexById.Rare
 local EPIC = RarityConfig.IndexById.Epic
@@ -162,6 +167,28 @@ function ScanSeal.Play(relicId: string, sizeId: string?)
 	end
 	if tier >= RARE then
 		Sounds.Play("Seal", nil, if tier >= LEGENDARY then 0.85 else 1.1)
+	end
+	local tierId = RarityConfig.Tiers[tier] and RarityConfig.Tiers[tier].Id
+	local flare = tierId and FLARE_SECONDS[tierId]
+	local auraName = tierId and PedestalAuras.ByTier[tierId]
+	local auraTemplate = auraName and RelicAura.template(auraName)
+	if flare and auraTemplate then
+		-- The pack's auras were authored around a 5-stud body, so this anchor matches them 1:1.
+		local anchor = Instance.new("Part")
+		anchor.Name = "ScanSealFlare"
+		anchor.Anchored = true
+		anchor.CanCollide = false
+		anchor.CanQuery = false
+		anchor.CanTouch = false
+		anchor.Transparency = 1
+		anchor.Size = Vector3.new(2, BODY_HEIGHT, 1)
+		anchor.CFrame = CFrame.new(at + Vector3.new(0, BODY_HEIGHT / 2 - GROUND_OFFSET, 0))
+		anchor.Parent = workspace
+		local handle = RelicAura.attach(anchor, auraTemplate, { Low = low })
+		task.delay(flare, function()
+			handle:Destroy()
+			anchor:Destroy()
+		end)
 	end
 
 	local start = os.clock()
