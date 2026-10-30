@@ -203,8 +203,11 @@ function RelicVfx.layers(relic: Relic, size: string?, index: number?): { Layer }
 			Density = look.Density,
 		},
 	}
-	for extra = 2, look.Layers do
-		local accent = RelicVfx.Accents[((seed // 7 + extra) % #RelicVfx.Accents) + 1]
+	-- Hand-picked relics already escalate through their primary; a shared accent on top made many
+	-- of them read alike (the wind swirl), so they only get a faint sparkle from Celestial up.
+	local extras = if assigned then (if look.Layers >= 3 or relic.Tier == "Celestial" then 2 else 1) else look.Layers
+	for extra = 2, extras do
+		local accent = if assigned then "Aura_Sparkle" else RelicVfx.Accents[((seed // 7 + extra) % #RelicVfx.Accents) + 1]
 		if accent ~= layers[1].Template then
 			table.insert(layers, {
 				Template = accent,
