@@ -276,11 +276,10 @@ function RebirthPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: 
 		Toggle = function()
 			if UIKit.toggle(panel) then
 				confirming = false
-				status.Text = if model == "BPlus" and BalanceTrials.coreLoopPresentation()
-					then "B+: CE resets; skills, pedestals, and Index stay. Seal again with permanent bonuses."
-					elseif model == "BPlus"
-					then "B+: CE resets; skills, pedestals, and Fusion stay. After Rebirth, pick a Resonance in Collection."
-					else "Rebirth when the bar is full. Your next run earns and finds more."
+				-- The Resets / You keep boxes already say what happens; only add what they don't.
+				status.Text = if model == "BPlus" and not BalanceTrials.coreLoopPresentation()
+					then "After Rebirth, pick a Resonance in Collection."
+					else ""
 				status.TextColor3 = colors.SubText
 				refresh()
 			end
