@@ -47,4 +47,16 @@ return {
 			expect.equal(ModelCheck.fitFactor(0, 2), 1, "degenerate size is left alone")
 		end,
 	},
+	{
+		Name = "presence factor gives swords and orbs the same pedestal presence",
+		Run = function()
+			local orb = ModelCheck.presenceFactor({ X = 10, Y = 10, Z = 10 })
+			expect.near(orb * 10, ModelCheck.DISPLAY_PRESENCE, 1e-9, "orb presence")
+			local book = ModelCheck.presenceFactor({ X = 0.2, Y = 0.8, Z = 0.5 })
+			expect.near(book * math.sqrt(0.8 * 0.5), ModelCheck.DISPLAY_PRESENCE, 1e-9, "book presence")
+			local sword = ModelCheck.presenceFactor({ X = 0.1, Y = 1, Z = 0.25 })
+			expect.near(sword * 1, ModelCheck.DISPLAY_MAX_LONGEST, 1e-9, "long sword capped at max length")
+			expect.equal(ModelCheck.presenceFactor({ X = 0, Y = 0, Z = 0 }), 1, "degenerate size is left alone")
+		end,
+	},
 }

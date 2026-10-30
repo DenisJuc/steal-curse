@@ -111,9 +111,10 @@ local function fromAsset(relic: RelicConfig.Relic, asset: Instance, at: CFrame, 
 			child:Destroy()
 		end
 	end
-	local target = RelicShapes.props(relic.ObjectType, CFrame.new(), scale).Size :: Vector3
+	-- Every model gets the same pedestal presence regardless of its object type or how big the
+	-- export came in; DisplayScale stays as a per-model tweak.
 	local extra = asset:GetAttribute("DisplayScale")
-	local factor = ModelCheck.fitFactor(math.max(part.Size.X, part.Size.Y, part.Size.Z), math.max(target.X, target.Y, target.Z))
+	local factor = ModelCheck.presenceFactor(part.Size) * scale
 	part.Size *= factor * (if type(extra) == "number" and extra > 0 then extra else 1)
 	local rotation = asset:GetAttribute("DisplayRotation")
 	local turn = if typeof(rotation) == "Vector3"

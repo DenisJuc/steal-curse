@@ -25,6 +25,23 @@ function ModelCheck.fitFactor(modelLongest: number, targetLongest: number): numb
 	return targetLongest / modelLongest
 end
 
+-- Display presence of a model: the geometric mean of its two largest dimensions, so a long thin
+-- sword and a round fruit with the same presence read as the same size on a pedestal.
+ModelCheck.DISPLAY_PRESENCE = 2.2
+ModelCheck.DISPLAY_MAX_LONGEST = 4.2
+
+function ModelCheck.presenceFactor(size: Vector3 | { X: number, Y: number, Z: number }): number
+	local dims = { size.X, size.Y, size.Z }
+	table.sort(dims, function(a, b)
+		return a > b
+	end)
+	local presence = math.sqrt(dims[1] * dims[2])
+	if presence <= 0 then
+		return 1
+	end
+	return math.min(ModelCheck.DISPLAY_PRESENCE / presence, ModelCheck.DISPLAY_MAX_LONGEST / dims[1])
+end
+
 function ModelCheck.issues(facts: Facts): { string }
 	local issues = {}
 	if facts.Parts == 0 then

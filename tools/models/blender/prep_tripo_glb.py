@@ -9,7 +9,10 @@ metallicRoughness map is split into the two maps Roblox takes (G = roughness, B 
 import sys
 from pathlib import Path
 
+import math
+
 import bpy
+import mathutils
 import numpy as np
 
 argv = sys.argv[sys.argv.index("--") + 1:]
@@ -29,6 +32,21 @@ if len(meshes) > 1:
 obj = bpy.context.view_layer.objects.active
 bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
 bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+
+# Tripo often poses long objects (swords, arrows) diagonally, which shrinks them on a pedestal once
+# they are fitted by bounding box. Stand a clearly elongated object up along its main axis.
+co = np.empty(len(obj.data.vertices) * 3, dtype=np.float64)
+obj.data.vertices.foreach_get("co", co)
+co = co.reshape(-1, 3)
+centred = co - co.mean(axis=0)
+values, vectors = np.linalg.eigh(np.cov(centred.T))
+axis = vectors[:, 2]
+if math.sqrt(values[2] / max(values[1], 1e-12)) > 2.2:
+    if axis[2] < 0:
+        axis = -axis
+    rot = mathutils.Vector(axis).rotation_difference(mathutils.Vector((0, 0, 1)))
+    obj.data.transform(rot.to_matrix().to_4x4())
+    obj.data.update()
 
 before = sum(len(p.vertices) - 2 for p in obj.data.polygons)
 if before > target:
