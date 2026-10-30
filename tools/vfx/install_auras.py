@@ -14,7 +14,7 @@ TARGET = ROOT / "assets" / "VFX" / "Auras"
 
 # game name: (candidate number, tint hex or None, tint strength 0..1)
 CHOICES = {
-    "Aura_Rare": (28, None, 0),
+    "Aura_Rare": (6, None, 0),
     "Aura_Epic": (18, None, 0),
     "Aura_Legendary": (25, "#FFB12E", 0.7),
     "Aura_Mythic": (21, "#FF4F6D", 0.35),
