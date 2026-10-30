@@ -35,26 +35,27 @@ local PREMADE = {
 	PLAY_ON_SCAN = false,
 
 	-- Player gets circle + orb; burst plays on the sealed curse.
+	-- Two effects only (player feedback: the old three-stage seal ran ~3.5 s and felt overdone).
 	ENABLE_BURST = true,
-	ENABLE_ORB = true,
+	ENABLE_ORB = false,
 
 	-- Stage windows (seconds at TIME_SCALE = 1). Everything plays on the sealed curse.
 	CIRCLE_START = 0.00,
-	CIRCLE_GROW = 0.45,
-	CIRCLE_EMIT_AT = 0.45, -- emit once full size so the waves aren't tiny
-	CIRCLE_END = 2.55,
+	CIRCLE_GROW = 0.2,
+	CIRCLE_EMIT_AT = 0.2, -- emit once full size so the waves aren't tiny
+	CIRCLE_END = 1.05,
 	-- Spike burst: cursed energy breaks loose on the curse. Lives until its particles finish.
-	BURST_AT = 0.50,
-	BURST_END = 1.55,
+	BURST_AT = 0.25,
+	BURST_END = 0.95,
 	-- Dome rises over the curse, holds, then collapses onto it (the seal).
 	ORB_AT = 0.85,
 	ORB_END = 0.85 + 1.45 + 0.3, -- = ORB_AT + ORB_PLAY_SECONDS + DOME_COLLAPSE
 	-- Circle holds until the dome has collapsed, then shrinks away.
-	FADE_START = 2.45,
-	FADE_END = 2.85,
+	FADE_START = 0.8,
+	FADE_END = 1.05,
 	-- Destroy after longest emitted Lifetime (~1s waves / flare) + pad.
-	CLEANUP_AFTER_FADE = 1.05,
-	MAX_CLEANUP = 4.20,
+	CLEANUP_AFTER_FADE = 0.6,
+	MAX_CLEANUP = 1.8,
 
 	-- Circle: flat on the ground under the curse.
 	GROUND_OFFSET = 0.2,
@@ -110,7 +111,7 @@ local PREMADE = {
 	-- Duration covers circle → curse burst → orb so VFX stay lit in the wild.
 	---------------------------------------------------------------------------
 	ENABLE_LIGHT_PULSE = true,
-	PULSE_DURATION = 3.0, -- covers burst + orb play-out
+	PULSE_DURATION = 1.1, -- covers circle + burst
 	PULSE_HOLD = 0.55, -- fraction of duration at full brightness before ease-out
 	PULSE_MIN_INTERVAL = 1.5, -- skip new pulses this soon after a start (unless extending active)
 	PULSE_LIGHT_FADE_IN = 0.1,
@@ -132,11 +133,16 @@ local APPEAR_END = 0.35
 local SWALLOW_START, SWALLOW_END = 0.45, 1.05
 local SLAM_AT = 1.4
 local SINK_START = 1.9
-if USE_PREMADE_VFX then
+if USE_PREMADE_VFX and PREMADE.ENABLE_ORB then
 	local orbDone = PREMADE.ORB_AT + PREMADE.ORB_PLAY_SECONDS + PREMADE.DOME_COLLAPSE
 	SealBurst.SlamAt = orbDone
 	SealBurst.RevealAt = orbDone
 	SealBurst.Seconds = PREMADE.ORB_END + PREMADE.CLEANUP_AFTER_FADE
+elseif USE_PREMADE_VFX then
+	-- No dome: the burst is the seal, and the relic flies in as it peaks.
+	SealBurst.SlamAt = PREMADE.BURST_AT + 0.2
+	SealBurst.RevealAt = PREMADE.BURST_AT + 0.2
+	SealBurst.Seconds = PREMADE.FADE_END + PREMADE.CLEANUP_AFTER_FADE
 else
 	SealBurst.SlamAt = SLAM_AT
 	SealBurst.RevealAt = SLAM_AT + 0.1
@@ -885,9 +891,12 @@ local function playPremade(relicId: string, options: Options, sealPosition: Vect
 			burst.Parent = folder
 			local burstLight = attachGlowLight(folder, curseAt, PREMADE.BURST_LIGHT_RANGE, PREMADE.BURST_LIGHT_BRIGHTNESS)
 			emitAll(burst, PREMADE.BURST_EMIT, 10)
+			if not orbSrc then
+				popLight(folder, curseAt, token)
+			end
 			if options.Personal then
 				Sounds.Play("Seal")
-				HuntFX.shake(0.15, 0.2)
+				HuntFX.shake(if orbSrc then 0.15 else 0.25, 0.2)
 			end
 			-- Keep the emitter alive until its particles finish (destroying it clears them).
 			task.delay(T(PREMADE.BURST_END - PREMADE.BURST_AT), function()
@@ -967,7 +976,7 @@ local function playPremade(relicId: string, options: Options, sealPosition: Vect
 	end
 
 	local cleanupAt = math.min(
-		T(math.max(PREMADE.FADE_END, PREMADE.ORB_END) + PREMADE.CLEANUP_AFTER_FADE),
+		T(math.max(PREMADE.FADE_END, if orbSrc then PREMADE.ORB_END else 0) + PREMADE.CLEANUP_AFTER_FADE),
 		T(PREMADE.MAX_CLEANUP)
 	)
 	task.delay(cleanupAt, function()
