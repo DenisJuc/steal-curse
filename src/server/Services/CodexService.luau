@@ -107,6 +107,7 @@ local function snapshot(player: Player)
 		Mutations = data.CodexMutations,
 		Ready = data.CodexReady,
 		Claimed = data.CodexMilestones,
+		Sizes = data.CodexSizes,
 	}
 end
 

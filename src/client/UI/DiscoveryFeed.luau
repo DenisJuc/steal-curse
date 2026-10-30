@@ -4,6 +4,7 @@
 -- Routine Common/Uncommon Normal duplicates collapse into one currency summary per batch.
 -- Exceptional finds (new base / mutation / size / Huge / Titanic / Epic+) stay individual.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AutoSell = require(ReplicatedStorage.Shared.AutoSell)
@@ -225,6 +226,22 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 		if type(results) ~= "table" or hunt then
 			return
 		end
+		-- A plain first find (no size, no mutation) gets no line: it lights the Codex button's
+		-- "new" badge instead (HUD), which clears when the Codex is opened.
+		local shown = {}
+		local fresh = 0
+		for _, result in results do
+			if result.First and not SizeConfig.normalize(result.Size) and not result.Mutation then
+				fresh += 1
+			else
+				table.insert(shown, result)
+			end
+		end
+		if fresh > 0 then
+			local player = Players.LocalPlayer
+			player:SetAttribute("CodexNew", (player:GetAttribute("CodexNew") or 0) + fresh)
+		end
+		results = shown
 		local plan = RewardPresentation.planFeed(results, tierOf)
 		-- Exceptionals first (rarest), then notables, then one routine summary.
 		local exceptional = table.clone(plan.Exceptional)

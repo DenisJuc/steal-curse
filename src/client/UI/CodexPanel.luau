@@ -1,7 +1,8 @@
 -- Codex menu (GDD 7, 12.1): discovery progress, milestones (essential bonuses, frequency
 -- unlocks, set titles, prestige titles), earned titles and one card per relic with its 3D model
 -- and, once discovered, its base income per second. Unknown relics show as a black silhouette of the model with only their tier and base odds. Seen mutations appear as colored dots
--- on the relic's card (no separate mutation Codex).
+-- on the relic's card (no separate mutation Codex). Relics are tabbed Normal / Huge / Titanic
+-- and grouped by rarity like an index.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,6 +39,11 @@ local REFRESH_SECONDS = 1
 local DONE_COLOR = Color3.fromRGB(120, 230, 140)
 local ROW_HEIGHT = 58
 local BAR_HEIGHT = 6
+local SIZE_TABS = { "Normal", "Huge", "Titanic" }
+local SIZE_COLORS = {
+	Huge = Color3.fromRGB(160, 210, 255),
+	Titanic = Color3.fromRGB(255, 210, 90),
+}
 
 -- Short reward-track titles ("28 relics", "9 Demonic") instead of full goal sentences.
 local function shortGoal(milestone: Codex.Milestone): string
@@ -60,6 +66,11 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	local order = 0
 	-- One render per relic, kept across refreshes; unknown relics tint it black.
 	local renders = RelicViewport.cache(#CodexBook.AllIds)
+	local sizeTab = "Normal"
+	local lastState: Codex.State = { Discovered = {}, Mutations = {} }
+	local lastSizes: { [string]: { [string]: number } } = {}
+	local relicList: Frame? = nil
+	local tabButtons: { [string]: TextButton } = {}
 
 	local function nextOrder(): number
 		order += 1
@@ -152,11 +163,27 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		})
 	end
 
-	local function relicCard(grid: Frame, relicId: string, index: number, state: Codex.State)
+	local function relicKnown(relicId: string, tab: string, state: Codex.State, sizes: { [string]: { [string]: number } }): boolean
+		if tab == "Normal" then
+			return state.Discovered[relicId] ~= nil
+		end
+		local seen = sizes[relicId]
+		return seen ~= nil and seen[tab] ~= nil
+	end
+
+	local function tabFound(tab: string, state: Codex.State, sizes: { [string]: { [string]: number } }): number
+		local found = 0
+		for _, relicId in CodexBook.AllIds do
+			if relicKnown(relicId, tab, state, sizes) then
+				found += 1
+			end
+		end
+		return found
+	end
+
+	local function relicCard(grid: Frame, relicId: string, index: number, state: Codex.State, known: boolean, sizeId: string?)
 		local relic = RelicConfig.ById[relicId]
-		local known = state.Discovered[relicId] ~= nil
 		local tierColor = UIKit.tierColor(relic.Tier)
-		local tier = RarityConfig.Get(relic.Tier)
 		local card = UIKit.create("Frame", {
 			LayoutOrder = index,
 			BackgroundColor3 = if known then colors.Card else colors.Track,
@@ -168,6 +195,17 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		render.Size = UDim2.fromOffset(42, 42)
 		render.ImageColor3 = if known then Color3.new(1, 1, 1) else Color3.new(0, 0, 0)
 		render.Parent = card
+		if known and sizeId then
+			UIKit.label({
+				Text = string.upper(sizeId),
+				TextSize = 10,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextColor3 = SIZE_COLORS[sizeId] or colors.Text,
+				Position = UDim2.fromOffset(4, 2),
+				Size = UDim2.new(1, -8, 0, 12),
+				Parent = card,
+			})
+		end
 		UIKit.label({
 			Text = if known then relic.Name else "???",
 			TextSize = 12,
@@ -229,15 +267,91 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		card.Parent = grid
 	end
 
+	local function skinTabs()
+		local total = #CodexBook.AllIds
+		for _, tab in SIZE_TABS do
+			local button = tabButtons[tab]
+			if button then
+				button.Text = `{tab} {tabFound(tab, lastState, lastSizes)}/{total}`
+				UIKit.skinButton(button, if tab == sizeTab then "Primary" else "Dark")
+			end
+		end
+	end
+
+	local function renderRelicList()
+		local list = relicList
+		if not list then
+			return
+		end
+		renders.DetachAll()
+		for _, child in list:GetChildren() do
+			if child:IsA("GuiObject") then
+				child:Destroy()
+			end
+		end
+		skinTabs()
+		local listOrder = 0
+		local sizeId = if sizeTab == "Normal" then nil else sizeTab
+		for _, tier in RarityConfig.Tiers do
+			local ids = {}
+			for _, relicId in CodexBook.AllIds do
+				local relic = RelicConfig.ById[relicId]
+				if relic and relic.Tier == tier.Id then
+					table.insert(ids, relicId)
+				end
+			end
+			if #ids == 0 then
+				continue
+			end
+			local found = 0
+			for _, relicId in ids do
+				if relicKnown(relicId, sizeTab, lastState, lastSizes) then
+					found += 1
+				end
+			end
+			listOrder += 1
+			local tierColor = UIKit.tierColor(tier.Id)
+			UIKit.label({
+				LayoutOrder = listOrder,
+				Text = `{tier.Name} {found}/{#ids}`,
+				TextSize = 14,
+				TextColor3 = tierColor,
+				Size = UDim2.new(1, 0, 0, 20),
+				Parent = list,
+			})
+			listOrder += 1
+			local grid = UIKit.create("Frame", {
+				LayoutOrder = listOrder,
+				BackgroundTransparency = 1,
+				Size = UDim2.fromScale(1, 0),
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Parent = list,
+			}, {
+				UIKit.create("UIGridLayout", {
+					CellSize = UDim2.fromOffset(124, 110),
+					CellPadding = UDim2.fromOffset(6, 6),
+					SortOrder = Enum.SortOrder.LayoutOrder,
+				}),
+			})
+			for index, relicId in ids do
+				relicCard(grid, relicId, index, lastState, relicKnown(relicId, sizeTab, lastState, lastSizes), sizeId)
+			end
+		end
+	end
+
 	local function render(snapshot: any)
 		order = 0
 		renders.DetachAll()
+		relicList = nil
+		tabButtons = {}
 		for _, child in body:GetChildren() do
 			if child:IsA("GuiObject") then
 				child:Destroy()
 			end
 		end
 		local state: Codex.State = { Discovered = snapshot.Discovered or {}, Mutations = snapshot.Mutations or {} }
+		lastState = state
+		lastSizes = snapshot.Sizes or {}
 		local claimed = snapshot.Claimed or {}
 		local ready = snapshot.Ready or {}
 		local claimable = 0
@@ -319,22 +433,46 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		})
 
 		heading("Relics")
-		local grid = UIKit.create("Frame", {
+		local tabs = UIKit.create("Frame", {
+			LayoutOrder = nextOrder(),
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, -10, 0, 32),
+			Parent = body,
+		}, {
+			UIKit.create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+			}),
+		})
+		for index, tab in SIZE_TABS do
+			tabButtons[tab] = UIKit.button({
+				Text = tab,
+				TextSize = 15,
+				LayoutOrder = index,
+				Size = UDim2.new(1 / #SIZE_TABS, -4, 1, 0),
+				Parent = tabs,
+			}, function()
+				if sizeTab == tab then
+					return
+				end
+				sizeTab = tab
+				renderRelicList()
+			end)
+		end
+		relicList = UIKit.create("Frame", {
 			LayoutOrder = nextOrder(),
 			BackgroundTransparency = 1,
 			Size = UDim2.new(1, -10, 0, 0),
 			AutomaticSize = Enum.AutomaticSize.Y,
 			Parent = body,
 		}, {
-			UIKit.create("UIGridLayout", {
-				CellSize = UDim2.fromOffset(124, 110),
-				CellPadding = UDim2.fromOffset(6, 6),
+			UIKit.create("UIListLayout", {
 				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 4),
 			}),
 		})
-		for index, relicId in CodexBook.AllIds do
-			relicCard(grid, relicId, index, state)
-		end
+		renderRelicList()
 	end
 
 	local claiming = false

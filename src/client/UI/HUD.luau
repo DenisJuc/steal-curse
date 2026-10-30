@@ -353,7 +353,11 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	end
 
 	local codexButton, _, codexChip = iconButton(buttons, "CodexButton", 7, "Codex", "Codex")
-	codexButton.Activated:Connect(callbacks.OnCodex)
+	codexButton.Activated:Connect(function()
+		-- Opening the Codex clears the "new relics" badge (DiscoveryFeed counts them).
+		player:SetAttribute("CodexNew", 0)
+		callbacks.OnCodex()
+	end)
 	codexChip.Visible = true
 
 	local journalButton = iconButton(buttons, "JournalButton", 8, "Journal", "Journal")
@@ -391,7 +395,8 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	player:GetAttributeChangedSignal("DiscoveredCount"):Connect(refreshCodex)
 	refreshCodex()
 
-	-- "!" badge while Codex milestones are waiting to be claimed; it breathes and the button shines.
+	-- Badge while Codex milestones are waiting to be claimed or new relics wait to be seen; it
+	-- breathes and the button shines.
 	local badge = UIKit.label({
 		Name = "ClaimBadge",
 		Text = "!",
@@ -415,18 +420,22 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		return claimable
 	end)
 	local function refreshBadge()
-		local now = (player:GetAttribute("CodexClaimable") or 0) > 0
+		local fresh = player:GetAttribute("CodexNew") or 0
+		local now = (player:GetAttribute("CodexClaimable") or 0) > 0 or fresh > 0
 		if now and not claimable then
 			Motion.pop(badge, 0, 0.2)
 		end
 		claimable = now
 		badge.Visible = now
+		-- A count of new relics to look at, or "!" when only a reward is waiting.
+		badge.Text = if fresh > 0 then tostring(math.min(fresh, 99)) else "!"
 		if codexStroke then
 			codexStroke.Color = if now then colors.Gold else colors.Trim
 			codexStroke.Thickness = if now then 3 else 2
 		end
 	end
 	player:GetAttributeChangedSignal("CodexClaimable"):Connect(refreshBadge)
+	player:GetAttributeChangedSignal("CodexNew"):Connect(refreshBadge)
 	refreshBadge()
 
 	local function refreshStats()
