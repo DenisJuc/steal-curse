@@ -1,9 +1,11 @@
 -- Server-side look of the active Showcase on a plot's podium, so visitors see it too.
---   Level 1: the base structure (spirit circle / crimson throne / golden guardian).
---   Level 2: + neon aura ring and light.   Level 3: + sparkles and floating ornaments.
---   Level 4: + a light pillar and big ornaments.
--- Unlocked accessories are added on top (cosmetic only). Lights, particles, the pillar and the
--- ornament spin are thinned out per client by ShowcaseLOD. Podium local -Z faces the hub.
+-- Every Showcase has its own set piece (binding circle, cursed throne, guardian statue, sacred
+-- tree, village bell, star orrery) and its own premade effects from the VFX pack.
+--   Level 1: the set piece and its main effect.   Level 2: + segment aura ring and light.
+--   Level 3: + floating seals and a second effect layer.   Level 4: + a ring of big seals.
+-- Effects are only anchors here ("ShowcaseVfx" attribute = an Aura_* template); each client
+-- builds them near the podium (ShowcaseLOD). Unlocked accessories are added on top (cosmetic
+-- only). Podium local -Z faces the hub.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -29,12 +31,48 @@ local ACCENT = {
 	Stance = Color3.fromRGB(150, 210, 255),
 	Throne = Color3.fromRGB(220, 50, 60),
 	Guardian = Color3.fromRGB(255, 200, 80),
+	Grove = Color3.fromRGB(120, 235, 160),
+	Bell = Color3.fromRGB(255, 170, 80),
+	Star = Color3.fromRGB(175, 160, 255),
 }
 
 local POSE_TEXT = {
-	Stance = "Stand in the circle",
+	Stance = "Meditate",
 	Throne = "Sit on the throne",
-	Guardian = "Stand guard",
+	Guardian = "Pray",
+	Grove = "Commune",
+	Bell = "Keep the watch",
+	Star = "Call the stars",
+}
+
+-- Premade effects per Showcase (Aura_* templates in ReplicatedStorage.VFX.Auras): template,
+-- {x, y, z} on the dais, scale, and the level the layer appears at.
+type Vfx = { Template: string, At: { number }, Scale: number, Level: number }
+local VFX: { [string]: { Vfx } } = {
+	SimpleStance = {
+		{ Template = "Aura_P019", At = { 0, 5.5, 0 }, Scale = 1.1, Level = 1 },
+		{ Template = "Aura_P017", At = { 0, 1, 0 }, Scale = 1.6, Level = 3 },
+	},
+	CrimsonThrone = {
+		{ Template = "Aura_P067", At = { 0, 3.5, 1.5 }, Scale = 1.5, Level = 1 },
+		{ Template = "Aura_P027", At = { 0, 0.5, 2.5 }, Scale = 1.4, Level = 3 },
+	},
+	GoldenGuardian = {
+		{ Template = "Aura_P072", At = { 0, 4, 5.4 }, Scale = 1.5, Level = 1 },
+		{ Template = "Aura_P142", At = { 0, 9, 6 }, Scale = 1.2, Level = 3 },
+	},
+	ForestGrove = {
+		{ Template = "Aura_P064", At = { 0, 3, 4 }, Scale = 2, Level = 1 },
+		{ Template = "Aura_P016", At = { 0, 0.5, 0 }, Scale = 1.8, Level = 3 },
+	},
+	BellWatch = {
+		{ Template = "Aura_P038", At = { 0, 0.5, 4.5 }, Scale = 1.6, Level = 1 },
+		{ Template = "Aura_P091", At = { 0, 6, 4.5 }, Scale = 1.6, Level = 3 },
+	},
+	StarCircle = {
+		{ Template = "Aura_P071", At = { 0, 4, 0 }, Scale = 1.4, Level = 1 },
+		{ Template = "Aura_P093", At = { 0, 9, 4 }, Scale = 1.4, Level = 3 },
+	},
 }
 
 -- Sealing chamber materials (match PlotBuilder).
@@ -195,6 +233,133 @@ local function buildGuardian(model: Model, at: At, accent: Color3)
 	end
 end
 
+-- Sacred tree: an ancient tree behind the dais, its trunk bound with a rope and paper streamers,
+-- spirit lanterns hanging from it and mossy stones around the roots.
+local function buildGrove(model: Model, at: At, accent: Color3)
+	MapProps.build(model, "AncientTree", at(0, 0, 5.5), 0.32)
+	local trunk = at(0, 3.2, 5.5)
+	BuildUtil.decor(BuildUtil.cylinder(model, trunk, 0.7, 4.4, {
+		Name = "TreeRope",
+		Material = Enum.Material.Fabric,
+		Color = ROPE,
+	}))
+	for index = -2, 2 do
+		BuildUtil.decor(BuildUtil.part(model, {
+			Name = "Shide",
+			Size = Vector3.new(0.4, 1.3, 0.04),
+			CFrame = at(index * 0.8, 2.3, 3.3),
+			Material = Enum.Material.Fabric,
+			Color = PAPER,
+		}))
+	end
+	for index, spot in { { -4.5, 7.5, 3 }, { 4, 8.5, 4 }, { -1.5, 9.5, 2.5 }, { 2.5, 6.5, 2 } } do
+		local lantern = neon(model, "SpiritLantern", Vector3.new(0.7, 0.9, 0.7), at(spot[1], spot[2], spot[3]), accent, 0.15)
+		if index == 1 then
+			local light = BuildUtil.light(lantern, accent, 16, 1.2)
+			light.Name = "ShowcaseLight"
+		end
+		BuildUtil.decor(BuildUtil.part(model, {
+			Name = "LanternCord",
+			Size = Vector3.new(0.06, 1.4, 0.06),
+			CFrame = at(spot[1], spot[2] + 1.15, spot[3]),
+			Material = Enum.Material.Fabric,
+			Color = ROPE,
+		}))
+	end
+	for _, spot in { { -5.5, 4.5 }, { 5, 5.5 }, { -3, 7 } } do
+		BuildUtil.part(model, {
+			Name = "MossStone",
+			Size = Vector3.new(1.8, 1, 1.5),
+			CFrame = at(spot[1], 0.5, spot[2]) * CFrame.Angles(0, math.rad(spot[1] * 20), 0),
+			Material = Enum.Material.Grass,
+			Color = Color3.fromRGB(48, 70, 52),
+		})
+	end
+end
+
+-- Village bell watch: a bell tower behind a raised wooden deck with a cushion to sit on and two
+-- paper lanterns.
+local function buildBell(model: Model, at: At, accent: Color3)
+	MapProps.build(model, "BellTower", at(0, 0, 6), 0.42)
+	BuildUtil.part(model, {
+		Name = "WatchDeck",
+		Size = Vector3.new(6, 0.8, 5),
+		CFrame = at(0, 0.4, 1.5),
+		Material = Enum.Material.WoodPlanks,
+		Color = Color3.fromRGB(70, 48, 38),
+	})
+	local seat = Instance.new("Seat")
+	seat.Name = "ShowcaseSeat"
+	seat.Anchored = true
+	seat.Disabled = true
+	seat.Size = Vector3.new(3, 0.5, 3)
+	seat.CFrame = at(0, 1.05, 1.5)
+	seat.Material = Enum.Material.Fabric
+	seat.Color = Color3.fromRGB(120, 34, 40)
+	seat.TopSurface = Enum.SurfaceType.Smooth
+	seat.BottomSurface = Enum.SurfaceType.Smooth
+	-- Only the pose prompt seats anyone (enabled just for that); visitors can't sit by touch.
+	seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+		if not seat.Occupant then
+			seat.Disabled = true
+		end
+	end)
+	seat.Parent = model
+	for _, side in { -1, 1 } do
+		BuildUtil.part(model, {
+			Name = "LanternPost",
+			Size = Vector3.new(0.35, 4.5, 0.35),
+			CFrame = at(side * 3.6, 2.25, 0),
+			Material = Enum.Material.Wood,
+			Color = Color3.fromRGB(40, 30, 28),
+		})
+		local lantern = BuildUtil.decor(BuildUtil.part(model, {
+			Name = "PaperLantern",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.new(1.3, 1.3, 1.3),
+			CFrame = at(side * 3.6, 4.9, 0),
+			Material = Enum.Material.Neon,
+			Color = accent,
+			Transparency = 0.1,
+		}))
+		lantern.Size = Vector3.new(1.3, 1.6, 1.3)
+		if side == 1 then
+			local light = BuildUtil.light(lantern, accent, 18, 1.4)
+			light.Name = "ShowcaseLight"
+		end
+	end
+end
+
+-- Star orrery: a rune monolith behind the dais and three tilted rings of light around the
+-- caster (the Orrery model; ShowcaseLOD turns it).
+local function buildStar(model: Model, at: At, accent: Color3)
+	MapProps.build(model, "RuneMonolith", at(0, 0, 6), 0.9)
+	segmentRing(model, at, "StarDial", 4.6, 32, 0.3, 0.06, accent, 0.25)
+	for index = 0, 7 do
+		local angle = math.rad(index * 45)
+		neon(model, "DialStar", Vector3.new(0.5, 0.06, 0.5), at(math.cos(angle) * 3.8, 0.08, math.sin(angle) * 3.8) * CFrame.Angles(0, math.rad(45), 0), Color3.fromRGB(240, 235, 255), 0.1)
+	end
+	local orrery = Instance.new("Model")
+	orrery.Name = "Orrery"
+	local center = BuildUtil.decor(BuildUtil.part(orrery, {
+		Name = "Center",
+		Size = Vector3.new(0.2, 0.2, 0.2),
+		CFrame = at(0, 5, 0),
+		Transparency = 1,
+	}))
+	orrery.PrimaryPart = center
+	for index, ring in { { Radius = 5.2, Tilt = 70, Turn = 0 }, { Radius = 4.6, Tilt = 70, Turn = 60 }, { Radius = 4, Tilt = 70, Turn = 120 } } do
+		local frame = center.CFrame * CFrame.Angles(0, math.rad(ring.Turn), 0) * CFrame.Angles(math.rad(ring.Tilt), 0, 0)
+		local count = 30
+		local length = 2 * math.pi * ring.Radius / count - 0.1
+		for i = 1, count do
+			local angle = (i - 0.5) / count * math.pi * 2
+			neon(orrery, "OrreryRing", Vector3.new(length, 0.12, 0.12), frame * CFrame.Angles(0, -angle, 0) * CFrame.new(0, 0, ring.Radius), if index == 2 then Color3.fromRGB(240, 235, 255) else accent, 0.15)
+		end
+	end
+	orrery.Parent = model
+end
+
 local ACCESSORY_BUILDERS: { [string]: (Model, At) -> () } = {
 	BoneFluteCharm = function(model, at)
 		local bone = Color3.fromRGB(232, 224, 205)
@@ -260,10 +425,6 @@ local function buildLevelEffects(model: Model, at: At, level: number, accent: Co
 	if level < 3 then
 		return
 	end
-	local sparkles = BuildUtil.sparkles(core, accent, 6 * (level - 2))
-	sparkles.Name = "ShowcaseSparkles"
-	sparkles.SpreadAngle = Vector2.new(60, 60)
-
 	-- Floating seals circle the showcase (ShowcaseLOD spins the Ornaments model).
 	local ornaments = Instance.new("Model")
 	ornaments.Name = "Ornaments"
@@ -284,12 +445,6 @@ local function buildLevelEffects(model: Model, at: At, level: number, accent: Co
 	seals(3, 6.2, 6, Vector3.new(0.9, 1.8, 0.06), 0)
 	if level >= 4 then
 		seals(3, 7, 8.5, Vector3.new(1.3, 2.6, 0.06), 60)
-		BuildUtil.decor(BuildUtil.cylinder(model, at(0, 18, 0), 36, 7, {
-			Name = "LightPillar",
-			Material = Enum.Material.Neon,
-			Color = accent,
-			Transparency = 0.9,
-		}))
 	end
 	ornaments.Parent = model
 end
@@ -333,14 +488,27 @@ function ShowcaseVisuals.Apply(plot: Model?, view: View?, ownerUserId: number?, 
 	model:SetAttribute("Style", showcase.Style)
 	model:SetAttribute("Level", view.Level)
 
-	if showcase.Style == "Throne" then
-		buildThrone(model, at, accent)
-	elseif showcase.Style == "Guardian" then
-		buildGuardian(model, at, accent)
-	else
-		buildStance(model, at, accent)
-	end
+	local builders = {
+		Throne = buildThrone,
+		Guardian = buildGuardian,
+		Grove = buildGrove,
+		Bell = buildBell,
+		Star = buildStar,
+	}
+	;(builders[showcase.Style] or buildStance)(model, at, accent)
 	buildLevelEffects(model, at, view.Level, accent)
+	for index, vfx in VFX[showcase.Id] or {} do
+		if view.Level >= vfx.Level then
+			local anchor = BuildUtil.decor(BuildUtil.part(model, {
+				Name = `VfxAnchor{index}`,
+				Size = Vector3.new(0.2, 0.2, 0.2),
+				CFrame = at(vfx.At[1], vfx.At[2], vfx.At[3]),
+				Transparency = 1,
+			}))
+			anchor:SetAttribute("ShowcaseVfx", vfx.Template)
+			anchor:SetAttribute("VfxScale", vfx.Scale)
+		end
+	end
 	for _, accessoryId in view.Accessories do
 		local build = ACCESSORY_BUILDERS[accessoryId]
 		if build then
@@ -379,8 +547,8 @@ function ShowcaseVisuals.PoseTarget(plot: Model?): (CFrame?, Seat?)
 	if not display or not point or not point:IsA("BasePart") then
 		return nil, nil
 	end
-	local seat = display:FindFirstChild("ThroneSeat")
-	return point.CFrame * CFrame.new(0, -0.5, 0), if seat and seat:IsA("Seat") then seat else nil
+	local seat = display:FindFirstChildWhichIsA("Seat", true)
+	return point.CFrame * CFrame.new(0, -0.5, 0), seat
 end
 
 return ShowcaseVisuals

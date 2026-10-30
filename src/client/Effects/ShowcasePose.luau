@@ -39,14 +39,14 @@ local function kneelPray(joints: Joints)
 end
 
 ShowcasePose.Poses = {
-	-- Binding Circle: floating cross-legged meditation, hands resting on the knees.
+	-- Binding Circle: cross-legged meditation floating about a body height up, hands on the knees.
 	SimpleStance = pose(function(joints)
 		sides(joints, "Hip", { 85, 0, 38 })
 		sides(joints, "Knee", { -120, 0, 0 })
 		sides(joints, "Shoulder", { 28, 0, 8 })
 		sides(joints, "Elbow", { 40, 0, 0 })
 		joints.Neck = { -6, 0, 0 }
-	end, { 0, -0.6, 0 }, 3, 0.25),
+	end, { 0, 4.4, 0 }, 3, 0.35),
 	-- Forest Grove: standing tree pose, palms joined overhead.
 	ForestGrove = pose(function(joints)
 		joints.RightHip = { 25, 0, 65 }

@@ -30,6 +30,9 @@ local STYLE_COLORS = {
 	Stance = Color3.fromRGB(150, 210, 255),
 	Throne = Color3.fromRGB(235, 80, 90),
 	Guardian = Color3.fromRGB(255, 200, 80),
+	Grove = Color3.fromRGB(120, 235, 160),
+	Bell = Color3.fromRGB(255, 170, 80),
+	Star = Color3.fromRGB(175, 160, 255),
 }
 
 type State = {

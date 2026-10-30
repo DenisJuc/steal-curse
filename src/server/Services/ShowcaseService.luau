@@ -401,7 +401,11 @@ function ShowcaseService.Init()
 				end
 			elseif os.clock() - current.Since > 0.3 then
 				local moved = (root.Position - current.At).Magnitude > 1.5
-				if moved or humanoid.MoveDirection.Magnitude > 0.1 then
+				local humanoidState = humanoid:GetState()
+				local jumped = humanoid.Jump
+					or humanoidState == Enum.HumanoidStateType.Jumping
+					or humanoidState == Enum.HumanoidStateType.Freefall
+				if moved or jumped or humanoid.MoveDirection.Magnitude > 0.1 then
 					endPose(player)
 				end
 			end

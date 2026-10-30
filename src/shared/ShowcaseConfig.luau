@@ -76,7 +76,7 @@ ShowcaseConfig.Showcases = {
 	{
 		Id = "ForestGrove",
 		Name = "Forest Grove",
-		Style = "Stance",
+		Style = "Grove",
 		Description = "The forest's spirits gather around the one who knows its every path.",
 		Unlock = { Kind = "Mastery", Area = "HauntedForest", Level = 10 },
 		Accessories = {},
@@ -84,7 +84,7 @@ ShowcaseConfig.Showcases = {
 	{
 		Id = "BellWatch",
 		Name = "Bell Watch",
-		Style = "Throne",
+		Style = "Bell",
 		Description = "The old village seat, kept for the one who walked every lane after dark.",
 		Unlock = { Kind = "Mastery", Area = "AbandonedVillage", Level = 10 },
 		Accessories = {},
@@ -92,8 +92,8 @@ ShowcaseConfig.Showcases = {
 	{
 		Id = "StarCircle",
 		Name = "Star Circle",
-		Style = "Guardian",
-		Description = "An ancient guardian of the ruins stands behind the one who read their stones.",
+		Style = "Star",
+		Description = "The ruins' star dial turns for the one who read their stones.",
 		Unlock = { Kind = "Mastery", Area = "AncientRuins", Level = 10 },
 		Accessories = {},
 	},
