@@ -11,6 +11,7 @@ local Motion = require(script.Parent.Motion)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
 local Spring = require(script.Parent.Spring)
+local UIKit = require(script.Parent.UIKit)
 
 local MenuMotion = {}
 
@@ -111,6 +112,10 @@ function MenuMotion.Start(screen: ScreenGui)
 			juice = created
 		end
 		local scale = juice :: UIScale
+		-- Resting size: menus grow on big screens (UIKit.menuScale), so text stays readable.
+		local function rest(): number
+			return UIKit.menuScale()
+		end
 		local basePosition = window.Position
 		states[window] = if window.Visible then "Open" else "Closed"
 		local reshowPending, hidingByUs = false, false
@@ -160,8 +165,8 @@ function MenuMotion.Start(screen: ScreenGui)
 			states[window] = "Open"
 			window:SetAttribute("Closing", nil)
 			popAll()
-			scale.Scale = OPEN_FROM
-			Spring.target(scale, 3.6, 0.5, { Scale = 1 })
+			scale.Scale = OPEN_FROM * rest()
+			Spring.target(scale, 3.6, 0.5, { Scale = rest() })
 			window.Position = basePosition + UDim2.fromOffset(0, OPEN_RISE)
 			Spring.target(window, 4, 0.8, { Position = basePosition })
 			Sounds.Play("MenuOpen", nil, 0.97 + math.random() * 0.06)
@@ -180,7 +185,7 @@ function MenuMotion.Start(screen: ScreenGui)
 			TweenService:Create(
 				scale,
 				TweenInfo.new(CLOSE_SECONDS, Enum.EasingStyle.Back, Enum.EasingDirection.In),
-				{ Scale = CLOSE_TO }
+				{ Scale = CLOSE_TO * rest() }
 			):Play()
 			Sounds.Play("MenuClose", nil, 0.97 + math.random() * 0.06)
 			refreshBackdrop()
@@ -194,7 +199,7 @@ function MenuMotion.Start(screen: ScreenGui)
 					hidingByUs = true
 					window.Visible = false
 				end
-				scale.Scale = 1
+				scale.Scale = rest()
 				window.Position = basePosition
 			end)
 		end

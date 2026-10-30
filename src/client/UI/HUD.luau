@@ -31,12 +31,12 @@ export type Callbacks = {
 	OnSettings: () -> (),
 }
 
-local ICON_BUTTON_SIZE = 64
+local ICON_BUTTON_SIZE = 72
 local ICON_GAP = 6
 -- Rows also leave room for the caption hanging under each button.
 local ROW_GAP = 16
 local COMPACT_PER_ROW = 3
-local CE_HEIGHT = 44
+local CE_HEIGHT = 52
 -- A CE gain bigger than this many seconds of passive income counts as a windfall.
 local WINDFALL_SECONDS = 5
 
@@ -68,7 +68,7 @@ local function iconButton(
 			scale.Scale = 1
 		end
 	end
-	local label = UIKit.iconCaption(button, caption, 14)
+	local label = UIKit.iconCaption(button, caption, 16)
 	local chip = UIKit.iconChip(button)
 	chip.Visible = false
 	return button, label, chip
@@ -97,26 +97,26 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local objectiveCard = UIKit.create("Frame", {
 		Name = "NextObjective",
 		LayoutOrder = 0,
-		Size = UDim2.fromOffset(280, 56),
+		Size = UDim2.fromOffset(300, 62),
 		Visible = false,
 		Parent = column,
 	}, { UIKit.corner(10), UIKit.padding(8) })
 	UIKit.skinPanel(objectiveCard, colors.Accent)
 	local objectiveTitle = UIKit.label({
 		Name = "Title",
-		Size = UDim2.new(1, 0, 0, 14),
+		Size = UDim2.new(1, 0, 0, 16),
 		Text = "NEXT",
-		TextSize = 11,
+		TextSize = 14,
 		TextColor3 = colors.Accent,
 		FontFace = UIKit.TitleFont,
 		Parent = objectiveCard,
 	})
 	local objectiveBody = UIKit.label({
 		Name = "Body",
-		Position = UDim2.fromOffset(0, 14),
-		Size = UDim2.new(1, 0, 0, 28),
+		Position = UDim2.fromOffset(0, 18),
+		Size = UDim2.new(1, 0, 0, 26),
 		Text = "",
-		TextSize = 13,
+		TextSize = 19,
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextTruncate = Enum.TextTruncate.AtEnd,
@@ -124,7 +124,6 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	})
 	local function refreshObjective()
 		local text = player:GetAttribute("NextObjectiveText")
-		local detail = player:GetAttribute("NextObjectiveDetail")
 		local hasCollection = type(player:GetAttribute("Essence")) == "number"
 		if not hasCollection or type(text) ~= "string" or text == "" then
 			objectiveCard.Visible = false
@@ -135,9 +134,8 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		objectiveTitle.Text = if type(lift) == "number" and lift > 1 + 1e-9
 			then `NEXT · Board ×{string.format("%.2f", lift)}`
 			else "NEXT"
-		objectiveBody.Text = if type(detail) == "string" and detail ~= "" and detail ~= text
-			then `{text}\n{detail}`
-			else text
+		-- One short line; the detail stays in the Collection menu (less text on screen).
+		objectiveBody.Text = text
 	end
 	player:GetAttributeChangedSignal("NextObjectiveText"):Connect(refreshObjective)
 	player:GetAttributeChangedSignal("NextObjectiveDetail"):Connect(refreshObjective)
@@ -183,7 +181,7 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	})
 
 	-- Cursed Energy: a coin pill in a fixed slot so its bounce never moves the buttons below.
-	local ceSlot = UIKit.slot(column, "CursedEnergySlot", UDim2.fromOffset(220, CE_HEIGHT), 2)
+	local ceSlot = UIKit.slot(column, "CursedEnergySlot", UDim2.fromOffset(250, CE_HEIGHT), 2)
 	local cePill = UIKit.create("Frame", {
 		Name = "CursedEnergy",
 		AnchorPoint = Vector2.new(0, 0.5),
@@ -192,17 +190,17 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		Parent = ceSlot,
 	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 	UIKit.skinPanel(cePill, colors.Gold)
-	local coinIcon = UIKit.coin(30)
+	local coinIcon = UIKit.coin(36)
 	coinIcon.AnchorPoint = Vector2.new(0, 0.5)
 	coinIcon.Position = UDim2.new(0, 7, 0.5, 0)
 	coinIcon.Parent = cePill
 	local ceLabel = UIKit.label({
 		Name = "Amount",
 		TextColor3 = colors.Gold,
-		TextSize = 24,
+		TextSize = 30,
 		TextStrokeTransparency = 0.4,
-		Position = UDim2.fromOffset(44, 0),
-		Size = UDim2.new(1, -54, 1, 0),
+		Position = UDim2.fromOffset(50, 0),
+		Size = UDim2.new(1, -60, 1, 0),
 		Parent = cePill,
 	})
 	local setCE = Motion.counter(ceLabel, function(value: number): string
@@ -456,6 +454,8 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		if warning then
 			warning.Visible = paused
 		end
+		-- The totals box only appears as the inventory-full warning (less text on screen).
+		panel.Visible = paused
 		titleLabel.Text = if paused then "INVENTORY FULL - PAUSED" else "SPIRIT RESONATOR"
 		titleLabel.TextColor3 = if paused then colors.Red else colors.Gold
 		if panelStroke then

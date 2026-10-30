@@ -658,12 +658,19 @@ function UIKit.scaler(panel: GuiObject): UIScale
 	local camera = getCamera()
 	local function update()
 		local viewport = camera.ViewportSize
-		scale.Scale = math.clamp(math.min(viewport.X / 1280, viewport.Y / 720), 0.65, 1.15) * userScale
+		scale.Scale = math.clamp(math.min(viewport.X / 1280, viewport.Y / 720), 0.65, 1.3) * userScale
 	end
 	camera:GetPropertyChangedSignal("ViewportSize"):Connect(update)
 	table.insert(scaleUpdaters, update)
 	update()
 	return scale
+end
+
+-- Resting scale for menu windows (MenuMotion springs to it): 1 on a 1280x720 screen, up to
+-- 1.25x on big monitors so menu text is not tiny, times the player's interface size.
+function UIKit.menuScale(): number
+	local viewport = getCamera().ViewportSize
+	return math.clamp(math.min(viewport.X / 1280, viewport.Y / 720), 1, 1.25) * userScale
 end
 
 function UIKit.SetUserScale(scale: number)
