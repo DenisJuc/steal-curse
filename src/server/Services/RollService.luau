@@ -6,12 +6,14 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Formulas = require(ReplicatedStorage.Shared.Formulas)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local RollRules = require(ReplicatedStorage.Shared.RollRules)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local DataService = require(script.Parent.DataService)
 local GameEvents = require(script.Parent.GameEvents)
 local MultiplierService = require(script.Parent.MultiplierService)
@@ -21,6 +23,7 @@ local RollService = {}
 export type RollResult = {
 	Id: string,
 	Mutation: string?,
+	Size: string?,
 }
 
 local rngs: { [Player]: Random } = {}
@@ -50,7 +53,9 @@ function RollService.Init()
 	MultiplierService.DefineKind("Luck", "Product")
 	MultiplierService.Register("Luck", "CoreLuck", function(player)
 		local data = DataService.Get(player)
-		return Formulas.coreLuck(if data then data.Skills.CoreLuck else 0)
+		local trial = BalanceTrials.current()
+		local divisor = if trial then trial.LuckDivisor else nil
+		return Formulas.coreLuck(if data then data.Skills.CoreLuck else 0, divisor)
 	end)
 	MultiplierService.Register("Luck", "Debug", function(player)
 		return debugLuck[player] or 1
@@ -74,19 +79,51 @@ end
 
 -- Extra factors for one batch (zone events): LuckFactor joins the full luck before Rarity Focus
 -- caps it; MutationFactor scales the mutation chance (still 0 until Mutation Resonance is bought).
-export type RollOptions = { LuckFactor: number?, MutationFactor: number? }
+export type RollOptions = {
+	LuckFactor: number?,
+	MutationFactor: number?,
+	-- Phase 2 Hunt Charm: hunt-only family weight (does not change AFK Frequency Focus).
+	HuntFamily: string?,
+	HuntFamilyBonus: number?,
+	-- SoftCap_P4 Hunt Quarry: exact relic SoftCap bias (binds only).
+	HuntQuarryId: string?,
+	HuntQuarryMult: number?,
+}
 
 function RollService.BuildContext(player: Player, options: RollOptions?): RollMath.Context
 	local data = DataService.Get(player)
+	local CollectionService = require(script.Parent.CollectionService)
+	local attuneFocus = CollectionService.AttuneFocusOverride(player)
+	local mutationRank = if data then data.Skills.MutationResonance else 0
+	-- Mutation Focus craft: temporary +1 effective resonance while charges remain.
+	if CollectionService.HasUnlock(player, "MutationFocus") then
+		local state = CollectionService.Get(player)
+		if state and (state.MutationFocusScansLeft or 0) > 0 then
+			mutationRank += 1
+		end
+	end
+	local familyAttune = CollectionService.FamilyAttuneBonus(player)
 	local ctx = RollMath.contextFor(RollRules, {
 		FullLuck = RollService.GetFullLuck(player) * (if options and options.LuckFactor then options.LuckFactor else 1),
-		RarityFocus = if data then data.Settings.RarityFocus else Config.Focus.Default,
-		Frequency = if data then data.Settings.Frequency else Config.Frequency.Default,
+		RarityFocus = attuneFocus or (if data then data.Settings.RarityFocus else Config.Focus.Default),
+		Frequency = familyAttune or (if data then data.Settings.Frequency else Config.Frequency.Default),
 		FrequencyRank = if data then data.Skills.FrequencyFocus else 0,
-		MutationRank = if data then data.Skills.MutationResonance else 0,
+		MutationRank = mutationRank,
+		Sampler = BalanceTrials.raritySampler(),
 	})
 	if options and options.MutationFactor then
 		ctx.MutationChance = math.min(1, ctx.MutationChance * options.MutationFactor)
+	end
+	if options and options.HuntFamily and (options.HuntFamilyBonus or 0) > 0 then
+		-- Distinct from Frequency Focus: only applied when BindService requests hunt rolls.
+		if not ctx.Frequency or ctx.Frequency == "All" or ctx.Frequency == options.HuntFamily then
+			ctx.Frequency = options.HuntFamily
+			ctx.FrequencyMultiplier = (ctx.FrequencyMultiplier or 1) + (options.HuntFamilyBonus or 0)
+		end
+	end
+	if options and options.HuntQuarryId and (options.HuntQuarryMult or 0) > 1 then
+		ctx.HuntQuarryId = options.HuntQuarryId
+		ctx.HuntQuarryMult = options.HuntQuarryMult
 	end
 	return ctx
 end
@@ -96,9 +133,16 @@ function RollService.RollMany(player: Player, count: number, options: RollOption
 	local ctx = RollService.BuildContext(player, options)
 	local nextNumber = numberSource(rngFor(player))
 	local results = table.create(count)
+	local CollectionService = require(script.Parent.CollectionService)
 	for index = 1, count do
 		local relic, mutation = RollMath.roll(ctx, nextNumber)
-		results[index] = { Id = relic.Id, Mutation = mutation }
+		local size = SizeConfig.roll(relic.Tier, nextNumber)
+		results[index] = { Id = relic.Id, Mutation = mutation, Size = size }
+		-- Attune / Mutation Focus consume per AFK scan; hunt batches use HuntFamily instead.
+		if not options or not options.HuntFamily then
+			CollectionService.ConsumeAttuneScan(player)
+			CollectionService.ConsumeMutationFocus(player)
+		end
 	end
 	return results
 end
@@ -138,6 +182,7 @@ function RollService.RefreshAttributes(player: Player)
 	player:SetAttribute("Frequency", data.Settings.Frequency)
 	player:SetAttribute("FrequencyRank", data.Skills.FrequencyFocus)
 	player:SetAttribute("MutationRank", data.Skills.MutationResonance)
+	player:SetAttribute("RaritySampler", ctx.Sampler)
 end
 
 return RollService

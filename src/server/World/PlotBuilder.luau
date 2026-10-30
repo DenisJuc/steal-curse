@@ -1,5 +1,5 @@
--- Builds one shrine plot: floor, walls, entrance gate with owner sign, Spirit Resonator,
--- starting pedestals and the Showcase podium. Plot local -Z faces the hub.
+-- Builds one shrine plot: stone courtyard, path, walls, gate, raised resonator terrace,
+-- pedestals and Showcase podium. Plot local -Z faces the hub.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -11,13 +11,21 @@ local PedestalVisuals = require(script.Parent.PedestalVisuals)
 
 local PlotBuilder = {}
 
-local STONE = Color3.fromRGB(72, 68, 84)
+local STONE = Color3.fromRGB(72, 74, 82)
+local STONE_DARK = Color3.fromRGB(58, 60, 68)
+local STONE_TRIM = Color3.fromRGB(110, 112, 120)
 local WOOD = Color3.fromRGB(96, 70, 56)
 local GATE_RED = Color3.fromRGB(150, 36, 42)
 local MARBLE = Color3.fromRGB(205, 200, 215)
 local SPIRIT = Color3.fromRGB(170, 110, 255)
+local WARM = Color3.fromRGB(255, 190, 90)
+local DAIS = Color3.fromRGB(95, 88, 78)
 
 local FLOOR_TOP = 1.2
+local WALL_H = 3.6
+local GATE_GAP = 16
+local PATH_W = 10
+local TERRACE_H = 1.0
 
 local function buildPedestal(parent: Instance, at: (number, number, number) -> CFrame, slot: number)
 	local offset = Config.Plots.PedestalOffsets[slot]
@@ -26,8 +34,20 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 	model.Name = "Pedestal" .. slot
 	model:SetAttribute("Slot", slot)
 
-	-- The primitive base and top match the RelicPedestal size, so an imported look lines up with
-	-- the glow disc and the relic display above it.
+	-- Thin shrine pad around the pedestal (does not change pedestal Y — relic math uses FLOOR_TOP).
+	BuildUtil.part(model, {
+		Name = "Dais",
+		Size = Vector3.new(5.5, 0.2, 5.5),
+		CFrame = at(x, FLOOR_TOP + 0.1, z),
+		Material = Enum.Material.Concrete,
+		Color = DAIS,
+	})
+	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + 0.22, z), 0.08, 4.6, {
+		Name = "DaisRing",
+		Material = Enum.Material.Metal,
+		Color = Color3.fromRGB(180, 150, 90),
+	}))
+
 	local width, height = MapPropConfig.size("RelicPedestal")
 	local imported = MapProps.has("RelicPedestal")
 	BuildUtil.cylinder(model, at(x, FLOOR_TOP + (height - 0.4) / 2, z), height - 0.4, width * 0.85, {
@@ -59,13 +79,13 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 	model.Parent = parent
 end
 
-local function buildResonator(parent: Instance, at: (number, number, number) -> CFrame)
+local function buildResonator(parent: Instance, at: (number, number, number) -> CFrame, floorY: number)
 	local offset = Config.Plots.ResonatorOffset
 	local x, z = offset[1], offset[2]
 	local model = Instance.new("Model")
 	model.Name = "SpiritResonator"
 	if MapProps.has("SpiritResonator") then
-		MapProps.build(model, "SpiritResonator", at(x, FLOOR_TOP, z))
+		MapProps.build(model, "SpiritResonator", at(x, floorY, z))
 		model.Parent = parent
 		return
 	end
@@ -73,11 +93,11 @@ local function buildResonator(parent: Instance, at: (number, number, number) -> 
 	BuildUtil.part(model, {
 		Name = "Base",
 		Size = Vector3.new(8, 2, 8),
-		CFrame = at(x, FLOOR_TOP + 1, z),
+		CFrame = at(x, floorY + 1, z),
 		Material = Enum.Material.Slate,
 		Color = STONE,
 	})
-	BuildUtil.cylinder(model, at(x, FLOOR_TOP + 6, z), 8, 3, {
+	BuildUtil.cylinder(model, at(x, floorY + 6, z), 8, 3, {
 		Name = "Column",
 		Material = Enum.Material.Basalt,
 		Color = Color3.fromRGB(40, 36, 52),
@@ -85,14 +105,14 @@ local function buildResonator(parent: Instance, at: (number, number, number) -> 
 	local core = BuildUtil.part(model, {
 		Name = "ResonatorCore",
 		Size = Vector3.new(2.6, 4, 2.6),
-		CFrame = at(x, FLOOR_TOP + 12, z) * CFrame.Angles(0, math.rad(45), 0),
+		CFrame = at(x, floorY + 12, z) * CFrame.Angles(0, math.rad(45), 0),
 		Material = Enum.Material.Neon,
 		Color = SPIRIT,
 	})
 	BuildUtil.decor(core)
 	BuildUtil.light(core, SPIRIT, 18, 2)
 	BuildUtil.sparkles(core, SPIRIT, 6)
-	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + 12, z) * CFrame.Angles(math.rad(20), 0, 0), 0.3, 7, {
+	BuildUtil.decor(BuildUtil.cylinder(model, at(x, floorY + 12, z) * CFrame.Angles(math.rad(20), 0, 0), 0.3, 7, {
 		Name = "Ring",
 		Material = Enum.Material.Neon,
 		Color = SPIRIT,
@@ -115,7 +135,7 @@ local function buildShowcasePodium(parent: Instance, at: (number, number, number
 	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + 1.25, z), 0.1, 16.4, {
 		Name = "Edge",
 		Material = Enum.Material.Neon,
-		Color = Color3.fromRGB(255, 190, 90),
+		Color = WARM,
 		Transparency = 0.5,
 	}))
 	BuildUtil.billboard(dais, "Showcase", 8, 1.6, 3, Color3.fromRGB(255, 210, 140))
@@ -131,7 +151,6 @@ local function buildGate(parent: Instance, at: (number, number, number) -> CFram
 	if MapProps.has("ShrineGate") then
 		MapProps.build(model, "ShrineGate", at(0, FLOOR_TOP, z))
 		local _, height, depth = MapPropConfig.size("ShrineGate")
-		-- The owner sign hangs on the hub side, just under the top beam.
 		local sign = BuildUtil.part(model, {
 			Name = "OwnerSign",
 			Size = Vector3.new(10, 1.6, 0.4),
@@ -178,29 +197,168 @@ local function buildGate(parent: Instance, at: (number, number, number) -> CFram
 	model.Parent = parent
 end
 
+local function buildCourtyardFloor(parent: Instance, at: (number, number, number) -> CFrame)
+	local size = Config.Plots.Size
+	local half = size / 2
+
+	-- Inner limestone courtyard (Base is the thick slate pad underneath).
+	BuildUtil.part(parent, {
+		Name = "Floor",
+		Size = Vector3.new(size - 4, 0.22, size - 4),
+		CFrame = at(0, FLOOR_TOP - 0.05, 0),
+		Material = Enum.Material.Limestone,
+		Color = STONE,
+	})
+
+	-- Dark border frame
+	local border = 2.4
+	local bH = 0.16
+	local frames = {
+		{ Vector3.new(size - 2, bH, border), at(0, FLOOR_TOP + bH / 2, -half + border / 2 + 1) },
+		{ Vector3.new(size - 2, bH, border), at(0, FLOOR_TOP + bH / 2, half - border / 2 - 1) },
+		{ Vector3.new(border, bH, size - border * 2 - 2), at(-half + border / 2 + 1, FLOOR_TOP + bH / 2, 0) },
+		{ Vector3.new(border, bH, size - border * 2 - 2), at(half - border / 2 - 1, FLOOR_TOP + bH / 2, 0) },
+	}
+	for _, frame in frames do
+		BuildUtil.part(parent, {
+			Name = "Border",
+			Size = frame[1],
+			CFrame = frame[2],
+			Material = Enum.Material.Slate,
+			Color = STONE_DARK,
+		})
+	end
+
+	-- Processional path: gate → resonator
+	BuildUtil.part(parent, {
+		Name = "Path",
+		Size = Vector3.new(PATH_W, 0.14, size - 10),
+		CFrame = at(0, FLOOR_TOP + 0.08, 2),
+		Material = Enum.Material.Cobblestone,
+		Color = STONE_DARK,
+	})
+end
+
 local function buildWalls(parent: Instance, at: (number, number, number) -> CFrame)
 	local size = Config.Plots.Size
 	local half = size / 2
-	local gap = 14
-	local sideLength = (size - gap) / 2
-	local wallProps = {
-		Material = Enum.Material.Slate,
-		Color = Color3.fromRGB(55, 52, 66),
-	}
+	local t = 1.0
+	local wing = (size - GATE_GAP) / 2
+	local wallColor = Color3.fromRGB(78, 80, 90)
+
 	local walls = {
-		{ Vector3.new(size, 1.6, 1.4), at(0, FLOOR_TOP + 0.8, half - 0.7) },
-		{ Vector3.new(1.4, 1.6, size), at(-half + 0.7, FLOOR_TOP + 0.8, 0) },
-		{ Vector3.new(1.4, 1.6, size), at(half - 0.7, FLOOR_TOP + 0.8, 0) },
-		{ Vector3.new(sideLength, 1.6, 1.4), at(-(gap / 2 + sideLength / 2), FLOOR_TOP + 0.8, -half + 0.7) },
-		{ Vector3.new(sideLength, 1.6, 1.4), at(gap / 2 + sideLength / 2, FLOOR_TOP + 0.8, -half + 0.7) },
+		-- Back
+		{ Vector3.new(size, WALL_H, t), at(0, FLOOR_TOP + WALL_H / 2, half - t / 2) },
+		-- Sides
+		{ Vector3.new(t, WALL_H, size), at(-half + t / 2, FLOOR_TOP + WALL_H / 2, 0) },
+		{ Vector3.new(t, WALL_H, size), at(half - t / 2, FLOOR_TOP + WALL_H / 2, 0) },
+		-- Front wings (gate gap in the middle)
+		{ Vector3.new(wing, WALL_H, t), at(-(GATE_GAP / 2 + wing / 2), FLOOR_TOP + WALL_H / 2, -half + t / 2) },
+		{ Vector3.new(wing, WALL_H, t), at(GATE_GAP / 2 + wing / 2, FLOOR_TOP + WALL_H / 2, -half + t / 2) },
 	}
 	for _, wall in walls do
-		local props = table.clone(wallProps)
-		props.Name = "Wall"
-		props.Size = wall[1]
-		props.CFrame = wall[2]
-		BuildUtil.part(parent, props)
+		BuildUtil.part(parent, {
+			Name = "Wall",
+			Size = wall[1],
+			CFrame = wall[2],
+			Material = Enum.Material.Slate,
+			Color = wallColor,
+		})
 	end
+
+	-- Capstones
+	local capH = 0.32
+	local caps = {
+		{ Vector3.new(size, capH, t + 0.25), at(0, FLOOR_TOP + WALL_H + capH / 2, half - t / 2) },
+		{ Vector3.new(t + 0.25, capH, size), at(-half + t / 2, FLOOR_TOP + WALL_H + capH / 2, 0) },
+		{ Vector3.new(t + 0.25, capH, size), at(half - t / 2, FLOOR_TOP + WALL_H + capH / 2, 0) },
+		{ Vector3.new(wing, capH, t + 0.25), at(-(GATE_GAP / 2 + wing / 2), FLOOR_TOP + WALL_H + capH / 2, -half + t / 2) },
+		{ Vector3.new(wing, capH, t + 0.25), at(GATE_GAP / 2 + wing / 2, FLOOR_TOP + WALL_H + capH / 2, -half + t / 2) },
+	}
+	for _, cap in caps do
+		BuildUtil.part(parent, {
+			Name = "Capstone",
+			Size = cap[1],
+			CFrame = cap[2],
+			Material = Enum.Material.Concrete,
+			Color = STONE_TRIM,
+		})
+	end
+end
+
+local function buildResonatorTerrace(parent: Instance, at: (number, number, number) -> CFrame)
+	local half = Config.Plots.Size / 2
+	local depth = 22
+	local width = 36
+	local z = half - depth / 2 - 2
+
+	BuildUtil.part(parent, {
+		Name = "Terrace",
+		Size = Vector3.new(width, TERRACE_H, depth),
+		CFrame = at(0, FLOOR_TOP + TERRACE_H / 2, z),
+		Material = Enum.Material.Slate,
+		Color = Color3.fromRGB(80, 82, 90),
+	})
+
+	for i = 1, 3 do
+		local stepH = TERRACE_H / 3
+		local stepD = 1.6
+		local y = FLOOR_TOP + stepH * (i - 0.5)
+		local stepZ = z - depth / 2 - stepD * (4 - i) + stepD / 2
+		BuildUtil.part(parent, {
+			Name = "TerraceStep",
+			Size = Vector3.new(width * 0.55, stepH, stepD),
+			CFrame = at(0, y, stepZ),
+			Material = Enum.Material.Concrete,
+			Color = STONE_TRIM,
+		})
+	end
+
+	local railH = 1.1
+	for _, side in { -1, 1 } do
+		BuildUtil.part(parent, {
+			Name = "TerraceRail",
+			Size = Vector3.new(0.5, railH, depth - 2),
+			CFrame = at(side * (width / 2 - 0.4), FLOOR_TOP + TERRACE_H + railH / 2, z),
+			Material = Enum.Material.Slate,
+			Color = Color3.fromRGB(78, 80, 90),
+		})
+	end
+end
+
+local function buildLantern(parent: Instance, at: (number, number, number) -> CFrame, x: number, z: number)
+	if MapProps.has("StoneLantern") then
+		MapProps.build(parent, "StoneLantern", at(x, FLOOR_TOP, z))
+		return
+	end
+	BuildUtil.part(parent, {
+		Name = "LanternPost",
+		Size = Vector3.new(0.55, 3.2, 0.55),
+		CFrame = at(x, FLOOR_TOP + 1.6, z),
+		Material = Enum.Material.Wood,
+		Color = WOOD,
+	})
+	local lamp = BuildUtil.decor(BuildUtil.part(parent, {
+		Name = "Lantern",
+		Size = Vector3.new(1.1, 1.3, 1.1),
+		CFrame = at(x, FLOOR_TOP + 3.5, z),
+		Material = Enum.Material.Neon,
+		Color = WARM,
+		Transparency = 0.15,
+	}))
+	BuildUtil.light(lamp, Color3.fromRGB(255, 200, 120), 18, 1.1)
+end
+
+local function buildCornerLanterns(parent: Instance, at: (number, number, number) -> CFrame)
+	local half = Config.Plots.Size / 2
+	local inset = 3.5
+	buildLantern(parent, at, -half + inset, -half + inset)
+	buildLantern(parent, at, half - inset, -half + inset)
+	buildLantern(parent, at, -half + inset, half - inset)
+	buildLantern(parent, at, half - inset, half - inset)
+	-- Flanking the gate
+	buildLantern(parent, at, -GATE_GAP / 2 - 2, -half + 4)
+	buildLantern(parent, at, GATE_GAP / 2 + 2, -half + 4)
 end
 
 function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Model
@@ -218,19 +376,16 @@ function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Mod
 		Size = Vector3.new(size, 1, size),
 		CFrame = at(0, 0.5, 0),
 		Material = Enum.Material.Slate,
-		Color = STONE,
+		Color = STONE_DARK,
 	})
-	BuildUtil.part(model, {
-		Name = "Floor",
-		Size = Vector3.new(size - 6, 0.2, size - 6),
-		CFrame = at(0, 1.1, 0),
-		Material = Enum.Material.WoodPlanks,
-		Color = WOOD,
-	})
+
+	buildCourtyardFloor(model, at)
 	buildWalls(model, at)
 	buildGate(model, at)
-	buildResonator(model, at)
+	buildResonatorTerrace(model, at)
+	buildResonator(model, at, FLOOR_TOP + TERRACE_H)
 	buildShowcasePodium(model, at)
+	buildCornerLanterns(model, at)
 
 	local pedestals = Instance.new("Folder")
 	pedestals.Name = "Pedestals"

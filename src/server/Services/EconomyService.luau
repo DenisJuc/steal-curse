@@ -13,6 +13,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rebirth = require(ReplicatedStorage.Shared.Rebirth)
@@ -36,11 +37,19 @@ function EconomyService.SetIncomeProvider(provider: (Player) -> { number })
 	contributionsOf = provider
 end
 
--- Global income multiplier: the additive bonus stack times the Rebirth multiplier.
+-- Global income multiplier: additive Income stack × Rebirth × (SoftCap_P4 Board Fusion, once).
 function EconomyService.GetIncomeMultiplier(player: Player): number
 	local data = DataService.Get(player)
 	local rebirths = if data then data.Rebirths or 0 else 0
-	return MultiplierService.Get(player, "Income") * Rebirth.incomeMultiplier(Config.Rebirth, rebirths)
+	local board = 1
+	if BalanceTrials.boardGlobalFusionIncome() then
+		-- Lazy require avoids CollectionService ↔ EconomyService init cycles.
+		local CollectionService = require(script.Parent.CollectionService)
+		board = CollectionService.BoardIncomeMult(player)
+	end
+	return MultiplierService.Get(player, "Income")
+		* Rebirth.incomeMultiplier(BalanceTrials.rebirthSettings(Config.Rebirth), rebirths)
+		* board
 end
 
 function EconomyService.GetIncomePerSec(player: Player): number

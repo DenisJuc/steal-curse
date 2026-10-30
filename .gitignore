@@ -7,3 +7,7 @@ Packages/
 ServerPackages/
 sourcemap.json
 roblox.yml
+
+# Raw purchased VFX packs: licensed, not for redistribution. Backed up outside git.
+assets/vfx-purchased/
+__pycache__/

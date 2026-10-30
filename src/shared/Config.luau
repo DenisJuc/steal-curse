@@ -99,67 +99,69 @@ Config.Afk = {
 -- Mutation is still a Roblox built-in placeholder.
 Config.Sounds = {
 	RevealSmall = { Id = "rbxassetid://79130903404606", Volume = 0.15 },
-	RevealMedium = { Id = "rbxassetid://114349697462397", Volume = 0.3 },
-	RevealLarge = { Id = "rbxassetid://95039614319250", Volume = 0.36 },
+	RevealMedium = { Id = "rbxassetid://114349697462397", Volume = 0.04 },
+	RevealLarge = { Id = "rbxassetid://95039614319250", Volume = 0.20 },
 	Mutation = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.36, Speed = 1.9 },
 	-- Interface
-	Hover = { Id = "rbxassetid://139800881181209", Volume = 0.09, Gap = 0.06 },
-	Click = { Id = "rbxassetid://6895079853", Volume = 0.2, Gap = 0.08 },
-	MenuOpen = { Id = "rbxassetid://74947743572579", Volume = 0.2 },
-	MenuClose = { Id = "rbxassetid://88861317075079", Volume = 0.18 },
-	Upgrade = { Id = "rbxassetid://14810387808", Volume = 0.3 },
-	Error = { Id = "rbxassetid://9120885640", Volume = 0.24 },
-	Coin = { Id = "rbxassetid://307631257", Volume = 0.13, Gap = 0.035 },
-	Shine = { Id = "rbxassetid://132381858621446", Volume = 0.2 },
-	Seal = { Id = "rbxassetid://127907930462931", Volume = 0.36 },
-	Collect = { Id = "rbxassetid://96524940709824", Volume = 0.27 },
-	ReelTick = { Id = "rbxassetid://75458150587771", Volume = 0.07, Gap = 0.03 },
-	ReelLand = { Id = "rbxassetid://115778296381875", Volume = 0.2 },
+	Hover = { Id = "rbxassetid://139800881181209", Volume = 0.07, Gap = 0.06 },
+	Click = { Id = "rbxassetid://6895079853", Volume = 0.10, Gap = 0.08 },
+	MenuOpen = { Id = "rbxassetid://74947743572579", Volume = 0.10 },
+	MenuClose = { Id = "rbxassetid://88861317075079", Volume = 0.10 },
+	Upgrade = { Id = "rbxassetid://14810387808", Volume = 0.08 },
+	Error = { Id = "rbxassetid://9120885640", Volume = 0.16 },
+	Coin = { Id = "rbxassetid://307631257", Volume = 0.09, Gap = 0.035 },
+	Shine = { Id = "rbxassetid://132381858621446", Volume = 0.10 },
+	Seal = { Id = "rbxassetid://127907930462931", Volume = 0.07 },
+	Collect = { Id = "rbxassetid://96524940709824", Volume = 0.03 },
+	ReelTick = { Id = "rbxassetid://75458150587771", Volume = 0.04, Gap = 0.03 },
+	ReelLand = { Id = "rbxassetid://115778296381875", Volume = 0.04 },
 	-- Hunt (Spirit Sight, pulse, signals, bind)
-	SightOn = { Id = "rbxassetid://126941244422484", Volume = 0.5 },
-	SightOff = { Id = "rbxassetid://9118158252", Volume = 0.4 },
+	SightOn = { Id = "rbxassetid://126941244422484", Volume = 0.08 },
+	SightOff = { Id = "rbxassetid://9118158252", Volume = 0.20 },
 	SightAmbience = { Id = "rbxassetid://82923387179908", Volume = 0.25 },
-	Pulse = { Id = "rbxassetid://9116394525", Volume = 0.5 },
-	SignalPing = { Id = "rbxassetid://119114391168229", Volume = 0.6, Range = 120 },
-	SignalHum = { Id = "rbxassetid://9125898973", Volume = 0.5, Range = 70 },
-	SignalWhisper = { Id = "rbxassetid://79028898635420", Volume = 0.35, Range = 25 },
-	Lock = { Id = "rbxassetid://108682776074559", Volume = 0.6 },
-	ChainRattle = { Id = "rbxassetid://9116539362", Volume = 0.35 },
-	ChainTighten = { Id = "rbxassetid://92066478647048", Volume = 0.55 },
-	BindRiser = { Id = "rbxassetid://9043356042", Volume = 0.4 },
-	SealSuck = { Id = "rbxassetid://676242549", Volume = 0.5 },
-	Cancel = { Id = "rbxassetid://119398240584172", Volume = 0.45 },
+	Pulse = { Id = "rbxassetid://9116394525", Volume = 0.30 },
+	SignalPing = { Id = "rbxassetid://119114391168229", Volume = 0.60, Range = 120 },
+	SignalHum = { Id = "rbxassetid://9125898973", Volume = 0.30, Range = 70 },
+	SignalWhisper = { Id = "rbxassetid://79028898635420", Volume = 0.26, Range = 25 },
+	Lock = { Id = "rbxassetid://108682776074559", Volume = 0.37 },
+	ChainRattle = { Id = "rbxassetid://9116539362", Volume = 0.28 },
+	ChainTighten = { Id = "rbxassetid://92066478647048", Volume = 0.35 },
+	BindRiser = { Id = "rbxassetid://9043356042", Volume = 0.26 },
+	SealSuck = { Id = "rbxassetid://676242549", Volume = 0.40 },
+	Cancel = { Id = "rbxassetid://119398240584172", Volume = 0.10 },
 	-- Hunt Streak going up (pitch rises with the streak).
-	StreakUp = { Id = "rbxassetid://132381858621446", Volume = 0.3 },
+	StreakUp = { Id = "rbxassetid://132381858621446", Volume = 0.20 },
 	-- A zone event begins.
-	EventStart = { Id = "rbxassetid://1846987019", Volume = 0.45 },
+	EventStart = { Id = "rbxassetid://1846987019", Volume = 0.30 },
 	-- A hidden offering box chimes every couple of seconds; players find it by ear, so it carries far.
-	OfferingChime = { Id = "rbxassetid://103648463150595", Volume = 0.55, Range = 150 },
+	OfferingChime = { Id = "rbxassetid://103648463150595", Volume = 0.20, Range = 150 },
 	-- Empty = silent until an id is pasted in.
-	OfferingOpen = { Id = "", Volume = 0.4 },
+	OfferingOpen = { Id = "", Volume = 0.40 },
 	-- The Lost One kneels and leaves its gift / turns out to be the False Watcher.
-	SpiritGift = { Id = "rbxassetid://9046882224", Volume = 0.4 },
-	FalseWatcher = { Id = "rbxassetid://96061686619018", Volume = 0.5 },
+	SpiritGift = { Id = "rbxassetid://9046882224", Volume = 0.16 },
+	FalseWatcher = { Id = "rbxassetid://96061686619018", Volume = 0.50 },
 	-- The False Watcher's face in yours (a scream / horror stinger) and its slow breathing before
 	-- it lunges. Empty = silent until an id is pasted in (FalseWatcher plays instead of the stinger).
-	WatcherStinger = { Id = "", Volume = 0.7 },
-	WatcherBreath = { Id = "", Volume = 0.5 },
+	WatcherStinger = { Id = "", Volume = 0.70 },
+	WatcherBreath = { Id = "", Volume = 0.50 },
 	-- Wild life and weather.
-	CrowCaw = { Id = "rbxassetid://5829815715", Volume = 0.6, Range = 90, Gap = 0.4 },
-	CrowFlap = { Id = "rbxassetid://9113444792", Volume = 0.4, Range = 50 },
-	FigureVanish = { Id = "rbxassetid://79028898635420", Volume = 0.6, Range = 120, Speed = 0.7 },
-	Thunder = { Id = "rbxassetid://140089926923698", Volume = 0.24, Gap = 2 },
+	CrowCaw = { Id = "rbxassetid://5829815715", Volume = 0.60, Range = 90, Gap = 0.4 },
+	CrowFlap = { Id = "rbxassetid://9113444792", Volume = 0.40, Range = 50 },
+	FigureVanish = { Id = "rbxassetid://79028898635420", Volume = 0.60, Range = 120, Speed = 0.7 },
+	Thunder = { Id = "rbxassetid://140089926923698", Volume = 0.12, Gap = 2 },
 	-- Random distant sounds per area (WildSounds), played somewhere out in the fog.
 	BellToll = { Id = "rbxassetid://18197817277", Volume = 0.45, Range = 250 },
-	DistantWhisper = { Id = "rbxassetid://9126213995", Volume = 0.4, Range = 120 },
-	BranchSnap = { Id = "rbxassetid://9113593581", Volume = 0.5, Range = 120 },
+	DistantWhisper = { Id = "rbxassetid://9126213995", Volume = 0.40, Range = 120 },
+	BranchSnap = { Id = "rbxassetid://9113593581", Volume = 0.50, Range = 120 },
 	StoneGrind = { Id = "rbxassetid://103179450736739", Volume = 0.45, Range = 160 },
-	DistantHowl = { Id = "rbxassetid://9113956884", Volume = 0.4, Range = 300 },
+	DistantHowl = { Id = "rbxassetid://9113956884", Volume = 1.00, Range = 300 },
 }
 
 -- Footstep sound per floor material (Enum.Material name; WildSounds swaps the character's running
--- sound). Empty / missing = Roblox's default step.
+-- sound). Empty / missing = Roblox's default step. FootstepVolumeScale multiplies the Running
+-- sound (0.35 = turned down 65% from Roblox's default).
 local STEP = "rbxassetid://92061301674605"
+Config.FootstepVolumeScale = 0.35
 Config.Footsteps = {
 	Grass = STEP,
 	LeafyGrass = STEP,
@@ -649,7 +651,8 @@ Config.ZoneEvents = {
 -- Landmarks live in WildLayout; signal spawn points are a generated grid (WorldLayout, Lune-tested).
 Config.World = {
 	-- Wild ring, in studs from the hub center.
-	WildInner = 190,
+	-- Past the outer corner of a plot. Keep a small gap before the wild / signposts.
+	WildInner = 240,
 	WildOuter = 620,
 	BlendDegrees = 25,
 	-- Signal spawn grid: spacing, distance kept from the ring edges and from landmark footprints.
@@ -811,23 +814,26 @@ Config.Travel = {
 }
 
 -- Plot local space: -Z faces the hub (entrance side). Offsets are {x, z} in studs.
+-- Courtyard ~88 studs (was 64): walkable shrine yard. RingRadius keeps town paths clear of plots;
+-- World.WildInner sits past the plot's outer corner.
 Config.Plots = {
 	Count = 8,
-	RingRadius = 140,
-	Size = 64,
+	RingRadius = 180,
+	Size = 88,
 	StartingPedestals = 3,
 	MaxPedestals = 6,
+	-- Front row toward the gate, back row toward the resonator, with real walking gaps.
 	PedestalOffsets = {
-		{ -16, -16 },
-		{ 0, -16 },
-		{ 16, -16 },
-		{ -16, -2 },
+		{ -20, -22 },
+		{ 0, -22 },
+		{ 20, -22 },
+		{ -20, -2 },
 		{ 0, -2 },
-		{ 16, -2 },
+		{ 20, -2 },
 	},
-	ResonatorOffset = { 0, 18 },
-	ShowcaseOffset = { 22, 14 },
-	SpawnOffset = { 0, -24 },
+	ResonatorOffset = { 0, 28 },
+	ShowcaseOffset = { 30, 24 },
+	SpawnOffset = { 0, -34 },
 }
 
 Config.Hub = {

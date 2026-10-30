@@ -1,0 +1,14 @@
+Elapsed,ElapsedSec,System,Item,RankBefore,RankAfter,Price,Currency,CE_Before,CE_After,Essence_Before,Essence_After,Luck,IncomePerSec,Rebirths,SecSincePrev,Kind,Ok,Reason
+00:44,44.207775099988794,Attune,Craft,,,75,Essence,0,0,0,0,1,0,0,0,Purchase,false,Complete Three Unique Mutated first.
+00:44,44.40728159999708,Attune,Activate,,,0,Essence,0,0,0,0,1,0,0,0.19949959999939892,Purchase,false,No Attune charges.
+00:45,45.24070189999475,MutationFocus,Craft,,,140,Essence,0,0,0,0,1,0,0,0.8334256999951322,Purchase,false,Complete Fifteen Unique Mutated first.
+00:46,45.507746899995254,Attune,Activate,,,0,Essence,0,0,0,0,1,0,0,0.2670466999989003,Purchase,false,No Attune charges.
+00:46,45.841620199993486,Attune,Craft,,,75,Essence,0,0,0,0,1,0,0,0.333872799994424,Purchase,false,Complete Three Unique Mutated first.
+02:38,157.56980149999436,Attune,Craft,,,75,Essence,52146,52146,276,276,1,0,0,111.72817960000248,Purchase,false,Complete Three Unique Mutated first.
+02:38,158.169313099992,MutationFocus,Craft,,,140,Essence,52146,52146,276,276,1,0,0,0.5995117999991635,Purchase,false,Complete Fifteen Unique Mutated first.
+03:41,220.61731069999223,Fusion,Kunay,0,1,16,Essence,52146,52146,276,260,1.15,0,0,62.44800280001073,Purchase,true,Fusion rank 1 — choose a Charm.
+03:46,225.80133979998936,Fusion,Kunay,1,2,29,Essence,52146,52146,260,231,1.15,0,0,5.184026599992649,Purchase,true,Fusion rank 2.
+03:57,237.251506399989,Charm,Kunay:Hunt,,,0,Essence,52146,52146,231,231,1.15,0,0,11.450161300002947,Purchase,true,Hunt Charm chosen.
+05:03,302.9307630999974,Attune,Craft,,,75,Essence,115185,115185,551,551,1.15,0,0,65.67926119999902,Purchase,false,Complete Three Unique Mutated first.
+05:04,303.68046609999146,Attune,Activate,,,0,Essence,115185,115185,551,551,1.15,0,0,0.7496940999990329,Purchase,false,No Attune charges.
+05:05,304.98080979999213,Attune,Activate,,,0,Essence,115185,115185,551,551,1.15,0,0,1.3003522000071825,Purchase,false,No Attune charges.

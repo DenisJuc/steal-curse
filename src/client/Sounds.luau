@@ -66,6 +66,12 @@ function Sounds.Play(name: string, at: Instance?, pitch: number?): Sound?
 	return sound
 end
 
+-- Preview for the temp SoundMixer: skips the rate-limit gap so knobs can be auditioned freely.
+function Sounds.Preview(name: string): Sound?
+	lastPlayed[name] = nil
+	return Sounds.Play(name)
+end
+
 -- Looping sound that plays until the caller destroys it. Nil when muted.
 function Sounds.Loop(name: string, at: Instance?): Sound?
 	local sound = create(name, at)

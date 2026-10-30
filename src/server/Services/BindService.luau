@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local CaptureSummary = require(ReplicatedStorage.Shared.CaptureSummary)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
@@ -122,13 +123,91 @@ end
 -- Hold time for a bind in `area` (zone mastery shortens it there).
 function BindService.GetHoldSeconds(player: Player, area: string?): number
 	local base = SkillConfig.holdSeconds(skillRank(player, "BindingEfficiency"))
-	return holdOverride[player] or base * MasteryService.HoldFactor(player, area)
+	local CollectionService = require(script.Parent.CollectionService)
+	local resonance = CollectionService.BinderHoldBonus(player)
+	local quick = CollectionService.QuickBindHoldFactor(player)
+	local hold = (holdOverride[player] or base * MasteryService.HoldFactor(player, area)) + resonance
+	hold *= quick
+	return math.max(0.5, hold)
 end
 
--- Bonus discoveries for one capture (GDD 4.4), raised by Resonant Harvest.
+export type BonusBreakdown = {
+	TrialId: string?,
+	BonusFloor: number,
+	BonusFactor: number,
+	ReferenceScanSeconds: number,
+	LiveScanSeconds: number,
+	RegenSeconds: number,
+	FormulaBase: number,
+	HarvestRank: number,
+	HarvestMult: number,
+	AfterHarvest: number,
+	StreakZoneMult: number,
+	BeforeCap: number,
+	MaxBonusRolls: number?,
+	FinalBonus: number,
+	TotalRolls: number,
+	HuntLuck: number,
+}
+
+-- Formula base + Resonant Harvest (streak/zone applied in FinalizeBonus).
+-- Trial MaxBonusRolls MUST be applied to the FINAL bonus — not here — or streak/zone bypass it.
+function BindService.ComputeBonusBase(player: Player): BonusBreakdown
+	local trial = BalanceTrials.current()
+	local liveScan = ScanService.GetInterval(player)
+	local hunt = {
+		BonusFloor = Config.Hunt.BonusFloor,
+		BonusFactor = Config.Hunt.BonusFactor,
+	}
+	local scanSeconds = liveScan
+	local maxBonusRolls: number? = nil
+	local huntLuck = 1
+	if trial then
+		hunt.BonusFloor = trial.Hunt.BonusFloor
+		hunt.BonusFactor = trial.Hunt.BonusFactor
+		scanSeconds = trial.Hunt.ReferenceScanSeconds or liveScan
+		maxBonusRolls = trial.Hunt.MaxBonusRolls
+		huntLuck = trial.Hunt.HuntLuckFactor
+	end
+	local formulaBase = Formulas.bonusRolls(scanSeconds, Config.Signals.RegenSeconds, hunt)
+	local harvestRank = skillRank(player, "ResonantHarvest")
+	local harvestMult = SkillConfig.harvestMultiplier(harvestRank)
+	local afterHarvest = math.ceil(formulaBase * harvestMult - 1e-9)
+	return {
+		TrialId = if trial then trial.Id else nil,
+		BonusFloor = hunt.BonusFloor,
+		BonusFactor = hunt.BonusFactor,
+		ReferenceScanSeconds = scanSeconds,
+		LiveScanSeconds = liveScan,
+		RegenSeconds = Config.Signals.RegenSeconds,
+		FormulaBase = formulaBase,
+		HarvestRank = harvestRank,
+		HarvestMult = harvestMult,
+		AfterHarvest = afterHarvest,
+		StreakZoneMult = 1,
+		BeforeCap = afterHarvest,
+		MaxBonusRolls = maxBonusRolls,
+		FinalBonus = afterHarvest,
+		TotalRolls = 1 + afterHarvest,
+		HuntLuck = huntLuck,
+	}
+end
+
 function BindService.BonusCount(player: Player): number
-	local base = Formulas.bonusRolls(ScanService.GetInterval(player), Config.Signals.RegenSeconds, Config.Hunt)
-	return math.ceil(base * SkillConfig.harvestMultiplier(skillRank(player, "ResonantHarvest")) - 1e-9)
+	return BindService.ComputeBonusBase(player).AfterHarvest
+end
+
+-- streakZoneMult = HuntStreak.combine(streak, zone, purified) already capped by MaxBonusMultiplier.
+function BindService.FinalizeBonus(player: Player, streakZoneMult: number): BonusBreakdown
+	local b = BindService.ComputeBonusBase(player)
+	b.StreakZoneMult = streakZoneMult
+	b.BeforeCap = math.ceil(b.AfterHarvest * streakZoneMult - 1e-9)
+	b.FinalBonus = b.BeforeCap
+	if b.MaxBonusRolls then
+		b.FinalBonus = math.min(b.BeforeCap, b.MaxBonusRolls)
+	end
+	b.TotalRolls = 1 + b.FinalBonus
+	return b
 end
 
 local function onBegin(player: Player, signalId: any)
@@ -270,30 +349,135 @@ local function onComplete(player: Player, signalId: any)
 		table.insert(info.Tags, "Purified")
 	end
 	info.Bonus = HuntStreak.combine(factors, Config.Hunt.MaxBonusMultiplier)
-	local bonusCount = math.ceil(BindService.BonusCount(player) * info.Bonus - 1e-9)
-	local rolls = RollService.RollMany(player, 1 + bonusCount, {
-		LuckFactor = eventFactors.Luck,
+	local breakdown = BindService.FinalizeBonus(player, info.Bonus)
+	local bonusCount = breakdown.FinalBonus
+	local CollectionMath = require(ReplicatedStorage.Shared.CollectionMath)
+	local CollectionService = require(script.Parent.CollectionService)
+	local huntFamily, huntBonus = CollectionService.HuntFamilyBonus(player)
+	local huntQuarryId, huntQuarryMult = CollectionService.HuntQuarry(player)
+	print(
+		string.format(
+			"[BindService] capture %s | trial=%s floor=%.2f factor=%.2f refScan=%.2f (liveScan=%.2f) regen=%d formulaBase=%d harvest=r%d x%.2f → %d | streakZone=x%.2f beforeCap=%d MaxBonusRolls=%s finalBonus=%d totalRolls=%d huntLuck=x%.2f tags=%s",
+			player.Name,
+			breakdown.TrialId or "LIVE",
+			breakdown.BonusFloor,
+			breakdown.BonusFactor,
+			breakdown.ReferenceScanSeconds,
+			breakdown.LiveScanSeconds,
+			breakdown.RegenSeconds,
+			breakdown.FormulaBase,
+			breakdown.HarvestRank,
+			breakdown.HarvestMult,
+			breakdown.AfterHarvest,
+			breakdown.StreakZoneMult,
+			breakdown.BeforeCap,
+			tostring(breakdown.MaxBonusRolls),
+			breakdown.FinalBonus,
+			breakdown.TotalRolls,
+			breakdown.HuntLuck,
+			table.concat(info.Tags, ",")
+		)
+	)
+	if breakdown.MaxBonusRolls and breakdown.BeforeCap > breakdown.MaxBonusRolls then
+		print(
+			string.format(
+				"[BindService] capped bonus %d → %d (streak/zone/harvest would have exceeded MaxBonusRolls)",
+				breakdown.BeforeCap,
+				breakdown.FinalBonus
+			)
+		)
+	end
+	local rolls = RollService.RollMany(player, breakdown.TotalRolls, {
+		LuckFactor = eventFactors.Luck * breakdown.HuntLuck,
 		MutationFactor = eventFactors.Mutation,
+		HuntFamily = huntFamily,
+		HuntFamilyBonus = huntBonus,
+		HuntQuarryId = huntQuarryId,
+		HuntQuarryMult = huntQuarryMult,
 	})
+	if #rolls ~= breakdown.TotalRolls then
+		warn(`[BindService] RollMany returned {#rolls} rolls, expected {breakdown.TotalRolls}`)
+	end
 	local captured = rolls[1]
-	local entries = { { Id = captured.Id, Mutation = captured.Mutation, Source = "Capture" } }
+	local entries = {
+		{ Id = captured.Id, Mutation = captured.Mutation, Size = captured.Size, Source = "Capture" },
+	}
 	local bonusIds = table.create(bonusCount)
 	for index = 2, #rolls do
 		table.insert(bonusIds, rolls[index].Id)
-		table.insert(entries, { Id = rolls[index].Id, Mutation = rolls[index].Mutation, Source = "Bonus" })
+		table.insert(
+			entries,
+			{ Id = rolls[index].Id, Mutation = rolls[index].Mutation, Size = rolls[index].Size, Source = "Bonus" }
+		)
+	end
+	-- Pre-grant: whether a Quarry hit advances Board/catalyst/Ascend (not mere Essence dupes).
+	local quarryNeed = if huntQuarryId then CollectionService.QuarryNeedFor(player, huntQuarryId) else nil
+	local quarryHits = 0
+	local quarryMutHits = 0
+	if huntQuarryId then
+		for _, entry in entries do
+			if entry.Id == huntQuarryId then
+				quarryHits += 1
+				if entry.Mutation then
+					quarryMutHits += 1
+				end
+			end
+		end
+	end
+	local quarryUseful = false
+	if quarryNeed and quarryHits > 0 then
+		quarryUseful = CollectionMath.quarryCaptureAdvances(quarryNeed, quarryMutHits > 0)
 	end
 	local results = DiscoveryPipeline.GrantBatch(player, entries)
+	local essenceBefore = player:GetAttribute("Essence")
+	local familyMatches = 0
+	if huntFamily then
+		for _, entry in entries do
+			local relic = RelicConfig.ById[entry.Id]
+			if relic and relic.Family == huntFamily then
+				familyMatches += 1
+			end
+		end
+	end
+	CollectionService.GrantHuntEssence(player, familyMatches)
 	GameEvents.Fire("Captured", player, info)
 
 	local summary = CaptureSummary.build(results, tierIndex, Config.Hunt.SummaryNotable)
 	if summary then
 		summary.BonusMultiplier = info.Bonus
 		summary.Tags = info.Tags
+		if huntQuarryId then
+			if quarryHits > 0 then
+				summary.Tags = summary.Tags or {}
+				local qRelic = RelicConfig.ById[huntQuarryId]
+				local qName = if qRelic then qRelic.Name else huntQuarryId
+				local tag = if quarryUseful
+					then (if quarryHits == 1 then `Quarry ✓ {qName}` else `Quarry ✓ {qName} ×{quarryHits}`)
+					else (if quarryHits == 1 then `Quarry dupe {qName}` else `Quarry dupe {qName} ×{quarryHits}`)
+				table.insert(summary.Tags, tag)
+			end
+			summary.HuntQuarryId = huntQuarryId
+			summary.HuntQuarryHits = quarryHits
+			summary.HuntQuarryUseful = quarryUseful
+			summary.HuntQuarryNeed = if quarryNeed then quarryNeed.Detail else nil
+		end
+		local essenceAfter = player:GetAttribute("Essence")
+		if type(essenceBefore) == "number" and type(essenceAfter) == "number" and essenceAfter > essenceBefore then
+			summary.CollectionEssence = essenceAfter - essenceBefore
+		elseif type(essenceAfter) == "number" and type(essenceBefore) ~= "number" then
+			-- First Collection mirror this session.
+			summary.CollectionEssence = essenceAfter
+		end
 	end
 
 	player:SetAttribute("SealPosition", bind.Position)
 	player:SetAttribute("SealRelic", `{captured.Id}|{captured.Mutation or ""}`)
 	player:SetAttribute("SealAt", workspace:GetServerTimeNow())
+	player:SetAttribute("LastHuntTotalRolls", breakdown.TotalRolls)
+	player:SetAttribute("LastHuntTrial", breakdown.TrialId or "LIVE")
+
+	local Analytics = require(script.Parent.PlaytestAnalyticsService)
+	Analytics.RecordCapture(player, bonusCount, breakdown.TotalRolls)
 
 	reply(player, {
 		Ok = true,

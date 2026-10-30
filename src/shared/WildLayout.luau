@@ -26,7 +26,7 @@ WildLayout.PathHalfWidth = 9
 WildLayout.Structures = {
 	-- Haunted Forest (around 22.5 degrees)
 	at("AncientTree", 44.5, 507),
-	at("JizoStatue", 12.5, 237, 10),
+	at("JizoStatue", 12.5, 255, 10),
 	at("JizoStatue", 36.5, 303, -15),
 	at("JizoStatue", 0.5, 466, 30),
 	at("JizoStatue", 62.5, 262),
@@ -37,9 +37,9 @@ WildLayout.Structures = {
 	at("GlowMushrooms", 8.5, 380),
 	-- Abandoned Village (around 157.5 degrees)
 	at("BellTower", 169.5, 297),
-	at("RuinedHouse", 139.5, 262, 8),
+	at("RuinedHouse", 139.5, 268, 8),
 	at("RuinedHouse", 146.5, 339, -10),
-	at("RuinedHouse", 177.5, 251, 5),
+	at("RuinedHouse", 177.5, 268, 5),
 	at("RuinedHouse", 173.5, 348, 12),
 	at("RuinedHouse", 140.5, 489, -6),
 	at("RuinedHouse", 177.5, 507, 10),
@@ -48,8 +48,8 @@ WildLayout.Structures = {
 	at("RuinedHut", 131.5, 554, 15),
 	at("RuinedHut", 185.5, 446, -12),
 	at("OldWell", 151.5, 466),
-	at("BrokenCart", 165.5, 223, 40),
-	at("CrateBarrelPile", 135.5, 215, 15),
+	at("BrokenCart", 165.5, 255, 40),
+	at("CrateBarrelPile", 135.5, 255, 15),
 	at("RuinedHouse", 150.5, 590, -8),
 	at("RuinedHut", 168.5, 580, 10),
 	at("OldWell", 162.5, 520),
@@ -67,10 +67,10 @@ WildLayout.Structures = {
 	at("RuinArch", 252.5, 450, 25),
 	at("RuneObelisk", 330.5, 590),
 	at("RuneObelisk", 300.5, 345),
-	-- Signposts beside each path where the wild begins.
-	at("Signpost", 27.5, 203),
-	at("Signpost", 162.5, 203),
-	at("Signpost", 297.5, 203),
+	-- Signposts beside each path where the wild begins (just past WildInner).
+	at("Signpost", 27.5, 248),
+	at("Signpost", 162.5, 248),
+	at("Signpost", 297.5, 248),
 }
 
 -- Cursed Shrines (Lift the Curse): 5 per area at (Angle degrees, Radius studs), mostly deep in.

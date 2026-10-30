@@ -1,0 +1,1089 @@
+<roblox version="4"><Item class="Model" referent="AURAMODEL26"><Properties><string name="Name">Aura26_Dummy</string></Properties><Item class="NumberValue"><Properties><string name="Name">RefHeight</string><double name="Value">5.0</double></Properties></Item><Item class="StringValue"><Properties><string name="Name">SourceName</string><string name="Value">Dummy</string></Properties></Item><Item class="Part" referent="AURA26_0"><Properties><string name="Name">Torso</string><Vector3 name="size">
+            <X>2</X>
+            <Y>2</Y>
+            <Z>1</Z>
+          </Vector3>
+          <CoordinateFrame name="CFrame">
+            <X>0</X>
+            <Y>0</Y>
+            <Z>0</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="Anchored">false</bool><bool name="CanCollide">false</bool><bool name="CanQuery">false</bool><bool name="CanTouch">false</bool><bool name="CastShadow">false</bool><bool name="Massless">true</bool><bool name="Locked">true</bool><float name="Transparency">1</float></Properties><Item class="Attachment" referent="2080"><Properties>
+            <string name="Name">Attachment</string>
+            <BinaryString name="AttributesSerialize" />
+            <CoordinateFrame name="CFrame">
+              <X>0</X>
+              <Y>-3</Y>
+              <Z>0</Z>
+              <R00>1</R00>
+              <R01>0</R01>
+              <R02>0</R02>
+              <R10>0</R10>
+              <R11>1</R11>
+              <R12>0</R12>
+              <R20>0</R20>
+              <R21>0</R21>
+              <R22>1</R22>
+            </CoordinateFrame>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <bool name="DefinesCapabilities">false</bool>
+            <int64 name="SourceAssetId">-1</int64>
+            <BinaryString name="Tags" />
+            <bool name="Visible">false</bool>
+          </Properties>
+          <Item class="ParticleEmitter" referent="2081"><Properties>
+              <string name="Name">ParticleEmitter</string>
+              <Vector3 name="Acceleration">
+                <X>0</X>
+                <Y>2</Y>
+                <Z>0</Z>
+              </Vector3>
+              <BinaryString name="AttributesSerialize" />
+              <float name="Brightness">1</float>
+              <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+              <ColorSequence name="Color">0 1 0.5764706 1 0 0.5034602 1 0.5764706 1 0 0.65916955 0.99215686 1 0.59607846 0 0.8425606 0.5254902 1 0.5568628 0 1 0.5647059 0.99215686 1 0 </ColorSequence>
+              <float name="Drag">1</float>
+              <token name="EmissionDirection">1</token>
+              <bool name="Enabled">true</bool>
+              <bool name="FlipbookBlendFrames">true</bool>
+              <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+              <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+              <token name="FlipbookLayout">0</token>
+              <token name="FlipbookMode">0</token>
+              <int name="FlipbookSizeX">1</int>
+              <int name="FlipbookSizeY">1</int>
+              <bool name="FlipbookStartRandom">false</bool>
+              <NumberRange name="Lifetime">2 2.5 </NumberRange>
+              <float name="LightEmission">1</float>
+              <float name="LightInfluence">0</float>
+              <bool name="LockedToPart">false</bool>
+              <token name="Orientation">0</token>
+              <float name="Rate">20</float>
+              <NumberRange name="RotSpeed">0 0 </NumberRange>
+              <NumberRange name="Rotation">0 0 </NumberRange>
+              <bool name="DefinesCapabilities">false</bool>
+              <token name="Shape">0</token>
+              <token name="ShapeInOut">0</token>
+              <float name="ShapePartial">1</float>
+              <token name="ShapeStyle">0</token>
+              <NumberSequence name="Size">0 0.0625 0.0625 1 0 0 </NumberSequence>
+              <int64 name="SourceAssetId">-1</int64>
+              <NumberRange name="Speed">2 4 </NumberRange>
+              <Vector2 name="SpreadAngle">
+                <X>360</X>
+                <Y>360</Y>
+              </Vector2>
+              <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+              <BinaryString name="Tags" />
+              <Content name="TextureContent">
+                <uri>rbxassetid://867619398</uri>
+              </Content>
+              <float name="TimeScale">1</float>
+              <NumberSequence name="Transparency">0 1 0 0.29411766 1 0 0.3579832 0.69375 0 0.50084037 0.5125 0 0.6184874 0.6875 0 1 1 0 </NumberSequence>
+              <float name="VelocityInheritance">0</float>
+              <bool name="WindAffectsDrag">false</bool>
+              <float name="ZOffset">0</float>
+            </Properties>
+          </Item></Item><Item class="Beam" referent="2082"><Properties>
+            <string name="Name">Beam</string>
+            <Ref name="Attachment0">2080</Ref>
+            <Ref name="Attachment1">2083</Ref>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">1</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 0.76862746 0.6117647 1 0 0.26297578 1 0.5568628 0.5568628 0 0.50173014 1 0.9843137 0.5058824 0 0.6712803 0.7882353 1 0.5647059 0 0.87370247 0.4117647 0.8235294 1 0 1 0 0.7019608 1 0 </ColorSequence>
+            <float name="CurveSize0">5</float>
+            <float name="CurveSize1">5</float>
+            <bool name="Enabled">true</bool>
+            <bool name="FaceCamera">true</bool>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="DefinesCapabilities">false</bool>
+            <int name="Segments">1000</int>
+            <int64 name="SourceAssetId">-1</int64>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>https://assetgame.roblox.com/asset/?id=12713360567&amp;assetName=trail2</uri>
+            </Content>
+            <float name="TextureLength">1</float>
+            <token name="TextureMode">0</token>
+            <float name="TextureSpeed">0.75</float>
+            <NumberSequence name="Transparency">0 1 0 0.497479 0.5 0 1 1 0 </NumberSequence>
+            <float name="Width0">4</float>
+            <float name="Width1">0.1</float>
+            <float name="ZOffset">1</float>
+          </Properties>
+        </Item><Item class="Attachment" referent="2084"><Properties>
+            <string name="Name">Attachment15</string>
+            <BinaryString name="AttributesSerialize" />
+            <CoordinateFrame name="CFrame">
+              <X>0</X>
+              <Y>0.00001335144</Y>
+              <Z>0</Z>
+              <R00>1</R00>
+              <R01>0</R01>
+              <R02>0</R02>
+              <R10>0</R10>
+              <R11>0</R11>
+              <R12>1</R12>
+              <R20>0</R20>
+              <R21>-1</R21>
+              <R22>0</R22>
+            </CoordinateFrame>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <bool name="DefinesCapabilities">false</bool>
+            <int64 name="SourceAssetId">-1</int64>
+            <BinaryString name="Tags" />
+            <bool name="Visible">false</bool>
+          </Properties>
+          <Item class="ParticleEmitter" referent="2085"><Properties>
+              <string name="Name">Aura</string>
+              <Vector3 name="Acceleration">
+                <X>0</X>
+                <Y>0</Y>
+                <Z>0</Z>
+              </Vector3>
+              <BinaryString name="AttributesSerialize" />
+              <float name="Brightness">1</float>
+              <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+              <ColorSequence name="Color">0 0.99215686 0.8156863 1 0 1 0.9764706 0.6745098 1 0 </ColorSequence>
+              <float name="Drag">0</float>
+              <token name="EmissionDirection">1</token>
+              <bool name="Enabled">true</bool>
+              <bool name="FlipbookBlendFrames">true</bool>
+              <NumberRange name="FlipbookFramerate">10 10 </NumberRange>
+              <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+              <token name="FlipbookLayout">2</token>
+              <token name="FlipbookMode">0</token>
+              <int name="FlipbookSizeX">1</int>
+              <int name="FlipbookSizeY">1</int>
+              <bool name="FlipbookStartRandom">false</bool>
+              <NumberRange name="Lifetime">5 5 </NumberRange>
+              <float name="LightEmission">0</float>
+              <float name="LightInfluence">0</float>
+              <bool name="LockedToPart">true</bool>
+              <token name="Orientation">3</token>
+              <float name="Rate">20</float>
+              <NumberRange name="RotSpeed">0 0 </NumberRange>
+              <NumberRange name="Rotation">-360 360 </NumberRange>
+              <bool name="DefinesCapabilities">false</bool>
+              <token name="Shape">0</token>
+              <token name="ShapeInOut">0</token>
+              <float name="ShapePartial">1</float>
+              <token name="ShapeStyle">0</token>
+              <NumberSequence name="Size">0 3 1 1 3 1 </NumberSequence>
+              <int64 name="SourceAssetId">-1</int64>
+              <NumberRange name="Speed">0.001 0.001 </NumberRange>
+              <Vector2 name="SpreadAngle">
+                <X>10</X>
+                <Y>10</Y>
+              </Vector2>
+              <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+              <BinaryString name="Tags" />
+              <Content name="TextureContent">
+                <uri>rbxassetid://12656840930</uri>
+              </Content>
+              <float name="TimeScale">1</float>
+              <NumberSequence name="Transparency">0 1 0 0.50084037 0.95 0 1 1 0 </NumberSequence>
+              <float name="VelocityInheritance">0</float>
+              <bool name="WindAffectsDrag">false</bool>
+              <float name="ZOffset">0</float>
+            </Properties>
+          </Item><Item class="ParticleEmitter" referent="2086"><Properties>
+              <string name="Name">Swirls</string>
+              <Vector3 name="Acceleration">
+                <X>0</X>
+                <Y>0</Y>
+                <Z>0</Z>
+              </Vector3>
+              <BinaryString name="AttributesSerialize" />
+              <float name="Brightness">10</float>
+              <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+              <ColorSequence name="Color">0 0.9607843 0.41568628 1 0 0.5380623 1 0.25490198 1 0 1 0.59607846 0.9647059 1 0 </ColorSequence>
+              <float name="Drag">20</float>
+              <token name="EmissionDirection">1</token>
+              <bool name="Enabled">true</bool>
+              <bool name="FlipbookBlendFrames">true</bool>
+              <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+              <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+              <token name="FlipbookLayout">2</token>
+              <token name="FlipbookMode">1</token>
+              <int name="FlipbookSizeX">1</int>
+              <int name="FlipbookSizeY">1</int>
+              <bool name="FlipbookStartRandom">false</bool>
+              <NumberRange name="Lifetime">1 2 </NumberRange>
+              <float name="LightEmission">1</float>
+              <float name="LightInfluence">0</float>
+              <bool name="LockedToPart">true</bool>
+              <token name="Orientation">0</token>
+              <float name="Rate">2</float>
+              <NumberRange name="RotSpeed">-30 30 </NumberRange>
+              <NumberRange name="Rotation">-360 360 </NumberRange>
+              <bool name="DefinesCapabilities">false</bool>
+              <token name="Shape">0</token>
+              <token name="ShapeInOut">0</token>
+              <float name="ShapePartial">1</float>
+              <token name="ShapeStyle">0</token>
+              <NumberSequence name="Size">0 0.5 0 1 0.5 0 </NumberSequence>
+              <int64 name="SourceAssetId">-1</int64>
+              <NumberRange name="Speed">30 30 </NumberRange>
+              <Vector2 name="SpreadAngle">
+                <X>360</X>
+                <Y>360</Y>
+              </Vector2>
+              <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+              <BinaryString name="Tags" />
+              <Content name="TextureContent">
+                <uri>http://www.roblox.com/asset/?id=12094495797</uri>
+              </Content>
+              <float name="TimeScale">1</float>
+              <NumberSequence name="Transparency">0 1 0 0.297479 1 0 0.6991597 0.9125 0 1 1 0 </NumberSequence>
+              <float name="VelocityInheritance">0</float>
+              <bool name="WindAffectsDrag">false</bool>
+              <float name="ZOffset">0</float>
+            </Properties>
+          </Item></Item><Item class="Attachment" referent="2083"><Properties>
+            <string name="Name">Attachment1</string>
+            <BinaryString name="AttributesSerialize" />
+            <CoordinateFrame name="CFrame">
+              <X>0</X>
+              <Y>3</Y>
+              <Z>0</Z>
+              <R00>1</R00>
+              <R01>0</R01>
+              <R02>0</R02>
+              <R10>0</R10>
+              <R11>1</R11>
+              <R12>0</R12>
+              <R20>0</R20>
+              <R21>0</R21>
+              <R22>1</R22>
+            </CoordinateFrame>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <bool name="DefinesCapabilities">false</bool>
+            <int64 name="SourceAssetId">-1</int64>
+            <BinaryString name="Tags" />
+            <bool name="Visible">false</bool>
+          </Properties>
+        </Item><Item class="Attachment" referent="2087"><Properties>
+            <string name="Name">Attachment3</string>
+            <BinaryString name="AttributesSerialize" />
+            <CoordinateFrame name="CFrame">
+              <X>0</X>
+              <Y>-3</Y>
+              <Z>0</Z>
+              <R00>-1</R00>
+              <R01>0</R01>
+              <R02>0</R02>
+              <R10>0</R10>
+              <R11>1</R11>
+              <R12>0</R12>
+              <R20>0</R20>
+              <R21>0</R21>
+              <R22>-1</R22>
+            </CoordinateFrame>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <bool name="DefinesCapabilities">false</bool>
+            <int64 name="SourceAssetId">-1</int64>
+            <BinaryString name="Tags" />
+            <bool name="Visible">false</bool>
+          </Properties>
+        </Item><Item class="Attachment" referent="2088"><Properties>
+            <string name="Name">Attachment2</string>
+            <BinaryString name="AttributesSerialize" />
+            <CoordinateFrame name="CFrame">
+              <X>0</X>
+              <Y>3</Y>
+              <Z>0</Z>
+              <R00>-1</R00>
+              <R01>0</R01>
+              <R02>0</R02>
+              <R10>0</R10>
+              <R11>1</R11>
+              <R12>0</R12>
+              <R20>0</R20>
+              <R21>0</R21>
+              <R22>-1</R22>
+            </CoordinateFrame>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <bool name="DefinesCapabilities">false</bool>
+            <int64 name="SourceAssetId">-1</int64>
+            <BinaryString name="Tags" />
+            <bool name="Visible">false</bool>
+          </Properties>
+        </Item><Item class="Beam" referent="2089"><Properties>
+            <string name="Name">Beam</string>
+            <Ref name="Attachment0">2087</Ref>
+            <Ref name="Attachment1">2088</Ref>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">1</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 0.76862746 0.6117647 1 0 0.26297578 1 0.5568628 0.5568628 0 0.50173014 1 0.9843137 0.5058824 0 0.6712803 0.7882353 1 0.5647059 0 0.87370247 0.4117647 0.8235294 1 0 1 0 0.7019608 1 0 </ColorSequence>
+            <float name="CurveSize0">5</float>
+            <float name="CurveSize1">5</float>
+            <bool name="Enabled">true</bool>
+            <bool name="FaceCamera">true</bool>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="DefinesCapabilities">false</bool>
+            <int name="Segments">1000</int>
+            <int64 name="SourceAssetId">-1</int64>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>https://assetgame.roblox.com/asset/?id=12713360567&amp;assetName=trail2</uri>
+            </Content>
+            <float name="TextureLength">1</float>
+            <token name="TextureMode">0</token>
+            <float name="TextureSpeed">0.75</float>
+            <NumberSequence name="Transparency">0 1 0 0.497479 0.5 0 1 1 0 </NumberSequence>
+            <float name="Width0">4</float>
+            <float name="Width1">0.1</float>
+            <float name="ZOffset">-1</float>
+          </Properties>
+        </Item><Item class="ParticleEmitter" referent="2090"><Properties>
+            <string name="Name">ParticleEmitter</string>
+            <Vector3 name="Acceleration">
+              <X>0</X>
+              <Y>0</Y>
+              <Z>0</Z>
+            </Vector3>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">10</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 0.94509804 0.54509807 1 0 0.26643598 1 0.75686276 0.5411765 0 0.5242215 1 1 0.56078434 0 0.7681661 0.5921569 1 0.58431375 0 1 0.4509804 0.7607843 1 0 </ColorSequence>
+            <float name="Drag">0</float>
+            <token name="EmissionDirection">1</token>
+            <bool name="Enabled">true</bool>
+            <bool name="FlipbookBlendFrames">true</bool>
+            <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+            <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+            <token name="FlipbookLayout">2</token>
+            <token name="FlipbookMode">1</token>
+            <int name="FlipbookSizeX">1</int>
+            <int name="FlipbookSizeY">1</int>
+            <bool name="FlipbookStartRandom">false</bool>
+            <NumberRange name="Lifetime">1 2 </NumberRange>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="LockedToPart">true</bool>
+            <token name="Orientation">0</token>
+            <float name="Rate">30</float>
+            <NumberRange name="RotSpeed">0 0 </NumberRange>
+            <NumberRange name="Rotation">-360 360 </NumberRange>
+            <bool name="DefinesCapabilities">false</bool>
+            <token name="Shape">0</token>
+            <token name="ShapeInOut">0</token>
+            <float name="ShapePartial">1</float>
+            <token name="ShapeStyle">0</token>
+            <NumberSequence name="Size">0 0.5 0 1 0.5 0 </NumberSequence>
+            <int64 name="SourceAssetId">-1</int64>
+            <NumberRange name="Speed">0 0 </NumberRange>
+            <Vector2 name="SpreadAngle">
+              <X>0</X>
+              <Y>0</Y>
+            </Vector2>
+            <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>http://www.roblox.com/asset/?id=12807576645</uri>
+            </Content>
+            <float name="TimeScale">1</float>
+            <NumberSequence name="Transparency">0 1 0 0.50084037 0.8875 0 1 1 0 </NumberSequence>
+            <float name="VelocityInheritance">0</float>
+            <bool name="WindAffectsDrag">false</bool>
+            <float name="ZOffset">-1</float>
+          </Properties>
+        </Item><Item class="Beam" referent="2091"><Properties>
+            <string name="Name">Beam3</string>
+            <Ref name="Attachment0">2087</Ref>
+            <Ref name="Attachment1">2088</Ref>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">1</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 0.76862746 0.6117647 1 0 0.26297578 1 0.5568628 0.5568628 0 0.50173014 1 0.9843137 0.5058824 0 0.6712803 0.7882353 1 0.5647059 0 0.87370247 0.4117647 0.8235294 1 0 1 0 0.7019608 1 0 </ColorSequence>
+            <float name="CurveSize0">0</float>
+            <float name="CurveSize1">0</float>
+            <bool name="Enabled">true</bool>
+            <bool name="FaceCamera">true</bool>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="DefinesCapabilities">false</bool>
+            <int name="Segments">1000</int>
+            <int64 name="SourceAssetId">-1</int64>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>rbxassetid://12191903502</uri>
+            </Content>
+            <float name="TextureLength">1</float>
+            <token name="TextureMode">0</token>
+            <float name="TextureSpeed">0.75</float>
+            <NumberSequence name="Transparency">0 1 0 0.497479 0.5 0 1 1 0 </NumberSequence>
+            <float name="Width0">3</float>
+            <float name="Width1">3</float>
+            <float name="ZOffset">0</float>
+          </Properties>
+        </Item><Item class="Attachment" referent="2092"><Properties>
+            <string name="Name">Attachment1512</string>
+            <BinaryString name="AttributesSerialize" />
+            <CoordinateFrame name="CFrame">
+              <X>0</X>
+              <Y>4</Y>
+              <Z>0</Z>
+              <R00>1</R00>
+              <R01>0</R01>
+              <R02>0</R02>
+              <R10>0</R10>
+              <R11>1</R11>
+              <R12>0</R12>
+              <R20>0</R20>
+              <R21>0</R21>
+              <R22>1</R22>
+            </CoordinateFrame>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <bool name="DefinesCapabilities">false</bool>
+            <int64 name="SourceAssetId">-1</int64>
+            <BinaryString name="Tags" />
+            <bool name="Visible">false</bool>
+          </Properties>
+          <Item class="ParticleEmitter" referent="2093"><Properties>
+              <string name="Name">Star</string>
+              <Vector3 name="Acceleration">
+                <X>0</X>
+                <Y>0</Y>
+                <Z>0</Z>
+              </Vector3>
+              <BinaryString name="AttributesSerialize" />
+              <float name="Brightness">1</float>
+              <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+              <ColorSequence name="Color">0 0.9490196 0.54901963 1 0 0.32698962 0.96862745 0.60784316 0.98039216 0 0.54498273 0.93333334 0.93333334 0.47058824 0 0.64186853 0.92156863 0.95686275 0.54901963 0 0.8027682 0.54509807 0.9411765 0.5803922 0 1 0.4745098 1 0.92156863 0 </ColorSequence>
+              <float name="Drag">0</float>
+              <token name="EmissionDirection">1</token>
+              <bool name="Enabled">false</bool>
+              <bool name="FlipbookBlendFrames">true</bool>
+              <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+              <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+              <token name="FlipbookLayout">0</token>
+              <token name="FlipbookMode">0</token>
+              <int name="FlipbookSizeX">1</int>
+              <int name="FlipbookSizeY">1</int>
+              <bool name="FlipbookStartRandom">false</bool>
+              <NumberRange name="Lifetime">1 1 </NumberRange>
+              <float name="LightEmission">1</float>
+              <float name="LightInfluence">0</float>
+              <bool name="LockedToPart">true</bool>
+              <token name="Orientation">0</token>
+              <float name="Rate">1</float>
+              <NumberRange name="RotSpeed">0 0 </NumberRange>
+              <NumberRange name="Rotation">0 0 </NumberRange>
+              <bool name="DefinesCapabilities">false</bool>
+              <token name="Shape">0</token>
+              <token name="ShapeInOut">0</token>
+              <float name="ShapePartial">1</float>
+              <token name="ShapeStyle">0</token>
+              <NumberSequence name="Size">0 1 0 1 1 0 </NumberSequence>
+              <int64 name="SourceAssetId">-1</int64>
+              <NumberRange name="Speed">0 0 </NumberRange>
+              <Vector2 name="SpreadAngle">
+                <X>0</X>
+                <Y>0</Y>
+              </Vector2>
+              <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+              <BinaryString name="Tags" />
+              <Content name="TextureContent">
+                <uri>rbxassetid://12362727262</uri>
+              </Content>
+              <float name="TimeScale">1</float>
+              <NumberSequence name="Transparency">0 1 0 0.50084037 0 0 1 1 0 </NumberSequence>
+              <float name="VelocityInheritance">0</float>
+              <bool name="WindAffectsDrag">false</bool>
+              <float name="ZOffset">0</float>
+            </Properties>
+          </Item><Item class="ParticleEmitter" referent="2094"><Properties>
+              <string name="Name">Dots</string>
+              <Vector3 name="Acceleration">
+                <X>0</X>
+                <Y>0</Y>
+                <Z>0</Z>
+              </Vector3>
+              <BinaryString name="AttributesSerialize" />
+              <float name="Brightness">10</float>
+              <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+              <ColorSequence name="Color">0 0.9843137 0.5137255 1 0 0.34602076 0.99215686 0.5529412 0.99215686 0 0.50692046 1 0.7607843 0.52156866 0 0.633218 1 0.96862745 0.5058824 0 0.8304499 0.6 1 0.57254905 0 0.90484434 0.3529412 0.81960785 0.9137255 0 1 0.5411765 0.8 1 0 </ColorSequence>
+              <float name="Drag">-2</float>
+              <token name="EmissionDirection">1</token>
+              <bool name="Enabled">false</bool>
+              <bool name="FlipbookBlendFrames">true</bool>
+              <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+              <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+              <token name="FlipbookLayout">0</token>
+              <token name="FlipbookMode">0</token>
+              <int name="FlipbookSizeX">1</int>
+              <int name="FlipbookSizeY">1</int>
+              <bool name="FlipbookStartRandom">false</bool>
+              <NumberRange name="Lifetime">0.3 0.6 </NumberRange>
+              <float name="LightEmission">1</float>
+              <float name="LightInfluence">0</float>
+              <bool name="LockedToPart">false</bool>
+              <token name="Orientation">0</token>
+              <float name="Rate">20</float>
+              <NumberRange name="RotSpeed">-1000 1000 </NumberRange>
+              <NumberRange name="Rotation">-360 360 </NumberRange>
+              <bool name="DefinesCapabilities">false</bool>
+              <token name="Shape">0</token>
+              <token name="ShapeInOut">0</token>
+              <float name="ShapePartial">1</float>
+              <token name="ShapeStyle">0</token>
+              <NumberSequence name="Size">0 0 0 1 0.3125 0 </NumberSequence>
+              <int64 name="SourceAssetId">-1</int64>
+              <NumberRange name="Speed">4 6 </NumberRange>
+              <Vector2 name="SpreadAngle">
+                <X>360</X>
+                <Y>360</Y>
+              </Vector2>
+              <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+              <BinaryString name="Tags" />
+              <Content name="TextureContent">
+                <uri>http://www.roblox.com/asset/?id=12222002958</uri>
+              </Content>
+              <float name="TimeScale">1</float>
+              <NumberSequence name="Transparency">0 0 0 0.39663866 0.74375 0 1 1 0 </NumberSequence>
+              <float name="VelocityInheritance">0</float>
+              <bool name="WindAffectsDrag">false</bool>
+              <float name="ZOffset">0</float>
+            </Properties>
+          </Item><Item class="ParticleEmitter" referent="2095"><Properties>
+              <string name="Name">Star2</string>
+              <Vector3 name="Acceleration">
+                <X>0</X>
+                <Y>0</Y>
+                <Z>0</Z>
+              </Vector3>
+              <BinaryString name="AttributesSerialize" />
+              <float name="Brightness">1</float>
+              <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+              <ColorSequence name="Color">0 0.9490196 0.54901963 1 0 1 0.9490196 0.54901963 1 0 </ColorSequence>
+              <float name="Drag">0</float>
+              <token name="EmissionDirection">1</token>
+              <bool name="Enabled">false</bool>
+              <bool name="FlipbookBlendFrames">true</bool>
+              <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+              <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+              <token name="FlipbookLayout">0</token>
+              <token name="FlipbookMode">0</token>
+              <int name="FlipbookSizeX">1</int>
+              <int name="FlipbookSizeY">1</int>
+              <bool name="FlipbookStartRandom">false</bool>
+              <NumberRange name="Lifetime">0.25 0.25 </NumberRange>
+              <float name="LightEmission">1</float>
+              <float name="LightInfluence">0</float>
+              <bool name="LockedToPart">true</bool>
+              <token name="Orientation">0</token>
+              <float name="Rate">1</float>
+              <NumberRange name="RotSpeed">0 0 </NumberRange>
+              <NumberRange name="Rotation">0 0 </NumberRange>
+              <bool name="DefinesCapabilities">false</bool>
+              <token name="Shape">0</token>
+              <token name="ShapeInOut">0</token>
+              <float name="ShapePartial">1</float>
+              <token name="ShapeStyle">0</token>
+              <NumberSequence name="Size">0 1 0 1 4.4374995 0 </NumberSequence>
+              <int64 name="SourceAssetId">-1</int64>
+              <NumberRange name="Speed">0 0 </NumberRange>
+              <Vector2 name="SpreadAngle">
+                <X>0</X>
+                <Y>0</Y>
+              </Vector2>
+              <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+              <BinaryString name="Tags" />
+              <Content name="TextureContent">
+                <uri>rbxassetid://12362727262</uri>
+              </Content>
+              <float name="TimeScale">1</float>
+              <NumberSequence name="Transparency">0 1 0 0.50252104 0.9 0 1 1 0 </NumberSequence>
+              <float name="VelocityInheritance">0</float>
+              <bool name="WindAffectsDrag">false</bool>
+              <float name="ZOffset">0</float>
+            </Properties>
+          </Item><Item class="ParticleEmitter" referent="2096"><Properties>
+              <string name="Name">Burst</string>
+              <Vector3 name="Acceleration">
+                <X>0</X>
+                <Y>0</Y>
+                <Z>0</Z>
+              </Vector3>
+              <BinaryString name="AttributesSerialize" />
+              <float name="Brightness">1</float>
+              <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+              <ColorSequence name="Color">0 0.94509804 0.5411765 1 0 1 0.94509804 0.5411765 1 0 </ColorSequence>
+              <float name="Drag">0</float>
+              <token name="EmissionDirection">1</token>
+              <bool name="Enabled">false</bool>
+              <bool name="FlipbookBlendFrames">true</bool>
+              <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+              <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+              <token name="FlipbookLayout">0</token>
+              <token name="FlipbookMode">0</token>
+              <int name="FlipbookSizeX">1</int>
+              <int name="FlipbookSizeY">1</int>
+              <bool name="FlipbookStartRandom">false</bool>
+              <NumberRange name="Lifetime">0.25 0.25 </NumberRange>
+              <float name="LightEmission">0</float>
+              <float name="LightInfluence">1</float>
+              <bool name="LockedToPart">false</bool>
+              <token name="Orientation">0</token>
+              <float name="Rate">1</float>
+              <NumberRange name="RotSpeed">0 0 </NumberRange>
+              <NumberRange name="Rotation">-360 360 </NumberRange>
+              <bool name="DefinesCapabilities">false</bool>
+              <token name="Shape">0</token>
+              <token name="ShapeInOut">0</token>
+              <float name="ShapePartial">1</float>
+              <token name="ShapeStyle">0</token>
+              <NumberSequence name="Size">0 0 0 1 3.75 0 </NumberSequence>
+              <int64 name="SourceAssetId">-1</int64>
+              <NumberRange name="Speed">0 0 </NumberRange>
+              <Vector2 name="SpreadAngle">
+                <X>0</X>
+                <Y>0</Y>
+              </Vector2>
+              <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+              <BinaryString name="Tags" />
+              <Content name="TextureContent">
+                <uri>rbxassetid://8210105223</uri>
+              </Content>
+              <float name="TimeScale">1</float>
+              <NumberSequence name="Transparency">0 0.5 0 1 1 0 </NumberSequence>
+              <float name="VelocityInheritance">0</float>
+              <bool name="WindAffectsDrag">false</bool>
+              <float name="ZOffset">0</float>
+            </Properties>
+          </Item></Item><Item class="ParticleEmitter" referent="2098"><Properties>
+            <string name="Name">SpinDots</string>
+            <Vector3 name="Acceleration">
+              <X>0</X>
+              <Y>0</Y>
+              <Z>0</Z>
+            </Vector3>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">1</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 1 0.56078434 0.9647059 0 0.25086507 1 0.80784315 0.64705884 0 0.5224914 0.9647059 1 0.72156864 0 0.7958478 0.67058825 1 0.67058825 0 1 0.61960787 0.8235294 1 0 </ColorSequence>
+            <float name="Drag">2</float>
+            <token name="EmissionDirection">1</token>
+            <bool name="Enabled">true</bool>
+            <bool name="FlipbookBlendFrames">true</bool>
+            <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+            <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+            <token name="FlipbookLayout">0</token>
+            <token name="FlipbookMode">0</token>
+            <int name="FlipbookSizeX">1</int>
+            <int name="FlipbookSizeY">1</int>
+            <bool name="FlipbookStartRandom">false</bool>
+            <NumberRange name="Lifetime">2 3 </NumberRange>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="LockedToPart">false</bool>
+            <token name="Orientation">0</token>
+            <float name="Rate">15</float>
+            <NumberRange name="RotSpeed">-500 500 </NumberRange>
+            <NumberRange name="Rotation">-360 360 </NumberRange>
+            <bool name="DefinesCapabilities">false</bool>
+            <token name="Shape">0</token>
+            <token name="ShapeInOut">0</token>
+            <float name="ShapePartial">1</float>
+            <token name="ShapeStyle">0</token>
+            <NumberSequence name="Size">0 0.18750012 0.18750012 1 0 0 </NumberSequence>
+            <int64 name="SourceAssetId">-1</int64>
+            <NumberRange name="Speed">4 6 </NumberRange>
+            <Vector2 name="SpreadAngle">
+              <X>360</X>
+              <Y>360</Y>
+            </Vector2>
+            <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>http://www.roblox.com/asset/?id=12222002958</uri>
+            </Content>
+            <float name="TimeScale">1</float>
+            <NumberSequence name="Transparency">0 0.5 0 1 0.5 0 </NumberSequence>
+            <float name="VelocityInheritance">0</float>
+            <bool name="WindAffectsDrag">false</bool>
+            <float name="ZOffset">0</float>
+          </Properties>
+        </Item></Item><Item class="Part" referent="AURA26_1"><Properties><string name="Name">Right Arm</string><Vector3 name="size">
+            <X>1</X>
+            <Y>2</Y>
+            <Z>1</Z>
+          </Vector3>
+          <CoordinateFrame name="CFrame">
+            <X>1.5</X>
+            <Y>0</Y>
+            <Z>0</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="Anchored">false</bool><bool name="CanCollide">false</bool><bool name="CanQuery">false</bool><bool name="CanTouch">false</bool><bool name="CastShadow">false</bool><bool name="Massless">true</bool><bool name="Locked">true</bool><float name="Transparency">1</float></Properties><Item class="ParticleEmitter" referent="2099"><Properties>
+            <string name="Name">ParticleEmitter</string>
+            <Vector3 name="Acceleration">
+              <X>0</X>
+              <Y>0</Y>
+              <Z>0</Z>
+            </Vector3>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">10</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 0.94509804 0.54509807 1 0 0.26643598 1 0.75686276 0.5411765 0 0.5242215 1 1 0.56078434 0 0.7681661 0.5921569 1 0.58431375 0 1 0.4509804 0.7607843 1 0 </ColorSequence>
+            <float name="Drag">0</float>
+            <token name="EmissionDirection">1</token>
+            <bool name="Enabled">true</bool>
+            <bool name="FlipbookBlendFrames">true</bool>
+            <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+            <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+            <token name="FlipbookLayout">2</token>
+            <token name="FlipbookMode">1</token>
+            <int name="FlipbookSizeX">1</int>
+            <int name="FlipbookSizeY">1</int>
+            <bool name="FlipbookStartRandom">false</bool>
+            <NumberRange name="Lifetime">1 2 </NumberRange>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="LockedToPart">true</bool>
+            <token name="Orientation">0</token>
+            <float name="Rate">30</float>
+            <NumberRange name="RotSpeed">0 0 </NumberRange>
+            <NumberRange name="Rotation">-360 360 </NumberRange>
+            <bool name="DefinesCapabilities">false</bool>
+            <token name="Shape">0</token>
+            <token name="ShapeInOut">0</token>
+            <float name="ShapePartial">1</float>
+            <token name="ShapeStyle">0</token>
+            <NumberSequence name="Size">0 0.35 0 1 0.35 0 </NumberSequence>
+            <int64 name="SourceAssetId">-1</int64>
+            <NumberRange name="Speed">0 0 </NumberRange>
+            <Vector2 name="SpreadAngle">
+              <X>0</X>
+              <Y>0</Y>
+            </Vector2>
+            <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>http://www.roblox.com/asset/?id=12807576645</uri>
+            </Content>
+            <float name="TimeScale">1</float>
+            <NumberSequence name="Transparency">0 1 0 0.50084037 0.8875 0 1 1 0 </NumberSequence>
+            <float name="VelocityInheritance">0</float>
+            <bool name="WindAffectsDrag">false</bool>
+            <float name="ZOffset">-1</float>
+          </Properties>
+        </Item></Item><Item class="Part" referent="AURA26_2"><Properties><string name="Name">Left Arm</string><Vector3 name="size">
+            <X>1</X>
+            <Y>2</Y>
+            <Z>1</Z>
+          </Vector3>
+          <CoordinateFrame name="CFrame">
+            <X>-1.5</X>
+            <Y>0</Y>
+            <Z>0</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="Anchored">false</bool><bool name="CanCollide">false</bool><bool name="CanQuery">false</bool><bool name="CanTouch">false</bool><bool name="CastShadow">false</bool><bool name="Massless">true</bool><bool name="Locked">true</bool><float name="Transparency">1</float></Properties><Item class="ParticleEmitter" referent="2100"><Properties>
+            <string name="Name">ParticleEmitter</string>
+            <Vector3 name="Acceleration">
+              <X>0</X>
+              <Y>0</Y>
+              <Z>0</Z>
+            </Vector3>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">10</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 0.94509804 0.54509807 1 0 0.26643598 1 0.75686276 0.5411765 0 0.5242215 1 1 0.56078434 0 0.7681661 0.5921569 1 0.58431375 0 1 0.4509804 0.7607843 1 0 </ColorSequence>
+            <float name="Drag">0</float>
+            <token name="EmissionDirection">1</token>
+            <bool name="Enabled">true</bool>
+            <bool name="FlipbookBlendFrames">true</bool>
+            <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+            <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+            <token name="FlipbookLayout">2</token>
+            <token name="FlipbookMode">1</token>
+            <int name="FlipbookSizeX">1</int>
+            <int name="FlipbookSizeY">1</int>
+            <bool name="FlipbookStartRandom">false</bool>
+            <NumberRange name="Lifetime">1 2 </NumberRange>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="LockedToPart">true</bool>
+            <token name="Orientation">0</token>
+            <float name="Rate">30</float>
+            <NumberRange name="RotSpeed">0 0 </NumberRange>
+            <NumberRange name="Rotation">-360 360 </NumberRange>
+            <bool name="DefinesCapabilities">false</bool>
+            <token name="Shape">0</token>
+            <token name="ShapeInOut">0</token>
+            <float name="ShapePartial">1</float>
+            <token name="ShapeStyle">0</token>
+            <NumberSequence name="Size">0 0.35 0 1 0.35 0 </NumberSequence>
+            <int64 name="SourceAssetId">-1</int64>
+            <NumberRange name="Speed">0 0 </NumberRange>
+            <Vector2 name="SpreadAngle">
+              <X>0</X>
+              <Y>0</Y>
+            </Vector2>
+            <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>http://www.roblox.com/asset/?id=12807576645</uri>
+            </Content>
+            <float name="TimeScale">1</float>
+            <NumberSequence name="Transparency">0 1 0 0.50084037 0.7625 0 1 1 0 </NumberSequence>
+            <float name="VelocityInheritance">0</float>
+            <bool name="WindAffectsDrag">false</bool>
+            <float name="ZOffset">-1</float>
+          </Properties>
+        </Item></Item><Item class="Part" referent="AURA26_3"><Properties><string name="Name">Left Leg</string><Vector3 name="size">
+            <X>1</X>
+            <Y>2</Y>
+            <Z>1</Z>
+          </Vector3>
+          <CoordinateFrame name="CFrame">
+            <X>-0.5</X>
+            <Y>-2</Y>
+            <Z>0</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="Anchored">false</bool><bool name="CanCollide">false</bool><bool name="CanQuery">false</bool><bool name="CanTouch">false</bool><bool name="CastShadow">false</bool><bool name="Massless">true</bool><bool name="Locked">true</bool><float name="Transparency">1</float></Properties><Item class="ParticleEmitter" referent="2101"><Properties>
+            <string name="Name">ParticleEmitter</string>
+            <Vector3 name="Acceleration">
+              <X>0</X>
+              <Y>0</Y>
+              <Z>0</Z>
+            </Vector3>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">10</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 0.94509804 0.54509807 1 0 0.26643598 1 0.75686276 0.5411765 0 0.5242215 1 1 0.56078434 0 0.7681661 0.5921569 1 0.58431375 0 1 0.4509804 0.7607843 1 0 </ColorSequence>
+            <float name="Drag">0</float>
+            <token name="EmissionDirection">1</token>
+            <bool name="Enabled">true</bool>
+            <bool name="FlipbookBlendFrames">true</bool>
+            <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+            <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+            <token name="FlipbookLayout">2</token>
+            <token name="FlipbookMode">1</token>
+            <int name="FlipbookSizeX">1</int>
+            <int name="FlipbookSizeY">1</int>
+            <bool name="FlipbookStartRandom">false</bool>
+            <NumberRange name="Lifetime">1 2 </NumberRange>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="LockedToPart">true</bool>
+            <token name="Orientation">0</token>
+            <float name="Rate">30</float>
+            <NumberRange name="RotSpeed">0 0 </NumberRange>
+            <NumberRange name="Rotation">-360 360 </NumberRange>
+            <bool name="DefinesCapabilities">false</bool>
+            <token name="Shape">0</token>
+            <token name="ShapeInOut">0</token>
+            <float name="ShapePartial">1</float>
+            <token name="ShapeStyle">0</token>
+            <NumberSequence name="Size">0 0.35 0 1 0.35 0 </NumberSequence>
+            <int64 name="SourceAssetId">-1</int64>
+            <NumberRange name="Speed">0 0 </NumberRange>
+            <Vector2 name="SpreadAngle">
+              <X>0</X>
+              <Y>0</Y>
+            </Vector2>
+            <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>http://www.roblox.com/asset/?id=12807576645</uri>
+            </Content>
+            <float name="TimeScale">1</float>
+            <NumberSequence name="Transparency">0 1 0 0.50084037 0.8875 0 1 1 0 </NumberSequence>
+            <float name="VelocityInheritance">0</float>
+            <bool name="WindAffectsDrag">false</bool>
+            <float name="ZOffset">-1</float>
+          </Properties>
+        </Item></Item><Item class="Part" referent="AURA26_4"><Properties><string name="Name">Right Leg</string><Vector3 name="size">
+            <X>1</X>
+            <Y>2</Y>
+            <Z>1</Z>
+          </Vector3>
+          <CoordinateFrame name="CFrame">
+            <X>0.5</X>
+            <Y>-2</Y>
+            <Z>0</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="Anchored">false</bool><bool name="CanCollide">false</bool><bool name="CanQuery">false</bool><bool name="CanTouch">false</bool><bool name="CastShadow">false</bool><bool name="Massless">true</bool><bool name="Locked">true</bool><float name="Transparency">1</float></Properties><Item class="ParticleEmitter" referent="2102"><Properties>
+            <string name="Name">ParticleEmitter</string>
+            <Vector3 name="Acceleration">
+              <X>0</X>
+              <Y>0</Y>
+              <Z>0</Z>
+            </Vector3>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">10</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 0.94509804 0.54509807 1 0 0.26643598 1 0.75686276 0.5411765 0 0.5242215 1 1 0.56078434 0 0.7681661 0.5921569 1 0.58431375 0 1 0.4509804 0.7607843 1 0 </ColorSequence>
+            <float name="Drag">0</float>
+            <token name="EmissionDirection">1</token>
+            <bool name="Enabled">true</bool>
+            <bool name="FlipbookBlendFrames">true</bool>
+            <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+            <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+            <token name="FlipbookLayout">2</token>
+            <token name="FlipbookMode">1</token>
+            <int name="FlipbookSizeX">1</int>
+            <int name="FlipbookSizeY">1</int>
+            <bool name="FlipbookStartRandom">false</bool>
+            <NumberRange name="Lifetime">1 2 </NumberRange>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="LockedToPart">true</bool>
+            <token name="Orientation">0</token>
+            <float name="Rate">30</float>
+            <NumberRange name="RotSpeed">0 0 </NumberRange>
+            <NumberRange name="Rotation">-360 360 </NumberRange>
+            <bool name="DefinesCapabilities">false</bool>
+            <token name="Shape">0</token>
+            <token name="ShapeInOut">0</token>
+            <float name="ShapePartial">1</float>
+            <token name="ShapeStyle">0</token>
+            <NumberSequence name="Size">0 0.35 0 1 0.35 0 </NumberSequence>
+            <int64 name="SourceAssetId">-1</int64>
+            <NumberRange name="Speed">0 0 </NumberRange>
+            <Vector2 name="SpreadAngle">
+              <X>0</X>
+              <Y>0</Y>
+            </Vector2>
+            <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>http://www.roblox.com/asset/?id=12807576645</uri>
+            </Content>
+            <float name="TimeScale">1</float>
+            <NumberSequence name="Transparency">0 1 0 0.50084037 0.8875 0 1 1 0 </NumberSequence>
+            <float name="VelocityInheritance">0</float>
+            <bool name="WindAffectsDrag">false</bool>
+            <float name="ZOffset">-1</float>
+          </Properties>
+        </Item></Item><Item class="Part" referent="AURA26_5"><Properties><string name="Name">Head</string><Vector3 name="size">
+            <X>1.1978998</X>
+            <Y>1.2024</Y>
+            <Z>1.1978002</Z>
+          </Vector3>
+          <CoordinateFrame name="CFrame">
+            <X>0</X>
+            <Y>1.5</Y>
+            <Z>0</Z>
+            <R00>1</R00>
+            <R01>0</R01>
+            <R02>0</R02>
+            <R10>0</R10>
+            <R11>1</R11>
+            <R12>0</R12>
+            <R20>0</R20>
+            <R21>0</R21>
+            <R22>1</R22>
+          </CoordinateFrame>
+          <bool name="Anchored">false</bool><bool name="CanCollide">false</bool><bool name="CanQuery">false</bool><bool name="CanTouch">false</bool><bool name="CastShadow">false</bool><bool name="Massless">true</bool><bool name="Locked">true</bool><float name="Transparency">1</float></Properties><Item class="ParticleEmitter" referent="2103"><Properties>
+            <string name="Name">ParticleEmitter</string>
+            <Vector3 name="Acceleration">
+              <X>0</X>
+              <Y>0</Y>
+              <Z>0</Z>
+            </Vector3>
+            <BinaryString name="AttributesSerialize" />
+            <float name="Brightness">10</float>
+            <SecurityCapabilities name="Capabilities">0</SecurityCapabilities>
+            <ColorSequence name="Color">0 0.94509804 0.54509807 1 0 0.26643598 1 0.75686276 0.5411765 0 0.5242215 1 1 0.56078434 0 0.7681661 0.5921569 1 0.58431375 0 1 0.4509804 0.7607843 1 0 </ColorSequence>
+            <float name="Drag">0</float>
+            <token name="EmissionDirection">1</token>
+            <bool name="Enabled">true</bool>
+            <bool name="FlipbookBlendFrames">true</bool>
+            <NumberRange name="FlipbookFramerate">1 1 </NumberRange>
+            <string name="FlipbookIncompatible">Particle texture must be 1024 by 1024 to use flipbooks.</string>
+            <token name="FlipbookLayout">2</token>
+            <token name="FlipbookMode">1</token>
+            <int name="FlipbookSizeX">1</int>
+            <int name="FlipbookSizeY">1</int>
+            <bool name="FlipbookStartRandom">false</bool>
+            <NumberRange name="Lifetime">1 2 </NumberRange>
+            <float name="LightEmission">1</float>
+            <float name="LightInfluence">0</float>
+            <bool name="LockedToPart">true</bool>
+            <token name="Orientation">0</token>
+            <float name="Rate">30</float>
+            <NumberRange name="RotSpeed">0 0 </NumberRange>
+            <NumberRange name="Rotation">-360 360 </NumberRange>
+            <bool name="DefinesCapabilities">false</bool>
+            <token name="Shape">0</token>
+            <token name="ShapeInOut">0</token>
+            <float name="ShapePartial">1</float>
+            <token name="ShapeStyle">0</token>
+            <NumberSequence name="Size">0 0.35 0 1 0.35 0 </NumberSequence>
+            <int64 name="SourceAssetId">-1</int64>
+            <NumberRange name="Speed">0 0 </NumberRange>
+            <Vector2 name="SpreadAngle">
+              <X>0</X>
+              <Y>0</Y>
+            </Vector2>
+            <NumberSequence name="Squash">0 0 0 1 0 0 </NumberSequence>
+            <BinaryString name="Tags" />
+            <Content name="TextureContent">
+              <uri>http://www.roblox.com/asset/?id=12807576645</uri>
+            </Content>
+            <float name="TimeScale">1</float>
+            <NumberSequence name="Transparency">0 1 0 0.50084037 0.8875 0 1 1 0 </NumberSequence>
+            <float name="VelocityInheritance">0</float>
+            <bool name="WindAffectsDrag">false</bool>
+            <float name="ZOffset">-1</float>
+          </Properties>
+        </Item></Item></Item><SharedStrings>
+    <SharedString md5="FVE3S1vlgkBkHUufpLQCqg==">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</SharedString>
+    <SharedString md5="KZu/yzpZi5z7IywpzqMBrA==">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</SharedString>
+    <SharedString md5="jMO+3ujG8WZbCV+FbCLE5Q==">Q1NHUEhTAAAAAEJMT0NL</SharedString>
+    <SharedString md5="rxNJufX5oaagQE3qNtzJSQ==" />
+    <SharedString md5="xtat+MzMkE2MkNRvQNuQAg==">Q1NHUEhTCAAAAAIAKLUv/WBoAJ0EAMQEAQAAABgAAAAsVwwgAb8u83+/AwAAvwAAAD8u838/AwAAP6SqFAq2qlXlb1tnAAGs3r4GrN4+AazePppDb76+mkNvPr+/MvP/v76/viOoUc7ZMov1M2BUUEN3UIwFYhIu7vOv8v1xjoShXvnoxbfiAzsl/xD+/wT/uo1f7oio4JVXQiHkF//h025VxVxHRRzhNA==</SharedString>
+  </SharedStrings>
+</roblox>

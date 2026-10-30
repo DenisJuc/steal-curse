@@ -136,7 +136,7 @@ function ShrinePanel.Start(
 		{}
 
 	local panel, content =
-		UIKit.modal(screen, "ShrineMenu", "SHRINE", colors.Gold, Vector2.new(PANEL_WIDTH, 620), "Shrine")
+		UIKit.modal(screen, "ShrineMenu", "PEDESTALS", colors.Gold, Vector2.new(PANEL_WIDTH, 620), "Pedestals")
 
 	local header = UIKit.create("Frame", {
 		Name = "Header",

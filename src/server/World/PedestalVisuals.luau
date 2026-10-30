@@ -11,6 +11,7 @@ local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local BuildUtil = require(script.Parent.BuildUtil)
 
 local PedestalVisuals = {}
@@ -28,13 +29,16 @@ export type SlotState = {
 	Locked: boolean?,
 	Id: string?,
 	Mutation: string?,
+	Size: string?,
 	IncomePerSec: number?,
 	Price: number?,
 	IsNext: boolean?,
 }
 
-local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mutationId: string?)
-	local part = RelicModels.build(relicId, CFrame.new(top.Position + Vector3.new(0, 2.4, 0)))
+local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mutationId: string?, sizeId: string?)
+	local scale = SizeConfig.scaleOf(sizeId)
+	local yLift = 2.4 + (scale - 1) * 0.9
+	local part = RelicModels.build(relicId, CFrame.new(top.Position + Vector3.new(0, yLift, 0)), scale)
 	if not part then
 		return
 	end
@@ -46,6 +50,14 @@ local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mut
 		local mutationColor = Color3.fromHex(mutation.Color)
 		BuildUtil.sparkles(part, mutationColor, 10)
 		BuildUtil.light(part, mutationColor, 10, 2)
+	end
+	local size = SizeConfig.normalize(sizeId)
+	if size == "Titanic" then
+		BuildUtil.sparkles(part, Color3.fromRGB(255, 210, 90), 14)
+		BuildUtil.light(part, Color3.fromRGB(255, 200, 80), 14, 3)
+	elseif size == "Huge" then
+		BuildUtil.sparkles(part, Color3.fromRGB(180, 220, 255), 8)
+		BuildUtil.light(part, Color3.fromRGB(160, 200, 255), 8, 2)
 	end
 end
 
@@ -150,9 +162,18 @@ end
 local function relicLook(state: SlotState): (string, Color3)
 	local relic = state.Id and RelicConfig.ById[state.Id]
 	local name = if relic then relic.Name else (state.Id or "")
+	local size = SizeConfig.normalize(state.Size)
+	if size then
+		name = `{SizeConfig.Label[size]} {name}`
+	end
 	local mutation = state.Mutation and MutationConfig.ById[state.Mutation]
 	if mutation then
 		return `{state.Mutation} {name}`, Color3.fromHex(mutation.Color)
+	end
+	if size == "Titanic" then
+		return name, GOLD
+	elseif size == "Huge" then
+		return name, Color3.fromRGB(160, 210, 255)
 	end
 	local tier = relic and RarityConfig.Get(relic.Tier)
 	return name, if tier then Color3.fromHex(tier.Color) else WHITE
@@ -185,7 +206,16 @@ local function updateInfo(top: BasePart, state: SlotState)
 	level.Visible = true
 	local levelText = level:FindFirstChild("Text") :: TextLabel
 	levelText.Text = `Lv {state.Level or 1}`
-	tag.Text = if state.Locked then "LOCKED" else ""
+	local size = SizeConfig.normalize(state.Size)
+	if state.Locked then
+		tag.Text = "LOCKED"
+	elseif size == "Titanic" then
+		tag.Text = "TITANIC"
+	elseif size == "Huge" then
+		tag.Text = "HUGE"
+	else
+		tag.Text = ""
+	end
 end
 
 function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
@@ -223,7 +253,9 @@ function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 			then 0.8 - 0.6 * (level - 1) / (Config.Economy.PedestalMaxLevel - 1)
 			else 1
 
-		local key = if state.Owned and state.Id then `{state.Id}|{state.Mutation or ""}` else ""
+		local key = if state.Owned and state.Id
+			then `{state.Id}|{state.Mutation or ""}|{state.Size or ""}`
+			else ""
 		if pedestal:GetAttribute("ShownKey") ~= key then
 			pedestal:SetAttribute("ShownKey", key)
 			local old = pedestal:FindFirstChild("RelicDisplay")
@@ -231,7 +263,7 @@ function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 				old:Destroy()
 			end
 			if state.Owned and state.Id then
-				buildDisplay(pedestal, top, state.Id, state.Mutation)
+				buildDisplay(pedestal, top, state.Id, state.Mutation, state.Size)
 			end
 		end
 

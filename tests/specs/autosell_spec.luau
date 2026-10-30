@@ -160,6 +160,53 @@ return {
 		Run = function()
 			expect.equal(AutoSell.favoriteKey("A", nil), "A", "plain key")
 			expect.equal(AutoSell.favoriteKey("A", "Golden"), "A|Golden", "mutated key")
+			expect.equal(AutoSell.favoriteKey("A", nil, "Huge"), "A|Huge", "huge key")
+			expect.equal(AutoSell.favoriteKey("A", "Golden", "Titanic"), "A|Golden|Titanic", "mutated titanic key")
+		end,
+	},
+	{
+		Name = "first Sized stamp is kept; excess sells under duplicate rules",
+		Run = function()
+			local rules = withTier("Rare", "SellDuplicates", { SellAllDuplicates = false })
+			local keep, keepReason = AutoSell.decide(rules, {
+				Tier = "Rare",
+				BaseOneIn = 100,
+				Duplicate = false,
+				First = false,
+				Mutated = false,
+				Favorite = false,
+				Sized = true,
+				SizedDuplicate = false,
+			})
+			expect.equal(keep, false, "keep first sized")
+			expect.equal(keepReason, "Sized", "sized reason")
+			local sell, sellReason = AutoSell.decide(rules, {
+				Tier = "Rare",
+				BaseOneIn = 100,
+				Duplicate = true,
+				First = false,
+				Mutated = false,
+				Favorite = false,
+				Sized = true,
+				SizedDuplicate = true,
+			})
+			expect.equal(sell, true, "sell excess sized")
+			expect.equal(sellReason, "Duplicate", "duplicate reason")
+		end,
+	},
+	{
+		Name = "sellAll keeps one sized identity and sells extras",
+		Run = function()
+			local uids = AutoSell.sellAll({
+				{ Uid = 1, Displayed = false, Locked = false, Favorite = false, Floating = false, Sized = true, IdentityKey = "A|Huge" },
+				{ Uid = 2, Displayed = false, Locked = false, Favorite = false, Floating = false, Sized = true, IdentityKey = "A|Huge" },
+				{ Uid = 3, Displayed = false, Locked = false, Favorite = false, Floating = false, Sized = true, IdentityKey = "B|Titanic" },
+				{ Uid = 4, Displayed = false, Locked = false, Favorite = false, Floating = false, Sized = false, IdentityKey = "C" },
+			})
+			table.sort(uids)
+			expect.equal(#uids, 2, "one excess Huge + one Normal")
+			expect.equal(uids[1], 2, "second Huge sold")
+			expect.equal(uids[2], 4, "normal sold")
 		end,
 	},
 }

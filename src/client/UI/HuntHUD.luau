@@ -176,6 +176,17 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		TextStrokeTransparency = 0.5,
 		Parent = bottom,
 	})
+	local hintIcon = Icons.image(hint, "Info", 22)
+	if hintIcon then
+		hintIcon.AnchorPoint = Vector2.new(1, 0.5)
+		local function placeHintIcon()
+			hintIcon.Visible = hint.Text ~= ""
+			hintIcon.Position = UDim2.new(0.5, -hint.TextBounds.X / 2 - 6, 0.5, 0)
+		end
+		hint:GetPropertyChangedSignal("TextBounds"):Connect(placeHintIcon)
+		hint:GetPropertyChangedSignal("Text"):Connect(placeHintIcon)
+		placeHintIcon()
+	end
 
 	local signalInfo = UIKit.label({
 		Name = "SignalInfo",
@@ -190,6 +201,21 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		Parent = screen,
 	})
 	UIKit.scaler(signalInfo)
+
+	-- Active Hunt Quarry chase (server attributes) — visible in the wild without Collection menus.
+	local quarryInfo = UIKit.label({
+		Name = "QuarryInfo",
+		AnchorPoint = Vector2.new(0.5, 1),
+		Position = UDim2.new(0.5, 0, 1, -268),
+		Size = UDim2.fromOffset(520, 26),
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextSize = 17,
+		TextColor3 = colors.Gold,
+		TextStrokeTransparency = 0.35,
+		Visible = false,
+		Parent = screen,
+	})
+	UIKit.scaler(quarryInfo)
 
 	-- Hunt Streak readout (top center while a streak is going): the multiplier and the time left
 	-- before it ends.
@@ -212,6 +238,15 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		TextStrokeTransparency = 0.2,
 		Parent = streakBox,
 	})
+	local streakIcon = Icons.image(streakLabel, "Streak", 34)
+	if streakIcon then
+		streakIcon.AnchorPoint = Vector2.new(1, 0.5)
+		local function placeIcon()
+			streakIcon.Position = UDim2.new(0.5, -streakLabel.TextBounds.X / 2 - 4, 0.5, -1)
+		end
+		streakLabel:GetPropertyChangedSignal("TextBounds"):Connect(placeIcon)
+		placeIcon()
+	end
 	local streakTrack = UIKit.create("Frame", {
 		Name = "Timer",
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -409,6 +444,23 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		slot.Visible = visible
 	end
 
+	local function refreshQuarryInfo()
+		local name = player:GetAttribute("HuntQuarryName")
+		local useful = player:GetAttribute("HuntQuarryUseful") == true
+		local detail = player:GetAttribute("HuntQuarryNeedDetail")
+		if type(name) == "string" and name ~= "" and useful then
+			local why = if type(detail) == "string" and detail ~= "" then detail else "focused binds"
+			quarryInfo.Text = `Chase: {name} — {why}`
+			quarryInfo.Visible = sightOn
+		else
+			quarryInfo.Visible = false
+		end
+	end
+	player:GetAttributeChangedSignal("HuntQuarryName"):Connect(refreshQuarryInfo)
+	player:GetAttributeChangedSignal("HuntQuarryUseful"):Connect(refreshQuarryInfo)
+	player:GetAttributeChangedSignal("HuntQuarryNeedDetail"):Connect(refreshQuarryInfo)
+	refreshQuarryInfo()
+
 	function hud.SetSightMode(on: boolean)
 		if on ~= sightOn then
 			Motion.punch(sightButton, 1.5)
@@ -421,6 +473,9 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 		signalInfo.Visible = on
 		if not on then
 			bindSlot.Visible = false
+			quarryInfo.Visible = false
+		else
+			refreshQuarryInfo()
 		end
 	end
 

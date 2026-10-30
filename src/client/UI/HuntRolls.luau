@@ -6,6 +6,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
+local Players = game:GetService("Players")
+
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
@@ -23,6 +25,7 @@ export type Header = {
 	BonusCount: number?,
 	BonusMultiplier: number?,
 	Tags: { string }?,
+	CollectionEssence: number?,
 }
 
 local PAPER_SIZE = Vector2.new(124, 172)
@@ -414,6 +417,8 @@ end
 
 local function footerText(results: { any }): string
 	local new, sold, soldCE = 0, 0, 0
+	local focusId = Players.LocalPlayer:GetAttribute("BoardFocusId")
+	local rank3Mut = false
 	for _, result in results do
 		if result.First == true or result.NewVariant == true then
 			new += 1
@@ -422,8 +427,21 @@ local function footerText(results: { any }): string
 			sold += 1
 			soldCE += result.Sold
 		end
+		if
+			type(focusId) == "string"
+			and focusId ~= ""
+			and result.Id == focusId
+			and type(result.Mutation) == "string"
+			and result.Mutation ~= ""
+			and type(result.Sold) ~= "number"
+		then
+			rank3Mut = true
+		end
 	end
 	local parts = {}
+	if rank3Mut then
+		table.insert(parts, "Rank 3 mutation secured")
+	end
 	if new > 0 then
 		table.insert(parts, `{new} new to your Codex`)
 	end
@@ -473,7 +491,10 @@ function HuntRolls.Play(results: { any }, header: Header?, onDone: () -> ())
 
 	local count = header and header.BonusCount or #results - #captured
 	local boost = header and header.BonusMultiplier
-	current.Header.Text = `Sealed!  +{count} bonus finds`
+	local essence = header and header.CollectionEssence
+	current.Header.Text = if type(essence) == "number" and essence > 0
+		then `Sealed!  +{count} bonus finds · +{essence} Essence`
+		else `Sealed!  +{count} bonus finds`
 		.. (if boost and boost > 1 then `  (x{Format.multiplier(boost)})` else "")
 	local tags = header and header.Tags
 	current.Tags.Text = if tags and #tags > 0 then table.concat(tags, "  |  ") else ""

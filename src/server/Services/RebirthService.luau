@@ -1,12 +1,13 @@
 -- Rebirth (Shared/Rebirth, Config.Rebirth). Remote "Rebirth" (RemoteFunction): "Get" returns the
--- state for the menu; "Rebirth" re-checks the cost on the server, then resets CE, pedestal levels
--- and skill ranks (Rebirth.apply) and keeps relics, slots, the Codex, titles, showcases, lanterns,
--- mastery and potions. Each Rebirth multiplies luck (the "Rebirth" Luck factor here) and income
--- (EconomyService applies it on top of the additive Income bonuses) for good.
+-- state for the menu; "Rebirth" re-checks the cost on the server, then applies Rebirth.apply.
+-- Live (production): resets CE, pedestal levels, skill ranks; keeps relics/Codex/slots/etc.
+-- SoftCap_P4 B+: resets CE only; keeps skills, pedestals, Collection/Fusion/Charms.
+-- Each Rebirth increments count once (permanent income/luck from formulas — no double-grant).
 -- Fires GameEvents "Rebirthed" so skills, pedestals and multipliers refresh; mirrors "Rebirths".
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Rebirth = require(ReplicatedStorage.Shared.Rebirth)
@@ -20,7 +21,9 @@ local RebirthRemote = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Re
 
 local RebirthService = {}
 
-local settings = Config.Rebirth
+local function settings()
+	return BalanceTrials.rebirthSettings(Config.Rebirth)
+end
 
 export type State = {
 	Rebirths: number,
@@ -29,7 +32,37 @@ export type State = {
 	LuckMultiplier: number,
 	NextIncomeMultiplier: number,
 	NextLuckMultiplier: number,
+	Model: Rebirth.Model,
+	Resets: { string },
+	Keeps: { string },
 }
+
+local function resetsFor(model: Rebirth.Model): { string }
+	if model == "BPlus" then
+		return { "Current Cursed Energy" }
+	end
+	return { "Cursed Energy", "Pedestal levels", "Skill ranks" }
+end
+
+local function keepsFor(model: Rebirth.Model): { string }
+	if model == "BPlus" then
+		return {
+			"Skill ranks (Core Luck 19–25 & Mastery 3–5 unlock after R1)",
+			"Pedestal levels and investments",
+			"Relics, slots, and Codex",
+			"Fusion Board, Charms, Essence",
+			"Showcases, lanterns, zone mastery, potions",
+			"Permanent income & luck from prior Rebirths",
+		}
+	end
+	return {
+		"Relics and pedestal slots",
+		"Codex, titles and bonuses",
+		"Showcases and lanterns",
+		"Zone mastery and potions",
+		"Collection Essence, fusions, Resonance (Studio)",
+	}
+end
 
 function RebirthService.Count(player: Player): number
 	local data = DataService.Get(player)
@@ -38,13 +71,18 @@ end
 
 function RebirthService.State(player: Player): State
 	local n = RebirthService.Count(player)
+	local s = settings()
+	local model = BalanceTrials.rebirthModel()
 	return {
 		Rebirths = n,
-		Cost = Rebirth.cost(settings, n),
-		IncomeMultiplier = Rebirth.incomeMultiplier(settings, n),
-		LuckMultiplier = Rebirth.luckMultiplier(settings, n),
-		NextIncomeMultiplier = Rebirth.incomeMultiplier(settings, n + 1),
-		NextLuckMultiplier = Rebirth.luckMultiplier(settings, n + 1),
+		Cost = Rebirth.cost(s, n),
+		IncomeMultiplier = Rebirth.incomeMultiplier(s, n),
+		LuckMultiplier = Rebirth.luckMultiplier(s, n),
+		NextIncomeMultiplier = Rebirth.incomeMultiplier(s, n + 1),
+		NextLuckMultiplier = Rebirth.luckMultiplier(s, n + 1),
+		Model = model,
+		Resets = resetsFor(model),
+		Keeps = keepsFor(model),
 	}
 end
 
@@ -58,21 +96,35 @@ function RebirthService.TryRebirth(player: Player): (boolean, string)
 	if not data then
 		return false, "Your data is still loading."
 	end
-	local cost = Rebirth.cost(settings, data.Rebirths or 0)
+	local s = settings()
+	local cost = Rebirth.cost(s, data.Rebirths or 0)
 	if data.CE + 1e-9 < cost then
 		return false, `Rebirth needs {Format.ce(cost)} CE.`
 	end
-	Rebirth.apply(data)
+	local model = BalanceTrials.rebirthModel()
+	Rebirth.apply(data, model)
 	mirror(player)
 	EconomyService.Mirror(player)
 	MultiplierService.Refresh(player)
 	GameEvents.Fire("Rebirthed", player)
 	DataService.RequestSave(player)
 	local n = data.Rebirths
-	return true,
-		`Rebirth {n}! Income x{Format.multiplier(Rebirth.incomeMultiplier(settings, n))}, luck x{Format.multiplier(
-			Rebirth.luckMultiplier(settings, n)
-		)}.`
+	local keepNote = if model == "BPlus"
+		then " Skills, pedestals, and Fusion kept. Choose a Resonance in Collection."
+		else ""
+	local msg =
+		`Rebirth {n}! Income x{Format.multiplier(Rebirth.incomeMultiplier(s, n))}, luck x{Format.multiplier(
+			Rebirth.luckMultiplier(s, n)
+		)}.{keepNote}`
+	local Notify = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Notify") :: RemoteEvent
+	Notify:FireClient(
+		player,
+		if model == "BPlus"
+			then `Rebirth {n} — skills & Fusion kept. Pick Resonance in Collection.`
+			else `Rebirth {n} — permanent income & luck up.`,
+		"Milestone"
+	)
+	return true, msg
 end
 
 local function onInvoke(player: Player, action: any)
@@ -90,7 +142,7 @@ end
 
 function RebirthService.Init()
 	MultiplierService.Register("Luck", "Rebirth", function(player)
-		return Rebirth.luckMultiplier(settings, RebirthService.Count(player))
+		return Rebirth.luckMultiplier(settings(), RebirthService.Count(player))
 	end)
 	RemoteGuard.Function(RebirthRemote, onInvoke, "Shrine")
 	DataService.OnPlayerLoaded(mirror)

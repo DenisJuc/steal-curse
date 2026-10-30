@@ -228,6 +228,7 @@ function SignalService.Init(points: { SpawnPoint })
 		while true do
 			task.wait(0.5)
 			local now = workspace:GetServerTimeNow()
+			local CollectionService = require(script.Parent.CollectionService)
 			for player, state in states do
 				if state.RegenAt and now >= state.RegenAt then
 					state.RegenAt = nil
@@ -240,6 +241,7 @@ function SignalService.Init(points: { SpawnPoint })
 					updateRegen(state, now)
 					push(player, state)
 				end
+				CollectionService.TryFreeSignal(player)
 			end
 		end
 	end)

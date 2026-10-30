@@ -10,6 +10,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local ServerStorage = game:GetService("ServerStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -28,7 +29,11 @@ type SaveState = {
 	Pending: boolean,
 }
 
-local store = ProfileStore.New(Config.Save.StoreName, DataTemplate.Template)
+-- Backing store for the live DataStore name. In Studio we always session through .Mock so
+-- playtests never read/write production PlayerData keys — even if API Services are enabled.
+local backingStore = ProfileStore.New(Config.Save.StoreName, DataTemplate.Template)
+local studioIsolated = RunService:IsStudio()
+local store = if studioIsolated then backingStore.Mock else backingStore
 local profiles: { [Player]: any } = {}
 local saveStates: { [Player]: SaveState } = {}
 local loadedCallbacks: { (Player) -> () } = {}
@@ -110,6 +115,13 @@ local function release(player: Player)
 end
 
 function DataService.Init()
+	if studioIsolated then
+		print(
+			`[DataService] Studio isolated ProfileStore.Mock — store="{Config.Save.StoreName}" (mock only; never touches production DataStores). ProfileStore API warnings about unavailable services are expected/safe.`
+		)
+	else
+		print(`[DataService] Live ProfileStore — store="{Config.Save.StoreName}"`)
+	end
 	Players.PlayerAdded:Connect(load)
 	Players.PlayerRemoving:Connect(release)
 	for _, player in Players:GetPlayers() do
@@ -202,9 +214,14 @@ function DataService.GetStoreState(): string
 	return ProfileStore.DataStoreState
 end
 
--- Exposes the store for Studio persistence tests (store.Mock never touches real data).
+-- Exposes the backing ProfileStore. PersistenceTests use .Mock explicitly.
+-- Runtime sessions in Studio already go through backingStore.Mock (see `store` above).
 function DataService.GetStore(): any
-	return store
+	return backingStore
+end
+
+function DataService.IsStudioIsolated(): boolean
+	return studioIsolated
 end
 
 function DataService.Wipe(player: Player)

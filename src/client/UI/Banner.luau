@@ -1,6 +1,6 @@
 -- Big celebratory banner in the upper middle of the screen, above every menu. It never blocks
--- clicks, pops in on a spring with a light sweep and shrinks away on its own; a newer banner
--- replaces an older one.
+-- clicks. Banners queue: each one plays in full (pop in, hold, shrink away) before the next starts,
+-- so zone-depth and reward banners never stack on top of each other.
 
 local TweenService = game:GetService("TweenService")
 
@@ -10,13 +10,71 @@ local UIKit = require(script.Parent.UIKit)
 
 local Banner = {}
 
-local SHOW_SECONDS = 3.5
+local SHOW_SECONDS = 3.2
+local HIDE_SECONDS = 0.25
+local MAX_QUEUE = 4
+
+type Entry = { Title: string, Text: string, Color: Color3 }
 
 local holder: Frame? = nil
 local card: Frame? = nil
 local titleLabel: TextLabel? = nil
 local textLabel: TextLabel? = nil
-local showId = 0
+local queue: { Entry } = {}
+local playing = false
+
+local function playNext()
+	if playing then
+		return
+	end
+	local frame, inner, titleText, bodyText = holder, card, titleLabel, textLabel
+	if not frame or not inner or not titleText or not bodyText then
+		return
+	end
+	local entry = table.remove(queue, 1)
+	if not entry then
+		return
+	end
+	playing = true
+
+	titleText.Text = entry.Title
+	titleText.TextColor3 = entry.Color
+	bodyText.Text = entry.Text
+	local stroke = inner:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = entry.Color
+	end
+	local scale = inner:FindFirstChild("Juice") :: UIScale
+	Spring.stop(scale)
+	scale.Scale = 0.4
+	frame.Visible = true
+	Spring.target(scale, 3.4, 0.45, { Scale = 1 })
+	task.delay(0.15, function()
+		if frame.Visible and titleText.Text == entry.Title then
+			Motion.shine(inner, 0.8)
+		end
+	end)
+
+	task.delay(SHOW_SECONDS, function()
+		if titleText.Text ~= entry.Title then
+			playing = false
+			playNext()
+			return
+		end
+		Spring.stop(scale)
+		TweenService:Create(
+			scale,
+			TweenInfo.new(HIDE_SECONDS, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+			{ Scale = 0 }
+		):Play()
+		task.wait(HIDE_SECONDS + 0.05)
+		if #queue == 0 then
+			frame.Visible = false
+		end
+		playing = false
+		playNext()
+	end)
+end
 
 function Banner.Start(screen: ScreenGui)
 	local colors = UIKit.Colors
@@ -60,41 +118,19 @@ function Banner.Start(screen: ScreenGui)
 end
 
 function Banner.Show(title: string, text: string, color: Color3)
-	local frame, inner, titleText, bodyText = holder, card, titleLabel, textLabel
-	if not frame or not inner or not titleText or not bodyText then
+	-- Skip a duplicate of what's already playing or last in the queue.
+	local last = queue[#queue]
+	if last and last.Title == title and last.Text == text then
 		return
 	end
-	showId += 1
-	local myId = showId
-	titleText.Text = title
-	titleText.TextColor3 = color
-	bodyText.Text = text
-	local stroke = inner:FindFirstChildOfClass("UIStroke")
-	if stroke then
-		stroke.Color = color
+	if playing and titleLabel and titleLabel.Text == title and textLabel and textLabel.Text == text then
+		return
 	end
-	local scale = inner:FindFirstChild("Juice") :: UIScale
-	Spring.stop(scale)
-	scale.Scale = 0.4
-	frame.Visible = true
-	Spring.target(scale, 3.4, 0.45, { Scale = 1 })
-	task.delay(0.15, function()
-		if showId == myId then
-			Motion.shine(inner, 0.8)
-		end
-	end)
-	task.delay(SHOW_SECONDS, function()
-		if showId ~= myId then
-			return
-		end
-		Spring.stop(scale)
-		TweenService:Create(scale, TweenInfo.new(0.22, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0 })
-			:Play()
-		task.wait(0.25)
-		if showId == myId then
-			frame.Visible = false
-		end
-	end)
+	table.insert(queue, { Title = title, Text = text, Color = color })
+	while #queue > MAX_QUEUE do
+		table.remove(queue, 1)
+	end
+	task.spawn(playNext)
 end
 
 return Banner

@@ -5,6 +5,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local UIKit = require(script.Parent.UIKit)
 
 local RelicViewport = {}
@@ -23,7 +24,7 @@ local function frame(viewport: ViewportFrame, part: BasePart)
 end
 
 -- A new viewport showing `relicId` (unparented). `props` are applied to the ViewportFrame.
-function RelicViewport.new(relicId: string, props: { [string]: any }?): ViewportFrame
+function RelicViewport.new(relicId: string, props: { [string]: any }?, sizeId: string?): ViewportFrame
 	local viewport = UIKit.create("ViewportFrame", {
 		Name = "Render",
 		BackgroundTransparency = 1,
@@ -35,23 +36,24 @@ function RelicViewport.new(relicId: string, props: { [string]: any }?): Viewport
 	for key, value in props or {} do
 		(viewport :: any)[key] = value
 	end
-	RelicViewport.show(viewport, relicId)
+	RelicViewport.show(viewport, relicId, sizeId)
 	return viewport
 end
 
--- Replaces the relic shown in `viewport`.
-function RelicViewport.show(viewport: ViewportFrame, relicId: string)
+-- Replaces the relic shown in `viewport`. Optional sizeId scales Huge/Titanic.
+function RelicViewport.show(viewport: ViewportFrame, relicId: string, sizeId: string?)
 	for _, child in viewport:GetChildren() do
 		if child:IsA("BasePart") then
 			child:Destroy()
 		end
 	end
-	local part = RelicModels.build(relicId, VIEW_ANGLE)
+	local part = RelicModels.build(relicId, VIEW_ANGLE, SizeConfig.scaleOf(sizeId))
 	if part then
 		part.Parent = viewport
 		frame(viewport, part)
 	end
 	viewport:SetAttribute("RelicId", relicId)
+	viewport:SetAttribute("Size", sizeId or "")
 end
 
 -- Turns the shown relic around its vertical axis (detail panel spin).
@@ -63,8 +65,8 @@ function RelicViewport.spin(viewport: ViewportFrame, radians: number)
 end
 
 export type Cache = {
-	-- `key` tells apart copies that share a model (e.g. "<relicId>|<mutation>").
-	Get: (key: string, relicId: string) -> ViewportFrame,
+	-- `key` tells apart copies that share a model (e.g. "<relicId>|<mutation>|<size>").
+	Get: (key: string, relicId: string, sizeId: string?) -> ViewportFrame,
 	DetachAll: () -> (),
 }
 
@@ -89,7 +91,7 @@ function RelicViewport.cache(maxLive: number): Cache
 	end
 
 	return {
-		Get = function(key: string, relicId: string): ViewportFrame
+		Get = function(key: string, relicId: string, sizeId: string?): ViewportFrame
 			clock += 1
 			local entry = entries[key]
 			if entry then
@@ -99,7 +101,7 @@ function RelicViewport.cache(maxLive: number): Cache
 			if count >= maxLive then
 				evictOne()
 			end
-			local viewport = RelicViewport.new(relicId)
+			local viewport = RelicViewport.new(relicId, nil, sizeId)
 			entries[key] = { Viewport = viewport, Used = clock }
 			count += 1
 			return viewport

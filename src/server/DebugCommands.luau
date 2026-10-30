@@ -12,6 +12,7 @@
 --   /relocate          move your signals near you now
 --   /bindtime <sec>    change your hold-to-bind time; /bindtime reset restores it
 --   /huntstats         captures, cancels and average time between captures this session
+--   /analytics [start|stop|export|status]   Studio playtest session recording + export
 --   /forceroll <tier|relicId> [mutation]   grant an exact relic, e.g. /forceroll cosmic abyssal
 --   /simroll [count]   simulate rolls with your current context and compare with the math (Output)
 --   /setluck <x>       extra debug luck multiplier; /setluck reset
@@ -30,7 +31,8 @@
 --   /pedlevel <slot> <level>   set a pedestal level directly
 --   /rebirths <n>      set your Rebirth count (income and luck multipliers) without resetting anything
 --   /gamepass <name> [on|off]   pretend you own (or don't own) a game pass, e.g. /gamepass autoequip
---   /give <relicId> [mutation|none] [count]   grant exact copies through the full pipeline (auto-sell included)
+--   /give <relicId> [mutation|none] [huge|titanic|normal] [count]   grant copies (Size optional; Studio SoftCap)
+--   /sizekit [relicId]   Studio fixture: Huge + Titanic of a relic (defaults to a Rare) for visual/ownership checks
 --   /codexfill [n]     mark the first n relics (rarity order, default all) as discovered, without items
 --   /potion <luck|haste|fortune|all> [count]   give potions
 --   /clearbuffs        end every active potion buff
@@ -41,6 +43,9 @@
 --   /lostone [gift|false]   the Lost One near you (forced to give a gift / be the False Watcher)
 --   /falsewatcher [now]     a False Watcher on its last hop (walk up to it); now = it lunges at once
 --   /facepitch <deg|auto>   tip the jumpscare mask back this many degrees (tuning a new model)
+--   /p41smoke              Phase 4.1 integration smoke (mock ProfileStore): Rank2 reserve, Board ×1.28, retire, B+
+--   /p6smoke               Phase 6 smoke: Rank2→3 mut reserve, sell-all keep-1, BoardFocus, Rank3 fuse, B+
+--   /rewardpreview         Studio: grant ordinary dupes + new/mut/Huge/Titanic for feed/reveal check
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -88,6 +93,7 @@ local CurseService = require(script.Parent.Services.CurseService)
 local BountyService = require(script.Parent.Services.BountyService)
 local DiscoveryPipeline = require(script.Parent.DiscoveryPipeline)
 local PersistenceTests = require(script.Parent.Tests.PersistenceTests)
+local PlaytestAnalyticsService = require(script.Parent.Services.PlaytestAnalyticsService)
 local MapProps = require(script.Parent.World.MapProps)
 
 local Notify = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Notify") :: RemoteEvent
@@ -522,26 +528,53 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 		give = function(player, args)
 			local relicId = findRelic(args[1] or "")
 			if not relicId then
-				reply(player, "Usage: /give <relicId> [mutation|none] [count], e.g. /give SenzoBean golden 5")
+				reply(
+					player,
+					"Usage: /give <relicId> [mutation|none] [huge|titanic|normal] [count], e.g. /give SenzoBean none huge 1"
+				)
 				return
 			end
 			local mutation = nil
-			local countArg = args[2]
-			local noMutation = args[2] and (string.lower(args[2]) == "none" or string.lower(args[2]) == "nil")
-			if noMutation then
-				countArg = args[3]
-			elseif args[2] and not tonumber(args[2]) and args[2] ~= "" then
-				mutation = findMutation(args[2])
+			local size: string? = nil
+			local countArg: string? = nil
+			local function parseSize(token: string?): boolean
+				if not token then
+					return false
+				end
+				local lower = string.lower(token)
+				if lower == "huge" then
+					size = "Huge"
+					return true
+				elseif lower == "titanic" then
+					size = "Titanic"
+					return true
+				elseif lower == "normal" or lower == "base" then
+					size = nil
+					return true
+				end
+				return false
+			end
+			local i = 2
+			local token2 = args[i]
+			if token2 and (string.lower(token2) == "none" or string.lower(token2) == "nil") then
+				mutation = nil
+				i += 1
+			elseif token2 and not tonumber(token2) and not parseSize(token2) and token2 ~= "" then
+				mutation = findMutation(token2)
 				if not mutation then
-					reply(player, `Unknown mutation "{args[2]}".`)
+					reply(player, `Unknown mutation "{token2}".`)
 					return
 				end
-				countArg = args[3]
+				i += 1
 			end
+			if parseSize(args[i]) then
+				i += 1
+			end
+			countArg = args[i]
 			local count = math.clamp(math.floor(tonumber(countArg) or 1), 1, Config.Debug.MaxRollsPerCommand)
 			local entries = table.create(count)
 			for index = 1, count do
-				entries[index] = { Id = relicId, Mutation = mutation, Source = "Debug" }
+				entries[index] = { Id = relicId, Mutation = mutation, Size = size, Source = "Debug" }
 			end
 			local results = DiscoveryPipeline.GrantBatch(player, entries)
 			local sold = 0
@@ -550,7 +583,78 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 					sold += 1
 				end
 			end
-			reply(player, `Granted {count} x {if mutation then mutation .. " " else ""}{relicId} ({sold} auto-sold).`)
+			local label = `{if size then size .. " " else ""}{if mutation then mutation .. " " else ""}{relicId}`
+			reply(player, `Granted {count} x {label} ({sold} auto-sold).`)
+		end,
+
+		sizekit = function(player, args)
+			local relicId = findRelic(args[1] or "") or findRelic("RedStoneOfAia") or findRelic("SenzoBean")
+			if not relicId then
+				for _, relic in RelicConfig.Relics do
+					if relic.Tier == "Rare" then
+						relicId = relic.Id
+						break
+					end
+				end
+			end
+			if not relicId then
+				reply(player, "No relic id available for sizekit.")
+				return
+			end
+			local entries = {
+				{ Id = relicId, Mutation = nil, Size = "Huge", Source = "Debug" },
+				{ Id = relicId, Mutation = nil, Size = "Titanic", Source = "Debug" },
+			}
+			DiscoveryPipeline.GrantBatch(player, entries)
+			reply(player, `Size kit: Huge + Titanic {relicId}. Equip / float / check sell protect.`)
+		end,
+
+		rewardpreview = function(player)
+			-- Deterministic presentation sequence (same grant pipeline as real rolls).
+			local commonId = findRelic("SenzoBean") or findRelic("StealBall")
+			local uncommonId = findRelic("BuraBuraFruit") or findRelic("YutosRing")
+			local rareId = findRelic("RedStoneOfAia")
+			if not rareId then
+				for _, relic in RelicConfig.Relics do
+					if relic.Tier == "Rare" then
+						rareId = relic.Id
+						break
+					end
+				end
+			end
+			local epicId = nil
+			for _, relic in RelicConfig.Relics do
+				if relic.Tier == "Epic" then
+					epicId = relic.Id
+					break
+				end
+			end
+			if not (commonId and uncommonId and rareId) then
+				reply(player, "rewardpreview: missing roster ids")
+				return
+			end
+			local mut = findMutation("Golden")
+			local entries = {
+				{ Id = commonId, Source = "Debug" },
+				{ Id = commonId, Source = "Debug" },
+				{ Id = commonId, Source = "Debug" },
+				{ Id = uncommonId, Source = "Debug" },
+				{ Id = uncommonId, Source = "Debug" },
+				{ Id = rareId, Source = "Debug" },
+				{ Id = commonId, Mutation = mut, Source = "Debug" },
+				{ Id = rareId, Size = "Huge", Source = "Debug" },
+				{ Id = rareId, Size = "Titanic", Source = "Debug" },
+			}
+			if epicId then
+				table.insert(entries, { Id = epicId, Source = "Debug" })
+			end
+			DiscoveryPipeline.GrantBatch(player, entries)
+			reply(
+				player,
+				"Reward preview granted: 5 ordinary C/U dupes (one feed summary), Rare, Golden mut, Huge, Titanic"
+					.. (if epicId then ", Epic" else "")
+					.. ". Watch DiscoveryFeed + reveals."
+			)
 		end,
 
 		codexfill = function(player, args)
@@ -993,6 +1097,347 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			local text = `Captures {stats.Captures} | Cancels {stats.Cancels} | Avg between captures {average}`
 			reply(player, text)
 			print(`[HuntStats] {player.Name}: {text}`)
+		end,
+
+		analytics = function(player, args)
+			local sub = string.lower(args[1] or "status")
+			if sub == "start" then
+				local ok, msg = PlaytestAnalyticsService.Start(player)
+				reply(player, msg)
+				print(`[PlaytestAnalytics] /analytics start → {msg}`)
+			elseif sub == "stop" then
+				local ok, msg = PlaytestAnalyticsService.Stop(player)
+				reply(player, msg)
+				print(`[PlaytestAnalytics] /analytics stop → {msg}`)
+			elseif sub == "export" then
+				local ok, msg = PlaytestAnalyticsService.Export(player)
+				reply(player, msg)
+				print(`[PlaytestAnalytics] /analytics export → {msg}`)
+			else
+				local st = PlaytestAnalyticsService.GetStatus(player)
+				local msg = `Analytics recording={st.Recording} elapsed={st.Elapsed} events={st.EventCount} purchases={st.PurchaseCount} session={st.SessionId or "—"}`
+				reply(player, msg)
+				print(`[PlaytestAnalytics] {msg}`)
+			end
+		end,
+
+		-- Phase 4.1: seed Rank1 Board + copies on mock ProfileStore; verify reserve/Rank2/Board/retire/B+.
+		p41smoke = function(player)
+			local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
+			local CollectionConfig = require(ReplicatedStorage.Shared.CollectionConfig)
+			local CollectionMath = require(ReplicatedStorage.Shared.CollectionMath)
+			local AutoSell = require(ReplicatedStorage.Shared.AutoSell)
+			local Rebirth = require(ReplicatedStorage.Shared.Rebirth)
+			local CollectionService = require(script.Parent.Services.CollectionService)
+			local MultiplierService = require(script.Parent.Services.MultiplierService)
+
+			local lines = { "[p41smoke] Phase 4.1 integration (Studio mock store)" }
+			local function check(cond: boolean, label: string)
+				table.insert(lines, if cond then `  PASS  {label}` else `  FAIL  {label}`)
+				return cond
+			end
+
+			local allOk = true
+			allOk = check(DataService.IsStudioIsolated(), "ProfileStore.Mock isolation") and allOk
+			allOk = check(BalanceTrials.collectionEnabled(), "Collection enabled") and allOk
+			allOk = check(BalanceTrials.boardGlobalFusionIncome(), "SoftCap_P4 board-global income") and allOk
+			allOk = check(BalanceTrials.rebirthModel() == "BPlus", "B+ Rebirth model") and allOk
+			allOk = check(Config.Rebirth.BaseCost == 4e8, "BaseCost 400M") and allOk
+
+			local data = DataService.Get(player)
+			if not data then
+				reply(player, "p41smoke: data not loaded")
+				return
+			end
+
+			local relicId: string? = nil
+			for _, relic in RelicConfig.Relics do
+				if relic.Tier == "Common" then
+					relicId = relic.Id
+					break
+				end
+			end
+			if not relicId then
+				reply(player, "p41smoke: no Common relic")
+				return
+			end
+
+			-- Snapshot fields we mutate so we can restore a minimal clean board after.
+			local state = data.Collection
+			local prevEssence = state.Essence
+			local prevFusion = state.Fusion[relicId]
+			local prevPin = state.FusionPins[relicId]
+			local prevCE = data.CE
+			local prevRebirths = data.Rebirths
+			local prevCL = data.Skills.CoreLuck
+			local prevPedLevels = {}
+			for i, ped in data.Pedestals do
+				prevPedLevels[i] = ped.Level
+			end
+
+			-- Strip base copies of the test relic (leave pedestaled/locked alone).
+			local keptInv = {}
+			for _, item in data.Inventory do
+				if not (item.Id == relicId and item.Mutation == nil) then
+					table.insert(keptInv, item)
+				end
+			end
+			data.Inventory = keptInv
+
+			local function addBaseCopies(n: number)
+				data.Cosmetic.Uid = (data.Cosmetic.Uid or 0)
+				for _ = 1, n do
+					data.Cosmetic.Uid += 1
+					table.insert(data.Inventory, {
+						Uid = data.Cosmetic.Uid,
+						Id = relicId,
+						At = os.time(),
+						Source = "Debug",
+					})
+				end
+			end
+
+			state.Essence = 500
+			state.Fusion[relicId] = { Rank = 1, Charm = "Hunt" }
+			state.FusionPins[relicId] = true
+			addBaseCopies(5)
+
+			local need2 = CollectionMath.copiesForRank(2)
+			local reserved5 = CollectionService.IsFusionReserved(player, relicId, nil)
+			allOk = check(need2 == 5 and reserved5 == true, `AutoSell reserve at 5 copies (need={need2})`) and allOk
+
+			local rules = AutoSell.defaults({ "Common" })
+			rules.Tiers.Common = "SellDuplicates"
+			local sell5, reason5 = AutoSell.decide(rules, {
+				Tier = "Common",
+				BaseOneIn = 2,
+				First = false,
+				Mutated = false,
+				Duplicate = true,
+				Favorite = false,
+				FusionReserve = reserved5,
+			})
+			allOk = check(sell5 == false and reason5 == "FusionReserve", "AutoSell keeps 5th copy") and allOk
+
+			local beforeOwned = CollectionService.OwnedCopies(player, relicId)
+			local fuseOk, fuseMsg = CollectionService.TryFuse(player, relicId)
+			local rank = if state.Fusion[relicId] then state.Fusion[relicId].Rank else 0
+			local board = CollectionService.BoardIncomeMult(player)
+			local pedFuse = CollectionService.FusionIncomeMult(player, relicId)
+			allOk = check(fuseOk == true and rank == 2, `TryFuse Rank2 ({fuseMsg})`) and allOk
+			allOk = check(math.abs(board - 1.28) < 1e-9, `BoardIncomeMult ×1.28 (got {board})`) and allOk
+			allOk = check(pedFuse == 1, `per-ped FusionIncomeMult=1 under P4 (got {pedFuse})`) and allOk
+			allOk = check(CollectionService.OwnedCopies(player, relicId) == beforeOwned - CollectionMath.consumeForRank(2), "consumed Rank2 copies") and allOk
+
+			MultiplierService.Refresh(player)
+			EconomyService.Mirror(player)
+			local ips = player:GetAttribute("IncomePerSec")
+			allOk = check(type(ips) == "number", `IncomePerSec mirrored ({ips})`) and allOk
+
+			-- Retire
+			state.Essence = math.max(state.Essence, CollectionConfig.BoardRetireEssence or 80)
+			local retireOk, retireMsg = CollectionService.TryRetireBoard(player, relicId)
+			allOk = check(retireOk == true, `RetireBoard ({retireMsg})`) and allOk
+			allOk = check(state.Fusion[relicId] == nil, "Fusion cleared") and allOk
+			allOk = check(state.FusionPins[relicId] == nil, "pin cleared") and allOk
+			allOk = check(CollectionService.BoardIncomeMult(player) == 1, "Board mult back to ×1") and allOk
+
+			-- B+ preserve: re-seed Fusion, bump skills/peds/CE, apply B+
+			state.Fusion[relicId] = { Rank = 2, Charm = "Workshop" }
+			state.FusionPins[relicId] = true
+			state.Essence = 42
+			data.Skills.CoreLuck = 18
+			if data.Pedestals[1] then
+				data.Pedestals[1].Level = 25
+			end
+			data.CE = Config.Rebirth.BaseCost
+			local rebBefore = data.Rebirths or 0
+			Rebirth.apply(data, "BPlus")
+			allOk = check(data.CE == 0, "B+ CE=0") and allOk
+			allOk = check(data.Rebirths == rebBefore + 1, "B+ increments Rebirths") and allOk
+			allOk = check(data.Skills.CoreLuck == 18, "B+ keeps CoreLuck") and allOk
+			allOk = check(data.Pedestals[1] and data.Pedestals[1].Level == 25, "B+ keeps pedestal") and allOk
+			allOk = check(state.Fusion[relicId] and state.Fusion[relicId].Rank == 2, "B+ keeps Fusion") and allOk
+			allOk = check(state.Fusion[relicId] and state.Fusion[relicId].Charm == "Workshop", "B+ keeps Charm") and allOk
+			allOk = check(state.Essence == 42, "B+ keeps Essence") and allOk
+
+			-- Restore session-ish state (mock; still polite)
+			state.Essence = prevEssence
+			state.Fusion[relicId] = prevFusion
+			state.FusionPins[relicId] = prevPin
+			data.CE = prevCE
+			data.Rebirths = prevRebirths
+			data.Skills.CoreLuck = prevCL
+			for i, lvl in prevPedLevels do
+				if data.Pedestals[i] then
+					data.Pedestals[i].Level = lvl
+				end
+			end
+			MultiplierService.Refresh(player)
+			EconomyService.Mirror(player)
+			DataService.RequestSave(player)
+
+			local summary = if allOk then "ALL PASS" else "FAILURES — see Output"
+			table.insert(lines, `Result: {summary} (relic={relicId})`)
+			for _, line in lines do
+				print(line)
+			end
+			reply(player, `p41smoke: {summary}. Details in Output.`)
+		end,
+
+		-- Phase 6: mutated reserve, sell-all UID slots, BoardFocus, Rank3 fuse (Studio mock).
+		p6smoke = function(player)
+			local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
+			local CollectionConfig = require(ReplicatedStorage.Shared.CollectionConfig)
+			local CollectionMath = require(ReplicatedStorage.Shared.CollectionMath)
+			local AutoSell = require(ReplicatedStorage.Shared.AutoSell)
+			local CollectionService = require(script.Parent.Services.CollectionService)
+			local MultiplierService = require(script.Parent.Services.MultiplierService)
+
+			local lines = { "[p6smoke] Phase 6 Rank3 / mut-reserve (Studio mock store)" }
+			local function check(cond: boolean, label: string)
+				table.insert(lines, if cond then `  PASS  {label}` else `  FAIL  {label}`)
+				return cond
+			end
+
+			local allOk = true
+			allOk = check(DataService.IsStudioIsolated(), "ProfileStore.Mock isolation") and allOk
+			allOk = check(BalanceTrials.collectionEnabled(), "Collection enabled") and allOk
+			allOk = check(BalanceTrials.boardGlobalFusionIncome(), "SoftCap_P4 board-global income") and allOk
+			allOk = check(CollectionConfig.Rank3NeedsMutation == true, "Rank3NeedsMutation") and allOk
+
+			local data = DataService.Get(player)
+			if not data then
+				reply(player, "p6smoke: data not loaded")
+				return
+			end
+
+			local aId: string? = nil
+			local bId: string? = nil
+			for _, relic in RelicConfig.Relics do
+				if relic.Tier == "Common" then
+					if not aId then
+						aId = relic.Id
+					elseif not bId then
+						bId = relic.Id
+						break
+					end
+				end
+			end
+			if not aId or not bId then
+				reply(player, "p6smoke: need two Common relics")
+				return
+			end
+
+			local state = data.Collection
+			local prevEssence = state.Essence
+			local prevFocus = state.BoardFocusId
+			local prevFusionA = state.Fusion[aId]
+			local prevFusionB = state.Fusion[bId]
+			local prevPinA = state.FusionPins[aId]
+			local prevPinB = state.FusionPins[bId]
+
+			local function stripRelic(relicId: string)
+				local kept = {}
+				for _, item in data.Inventory do
+					if item.Id ~= relicId then
+						table.insert(kept, item)
+					end
+				end
+				data.Inventory = kept
+			end
+
+			local function addCopies(relicId: string, n: number, mutation: string?)
+				data.Cosmetic.Uid = data.Cosmetic.Uid or 0
+				for _ = 1, n do
+					data.Cosmetic.Uid += 1
+					table.insert(data.Inventory, {
+						Uid = data.Cosmetic.Uid,
+						Id = relicId,
+						Mutation = mutation,
+						At = os.time(),
+						Source = "Debug",
+					})
+				end
+			end
+
+			stripRelic(aId)
+			stripRelic(bId)
+			state.Essence = 800
+			state.Fusion[aId] = { Rank = 2, Charm = "Hunt" }
+			state.FusionPins[aId] = true
+			state.BoardFocusId = nil
+			addCopies(aId, 4, nil)
+			addCopies(aId, 1, "Golden")
+
+			allOk = check(CollectionMath.mutatedCopiesToReserve(state, aId) == 1, "mutatedCopiesToReserve=1 at Rank2") and allOk
+			allOk = check(CollectionService.IsFusionReserved(player, aId, "Golden") == true, "IsFusionReserved keeps sole mut") and allOk
+
+			-- Second mutated: sequential AutoSell may sell; sell-all still protects exactly one UID.
+			addCopies(aId, 1, "Golden")
+			allOk = check(CollectionService.IsFusionReserved(player, aId, "Golden") == false, "extra mut not reserved (owned>1)") and allOk
+			local reserved = CollectionService.FusionReserveByUid(player)
+			local mutKept = 0
+			local mutTotal = 0
+			for _, item in data.Inventory do
+				if item.Id == aId and item.Mutation ~= nil then
+					mutTotal += 1
+					if reserved[item.Uid] then
+						mutKept += 1
+					end
+				end
+			end
+			allOk = check(mutTotal == 2 and mutKept == 1, `sell-all keeps exactly 1 mut UID (kept={mutKept}/{mutTotal})`) and allOk
+
+			local focusResolved = CollectionMath.resolveBoardFocusId(state)
+			allOk = check(focusResolved == aId, "auto BoardFocus with one Rank2 candidate") and allOk
+
+			-- Second Rank2 candidate → Pursue sets focus
+			state.MutationGoalsClaimed.FirstGolden = state.MutationGoalsClaimed.FirstGolden or 1
+			state.Fusion[bId] = { Rank = 2, Charm = "Shrine" }
+			state.FusionPins[bId] = true
+			local setOk, setMsg = CollectionService.SetBoardFocus(player, bId)
+			allOk = check(setOk == true and state.BoardFocusId == bId, `SetBoardFocus B ({setMsg})`) and allOk
+			allOk = check(player:GetAttribute("BoardFocusId") == bId or CollectionMath.resolveBoardFocusId(state) == bId, "focus readable") and allOk
+
+			-- Rank3 fuse on A: need 4 base + 1 mut + essence
+			state.BoardFocusId = aId
+			state.Fusion[bId] = nil
+			state.FusionPins[bId] = nil
+			stripRelic(aId)
+			addCopies(aId, 4, nil)
+			addCopies(aId, 1, "Golden")
+			state.Essence = math.max(state.Essence, CollectionMath.fusionEssenceCost("Common", 3))
+			local fuseOk, fuseMsg = CollectionService.TryFuse(player, aId)
+			local rank = if state.Fusion[aId] then state.Fusion[aId].Rank else 0
+			local board = CollectionService.BoardIncomeMult(player)
+			allOk = check(fuseOk == true and rank == 3, `TryFuse Rank3 ({fuseMsg})`) and allOk
+			allOk = check(math.abs(board - 1.5) < 1e-9, `BoardIncomeMult ×1.50 (got {board})`) and allOk
+			allOk = check(state.BoardFocusId == nil, "BoardFocus cleared at max rank") and allOk
+			allOk = check(CollectionMath.mutatedCopiesToReserve(state, aId) == 0, "mut reserve cleared at Rank3") and allOk
+
+			MultiplierService.Refresh(player)
+			EconomyService.Mirror(player)
+
+			-- Restore
+			state.Essence = prevEssence
+			state.BoardFocusId = prevFocus
+			state.Fusion[aId] = prevFusionA
+			state.Fusion[bId] = prevFusionB
+			state.FusionPins[aId] = prevPinA
+			state.FusionPins[bId] = prevPinB
+			stripRelic(aId)
+			stripRelic(bId)
+			MultiplierService.Refresh(player)
+			EconomyService.Mirror(player)
+			DataService.RequestSave(player)
+
+			local summary = if allOk then "ALL PASS" else "FAILURES — see Output"
+			table.insert(lines, `Result: {summary} (A={aId} B={bId})`)
+			for _, line in lines do
+				print(line)
+			end
+			reply(player, `p6smoke: {summary}. Details in Output.`)
 		end,
 	}
 end

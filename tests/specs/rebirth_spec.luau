@@ -75,4 +75,47 @@ return {
 			expect.equal(Config.Save.StoreName, "PlayerData_v2", "fresh DataStore for the new economy")
 		end,
 	},
+	{
+		Name = "BPlus apply resets CE only and preserves skills pedestals Collection",
+		Run = function()
+			local data = deepCopy(DataTemplate.Template)
+			data.CE = 5e8
+			data.Pedestals = {
+				{ Level = 30, Locked = true, Uid = 7 },
+				{ Level = 12, Locked = false },
+			}
+			data.Skills.CoreLuck = 18
+			data.Skills.PedestalMastery = 2
+			data.Collection.Essence = 40
+			data.Collection.Fusion = { Zabimaru = { Rank = 1, Charm = "Hunt" } }
+			data.Inventory = { { Uid = 7, Id = "SenzoBean", At = 1, Source = "Scan" } }
+			data.Discovered = { SenzoBean = 1 }
+			Rebirth.apply(data, "BPlus")
+			expect.equal(data.Rebirths, 1, "one Rebirth")
+			expect.equal(data.CE, 0, "CE reset")
+			expect.equal(data.Pedestals[1].Level, 30, "pedestal kept")
+			expect.equal(data.Pedestals[2].Level, 12, "pedestal 2 kept")
+			expect.equal(data.Skills.CoreLuck, 18, "CoreLuck kept")
+			expect.equal(data.Skills.PedestalMastery, 2, "Mastery kept")
+			expect.equal(data.Collection.Essence, 40, "Essence kept")
+			expect.equal(data.Collection.Fusion.Zabimaru.Rank, 1, "Fusion kept")
+			expect.equal(data.Discovered.SenzoBean, 1, "Codex kept")
+			Rebirth.apply(data, "BPlus")
+			expect.equal(data.Rebirths, 2, "counts up once per apply")
+			expect.equal(data.Skills.CoreLuck, 18, "no skill wipe on R2")
+			expect.near(Rebirth.incomeMultiplier(settings, 2), settings.IncomeGrowth ^ 2, 1e-12, "perm income")
+		end,
+	},
+	{
+		Name = "Live apply still resets skills and pedestals (production path)",
+		Run = function()
+			local data = deepCopy(DataTemplate.Template)
+			data.CE = 5e8
+			data.Pedestals = { { Level = 20 } }
+			data.Skills.CoreLuck = 10
+			Rebirth.apply(data, "Live")
+			expect.equal(data.Pedestals[1].Level, 1, "ped reset")
+			expect.equal(data.Skills.CoreLuck, 0, "skill reset")
+		end,
+	},
 }

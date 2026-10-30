@@ -38,46 +38,47 @@ local PREMADE = {
 	ENABLE_BURST = true,
 	ENABLE_ORB = true,
 
-	-- Stage windows (seconds at TIME_SCALE = 1).
+	-- Stage windows (seconds at TIME_SCALE = 1). Everything plays on the sealed curse.
 	CIRCLE_START = 0.00,
-	CIRCLE_GROW = 0.20,
-	CIRCLE_EMIT_AT = 0.14, -- emit after grow so particles aren't scaled to ~5%
-	CIRCLE_END = 0.85,
-	-- Burst: short punch on the curse, then clear so the orb has room to play.
-	BURST_AT = 0.08,
-	BURST_END = 0.32,
-	-- Orb starts once the spike burst is done — long enough to rotate + animate.
-	ORB_AT = 0.38,
-	ORB_END = 0.38 + 1.8, -- = ORB_AT + ORB_PLAY_SECONDS
-	-- Hold at full radius a bit past the seal beat, then fade out.
-	FADE_START = 0.80,
-	FADE_END = 1.25,
+	CIRCLE_GROW = 0.45,
+	CIRCLE_EMIT_AT = 0.45, -- emit once full size so the waves aren't tiny
+	CIRCLE_END = 2.55,
+	-- Spike burst: cursed energy breaks loose on the curse. Lives until its particles finish.
+	BURST_AT = 0.50,
+	BURST_END = 1.55,
+	-- Dome rises over the curse, holds, then collapses onto it (the seal).
+	ORB_AT = 0.85,
+	ORB_END = 0.85 + 1.45 + 0.3, -- = ORB_AT + ORB_PLAY_SECONDS + DOME_COLLAPSE
+	-- Circle holds until the dome has collapsed, then shrinks away.
+	FADE_START = 2.45,
+	FADE_END = 2.85,
 	-- Destroy after longest emitted Lifetime (~1s waves / flare) + pad.
 	CLEANUP_AFTER_FADE = 1.05,
 	MAX_CLEANUP = 4.20,
 
-	-- Circle: around the ankles, not under the floor / not giant.
-	GROUND_OFFSET = 0.75,
-	CIRCLE_SCALE_START = 0.08,
-	CIRCLE_SCALE_END = 0.68, -- wider ring so it clears the character
-	CIRCLE_SPIN = 2.2,
-	CIRCLE_BEAM_WIDTH_MULT = 0.32, -- MeteorSpawn beams are Width 20 authored — shrink hard
-	CIRCLE_SIZE_MULT = 0.85, -- wave particles slightly under authored size
+	-- Circle: flat on the ground under the curse.
+	GROUND_OFFSET = 0.2,
+	CIRCLE_SCALE_START = 0.05,
+	CIRCLE_SCALE_END = 0.55, -- MeteorSpawn ring is ~20 studs authored → ~11 studs
+	CIRCLE_SPIN = 1.2,
+	CIRCLE_BEAM_WIDTH_MULT = 1.0, -- ScaleTo already scales beam widths
+	CIRCLE_SIZE_MULT = 1.0,
 
-	-- Burst sits on the sealed curse (capture position), scaled to ~spirit size.
+	-- Burst sits on the sealed curse (capture position).
 	BURST_CURSE_LIFT = 0.4, -- slightly above the signal pivot
-	BURST_SCALE = 0.28, -- Model:ScaleTo — envelope ≈ sealed curse (~2–3 studs)
-	BURST_SIZE_MULT = 0.65, -- particle Size vs authored (keep tight to the curse)
-	-- Orb replaces the sealed curse after the spike burst (cursed object → energy ball).
-	-- DarkOrbSkill is authored enormous — ScaleTo only; leave colors/meshes alone.
-	ORB_LIFT = 3.2, -- studs above terrain (raycast), not raw seal Y
-	ORB_SCALE = 0.12, -- ≈ sealed-curse size
-	ORB_SPIN = 2.8, -- rad/s while it swirls, then vanishes
-	ORB_PLAY_SECONDS = 1.8, -- 75% of prior 2.4s
-	-- Authored extras to strip on clone (DarkShadowParticle removed on purpose).
-	ORB_STRIP_NAMES = { "Dust", "OnFinishRing", "DarkShadowParticle" },
+	BURST_SIZE_MULT = 0.6, -- particle Size vs authored (root is a Part, so no ScaleTo)
+	-- DarkOrbSkill is a ground dome (half sphere, ~43 studs wide authored): it sits on the
+	-- ground over the curse, never floating (a floating dome shows its flat cut-off bottom).
+	ORB_SCALE = 0.26, -- ≈ 11-stud dome, matches the circle
+	DOME_SCALE_START = 0.03,
+	DOME_RISE = 0.4,
+	DOME_COLLAPSE = 0.3,
+	DOME_SINK = 0.3, -- push the dome rim just under the ground
+	ORB_SPIN = 1.4, -- rad/s
+	ORB_PLAY_SECONDS = 1.45, -- rise + hold, then collapse
+	-- Authored extras to strip on clone. "Lower" hangs below the dome (underground part).
+	ORB_STRIP_NAMES = { "Dust", "OnFinishRing", "DarkShadowParticle", "Lower" },
 	ORB_DEBUG_DUMP = false,
-
 	-- Force readability in dark wild / Hunt (applied to clones only).
 	GLOW_LIGHT_EMISSION = 1,
 	GLOW_LIGHT_INFLUENCE = 0,
@@ -132,7 +133,7 @@ local SWALLOW_START, SWALLOW_END = 0.45, 1.05
 local SLAM_AT = 1.4
 local SINK_START = 1.9
 if USE_PREMADE_VFX then
-	local orbDone = PREMADE.ORB_AT + PREMADE.ORB_PLAY_SECONDS
+	local orbDone = PREMADE.ORB_AT + PREMADE.ORB_PLAY_SECONDS + PREMADE.DOME_COLLAPSE
 	SealBurst.SlamAt = orbDone
 	SealBurst.RevealAt = orbDone
 	SealBurst.Seconds = PREMADE.ORB_END + PREMADE.CLEANUP_AFTER_FADE
@@ -219,27 +220,6 @@ local function groundBelow(position: Vector3): number
 	local origin = Vector3.new(position.X, position.Y + 12, position.Z)
 	local hit = workspace:Raycast(origin, Vector3.new(0, -50, 0), params)
 	return if hit then hit.Position.Y else position.Y - Config.Signals.HoverHeight
-end
-
--- Always float ORB_LIFT above terrain at the seal's XZ (ignores inconsistent seal Y).
-local function orbHoverAt(sealPos: Vector3): Vector3
-	local ground = groundBelow(sealPos)
-	return Vector3.new(sealPos.X, ground + PREMADE.ORB_LIFT, sealPos.Z)
-end
-
--- PivotTo so the model's bounding-box center sits on `at` (authored pivots vary).
-local function placeOrbCentered(orb: Instance, at: Vector3, yaw: number)
-	local cf = CFrame.new(at) * CFrame.Angles(0, yaw, 0)
-	if orb:IsA("Model") then
-		orb:PivotTo(cf)
-		local bbCf = orb:GetBoundingBox()
-		local delta = at - bbCf.Position
-		if delta.Magnitude > 1e-3 then
-			orb:PivotTo(orb:GetPivot() + delta)
-		end
-	elseif orb:IsA("BasePart") then
-		orb.CFrame = cf
-	end
 end
 
 local function dumpOrbTree(orb: Instance)
@@ -403,31 +383,40 @@ local function ensurePulseCC(): ColorCorrectionEffect
 	return cc
 end
 
-local function ensurePulseLight(): PointLight?
-	local character = Players.LocalPlayer.Character
-	local root = character and character:FindFirstChild("HumanoidRootPart")
-	if not root or not root:IsA("BasePart") then
-		return nil
-	end
-	if pulseLight and pulseLight.Parent == root then
+-- The pulse light sits on the sealed curse (lights the effect, not the player).
+local function ensurePulseLight(at: Vector3?): PointLight?
+	local holder = pulseLight and pulseLight.Parent
+	if holder and holder:IsA("BasePart") and holder.Parent then
+		if at then
+			holder.CFrame = CFrame.new(at)
+		end
 		return pulseLight
 	end
 	if pulseLight then
 		pulseLight:Destroy()
 		pulseLight = nil
 	end
-	local existing = root:FindFirstChild("SealPulseLight")
-	if existing and existing:IsA("PointLight") then
-		pulseLight = existing
-		return existing
+	if not at then
+		return nil
 	end
+	local part = Instance.new("Part")
+	part.Name = "SealPulseLightHolder"
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanTouch = false
+	part.CanQuery = false
+	part.CastShadow = false
+	part.Transparency = 1
+	part.Size = Vector3.one * 0.2
+	part.CFrame = CFrame.new(at)
+	part.Parent = workspace
 	local light = Instance.new("PointLight")
 	light.Name = "SealPulseLight"
 	light.Color = PREMADE.PULSE_LIGHT_COLOR
 	light.Range = PREMADE.PULSE_LIGHT_RANGE
 	light.Brightness = 0
 	light.Shadows = false
-	light.Parent = root
+	light.Parent = part
 	pulseLight = light
 	return light
 end
@@ -450,7 +439,7 @@ local function endLightPulse()
 	end
 end
 
-local function startLightPulse()
+local function startLightPulse(at: Vector3?)
 	if not PREMADE.ENABLE_LIGHT_PULSE then
 		return
 	end
@@ -468,7 +457,7 @@ local function startLightPulse()
 
 	ensurePulseBloom()
 	ensurePulseCC()
-	local light = ensurePulseLight()
+	local light = ensurePulseLight(at)
 
 	if pulseConn then
 		pulseConn:Disconnect()
@@ -498,7 +487,7 @@ local function startLightPulse()
 		end
 
 		if not light or not light.Parent then
-			light = ensurePulseLight()
+			light = ensurePulseLight(at)
 		end
 		if light and light.Parent then
 			light.Color = PREMADE.PULSE_LIGHT_COLOR
@@ -513,14 +502,19 @@ end
 Players.LocalPlayer.CharacterRemoving:Connect(function()
 	endLightPulse()
 	if pulseLight then
+		local holder = pulseLight.Parent
 		pulseLight:Destroy()
 		pulseLight = nil
+		if holder and holder.Name == "SealPulseLightHolder" then
+			holder:Destroy()
+		end
 	end
 end)
 
--- Dark ring look for MeteorSpawn (never wash to white).
-local CIRCLE_DARK = Color3.fromRGB(18, 10, 28)
-local CIRCLE_DARK_MID = Color3.fromRGB(45, 25, 70)
+-- Ring colors for MeteorSpawn. Particles glow additively, so near-black would be invisible.
+local CIRCLE_DARK = Color3.fromRGB(110, 50, 230)
+local CIRCLE_DARK_MID = Color3.fromRGB(175, 110, 255)
+local DEEP_PURPLE = Color3.fromRGB(70, 25, 130)
 
 -- Clone setup.
 -- orb: leave authored look alone — only strip scripts + harden parts (ScaleTo handles size).
@@ -581,10 +575,19 @@ local function armClone(root: Instance, kind: string)
 		for _, item in root:GetDescendants() do
 			if shouldStrip(item) then
 				table.insert(strip, item)
-			elseif item:IsA("ParticleEmitter") then
+			elseif item:IsA("ParticleEmitter") or item:IsA("Beam") then
 				item.Enabled = false
-			elseif item:IsA("Beam") or item:IsA("PointLight") then
+				-- Pure-black smoke/beams vanish against the dark wild: lift to deep purple.
+				local c0 = item.Color.Keypoints[1].Value
+				if c0.R + c0.G + c0.B < 0.1 then
+					item.Color = ColorSequence.new(DEEP_PURPLE)
+					item.LightInfluence = 0
+				end
+			elseif item:IsA("PointLight") then
+				-- Authored red, 60-stud lights tint the whole area red.
 				item.Enabled = false
+				item.Color = PURPLE
+				item.Brightness = math.min(item.Brightness, 2)
 			end
 		end
 		for _, item in strip do
@@ -752,18 +755,46 @@ local function popLight(parent: Instance, at: Vector3, token: number)
 	end)
 end
 
+-- Dome base (InnerDome bottom) on the ground at the seal's XZ; authored pivots vary.
+local function placeDome(orb: Instance, x: number, ground: number, z: number, yaw: number)
+	if not orb:IsA("Model") then
+		placeAt(orb, Vector3.new(x, ground, z), yaw)
+		return
+	end
+	orb:PivotTo(CFrame.new(x, ground, z) * CFrame.Angles(0, yaw, 0))
+	local dome = orb:FindFirstChild("InnerDome", true)
+	local center, bottom
+	if dome and dome:IsA("BasePart") then
+		center, bottom = dome.Position, dome.Position.Y - dome.Size.Y / 2
+	else
+		local bbCf, bbSize = orb:GetBoundingBox()
+		center, bottom = bbCf.Position, bbCf.Position.Y - bbSize.Y / 2
+	end
+	local delta = Vector3.new(x - center.X, ground - PREMADE.DOME_SINK - bottom, z - center.Z)
+	if delta.Magnitude > 1e-3 then
+		orb:PivotTo(orb:GetPivot() + delta)
+	end
+end
+
+-- Everything plays on the sealed curse: circle on the ground under it, spike burst on it,
+-- then the dome closes over it and collapses. Nothing is attached to the player.
 local function playPremade(relicId: string, options: Options, sealPosition: Vector3?)
 	if options.Low then
 		return
 	end
-	local at = feetPosition()
-	if not at then
+	local origin = sealPosition or feetPosition()
+	if not origin then
 		return
 	end
+	local ground = groundBelow(origin)
+	local at = Vector3.new(origin.X, ground + PREMADE.GROUND_OFFSET, origin.Z)
+	local curseAt = if sealPosition
+		then sealPosition + Vector3.new(0, PREMADE.BURST_CURSE_LIFT, 0)
+		else Vector3.new(origin.X, ground + Config.Signals.HoverHeight, origin.Z)
 
 	-- Fire-and-forget light pulse; never blocks VFX, rewards, or auto-scan.
 	if options.Personal then
-		startLightPulse()
+		startLightPulse(curseAt)
 	end
 
 	clearActive()
@@ -785,12 +816,6 @@ local function playPremade(relicId: string, options: Options, sealPosition: Vect
 		return
 	end
 
-	-- Sealed curse world point (signal / bind position). Burst goes here, not on the player.
-	local curseAt: Vector3? = nil
-	if sealPosition then
-		curseAt = sealPosition + Vector3.new(0, PREMADE.BURST_CURSE_LIFT, 0)
-	end
-
 	local connections: { RBXScriptConnection } = {}
 	local function track(conn: RBXScriptConnection)
 		table.insert(connections, conn)
@@ -804,105 +829,76 @@ local function playPremade(relicId: string, options: Options, sealPosition: Vect
 		table.clear(connections)
 	end
 
-	-- —— Stage 1: circle (Beams + wave particles; flat ring at feet) ——
-	-- Method: MeteorSpawn's Beams laid as a ring (LightEmission forced to 1) + Emit waves.
-	-- Not SurfaceGui — purchased asset already uses Beams on an invisible Part.
-	if circleSrc then
-		local circle = circleSrc:Clone()
-		armClone(circle, "circle")
-		placeAt(circle, at)
-		if circle:IsA("Model") then
-			scaleModel(circle, PREMADE.CIRCLE_SCALE_START)
-		elseif circle:IsA("BasePart") then
-			circle.Size = circle.Size * PREMADE.CIRCLE_SCALE_START
-		end
-		circle.Parent = folder
-		setBeams(circle, true)
-
-		local t0 = os.clock()
-		local growDur = T(PREMADE.CIRCLE_GROW)
-		local circleEnd = T(PREMADE.CIRCLE_END)
-		local fadeStart = T(PREMADE.FADE_START)
-		local fadeEnd = T(PREMADE.FADE_END)
-		local emitted = false
-
-		if circle:IsA("Model") then
-			local model = circle
-			track(RunService.RenderStepped:Connect(function()
-				if token ~= activeToken or not model.Parent then
-					return
-				end
-				local elapsed = os.clock() - t0
-				local growU = math.clamp(elapsed / growDur, 0, 1)
-				local scale = PREMADE.CIRCLE_SCALE_START
-					+ (PREMADE.CIRCLE_SCALE_END - PREMADE.CIRCLE_SCALE_START) * easeOutBack(growU)
-				if elapsed >= fadeStart then
-					local f = math.clamp((elapsed - fadeStart) / math.max(1e-3, fadeEnd - fadeStart), 0, 1)
-					scale = PREMADE.CIRCLE_SCALE_END * (1 - f)
-					if f > 0.5 then
-						setBeams(model, false)
-					end
-				end
-				scaleModel(model, math.max(0.05, scale))
-				model:PivotTo(CFrame.new(at) * CFrame.Angles(0, elapsed * PREMADE.CIRCLE_SPIN, 0))
-				if not emitted and elapsed >= T(PREMADE.CIRCLE_EMIT_AT) then
-					emitted = true
-					emitAll(model, PREMADE.CIRCLE_EMIT, PREMADE.DEFAULT_EMIT)
-				end
-			end))
-		elseif circle:IsA("BasePart") then
-			local part = circle
-			local full = part.Size / PREMADE.CIRCLE_SCALE_START
-			TweenService:Create(part, TweenInfo.new(growDur, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-				Size = full * PREMADE.CIRCLE_SCALE_END,
-			}):Play()
-			track(RunService.RenderStepped:Connect(function()
-				if token ~= activeToken or not part.Parent then
-					return
-				end
-				local elapsed = os.clock() - t0
-				part.CFrame = CFrame.new(at) * CFrame.Angles(0, elapsed * PREMADE.CIRCLE_SPIN, 0)
-				if not emitted and elapsed >= T(PREMADE.CIRCLE_EMIT_AT) then
-					emitted = true
-					emitAll(part, PREMADE.CIRCLE_EMIT, PREMADE.DEFAULT_EMIT)
-				end
-				if elapsed >= circleEnd then
-					setBeams(part, false)
-				end
-			end))
-		end
+	-- —— Stage 1: sealing circle on the ground under the curse ——
+	local circle = circleSrc:Clone()
+	armClone(circle, "circle")
+	placeAt(circle, at)
+	if circle:IsA("Model") then
+		scaleModel(circle, PREMADE.CIRCLE_SCALE_START)
 	end
+	circle.Parent = folder
+	setBeams(circle, true)
+	local t0 = os.clock()
+	local emitted = false
+	local circleScale = PREMADE.CIRCLE_SCALE_START
+	track(RunService.RenderStepped:Connect(function()
+		if token ~= activeToken or not circle.Parent then
+			return
+		end
+		local elapsed = os.clock() - t0
+		local growU = span(elapsed, 0, T(PREMADE.CIRCLE_GROW))
+		local scale = PREMADE.CIRCLE_SCALE_START
+			+ (PREMADE.CIRCLE_SCALE_END - PREMADE.CIRCLE_SCALE_START) * easeOutBack(growU)
+		local fadeU = span(elapsed, T(PREMADE.FADE_START), T(PREMADE.FADE_END))
+		if fadeU > 0 then
+			scale = PREMADE.CIRCLE_SCALE_END * (1 - fadeU * fadeU)
+			if fadeU > 0.6 then
+				setBeams(circle, false)
+			end
+		end
+		local cf = CFrame.new(at) * CFrame.Angles(0, elapsed * PREMADE.CIRCLE_SPIN, 0)
+		if circle:IsA("Model") then
+			scale = math.max(0.05, scale)
+			if math.abs(scale - circleScale) > 1e-3 then
+				circleScale = scale
+				scaleModel(circle, scale)
+			end
+			circle:PivotTo(cf)
+		elseif circle:IsA("BasePart") then
+			circle.CFrame = cf
+		end
+		if not emitted and elapsed >= T(PREMADE.CIRCLE_EMIT_AT) then
+			emitted = true
+			emitAll(circle, PREMADE.CIRCLE_EMIT, PREMADE.DEFAULT_EMIT)
+		end
+	end))
 
-	-- —— Stage 2: PurpleSpikeBurst on the sealed curse (not the player) ——
-	if PREMADE.ENABLE_BURST and curseAt and burstSrc then
-		local burstAt = curseAt
+	-- —— Stage 2: purple spike burst on the curse (cursed energy breaks loose) ——
+	if burstSrc then
 		task.delay(T(PREMADE.BURST_AT), function()
-			if token ~= activeToken or not folder.Parent or not burstSrc then
+			if token ~= activeToken or not folder.Parent then
 				return
 			end
 			local burst = burstSrc:Clone()
 			armClone(burst, "burst")
-			if burst:IsA("Model") then
-				scaleModel(burst, PREMADE.BURST_SCALE)
-			end
-			placeAt(burst, burstAt)
+			placeAt(burst, curseAt)
 			burst.Parent = folder
-			local burstLight = attachGlowLight(folder, burstAt, PREMADE.BURST_LIGHT_RANGE, PREMADE.BURST_LIGHT_BRIGHTNESS)
+			local burstLight = attachGlowLight(folder, curseAt, PREMADE.BURST_LIGHT_RANGE, PREMADE.BURST_LIGHT_BRIGHTNESS)
 			emitAll(burst, PREMADE.BURST_EMIT, 10)
-			setBeams(burst, true)
 			if options.Personal then
 				Sounds.Play("Seal")
+				HuntFX.shake(0.15, 0.2)
 			end
+			-- Keep the emitter alive until its particles finish (destroying it clears them).
 			task.delay(T(PREMADE.BURST_END - PREMADE.BURST_AT), function()
 				if token ~= activeToken then
 					return
 				end
 				if burst.Parent then
-					setBeams(burst, false)
 					burst:Destroy()
 				end
 				if burstLight.Parent then
-					TweenService:Create(burstLight, TweenInfo.new(T(0.12)), { Brightness = 0 }):Play()
+					TweenService:Create(burstLight, TweenInfo.new(T(0.25)), { Brightness = 0 }):Play()
 				end
 			end)
 		end)
@@ -914,52 +910,59 @@ local function playPremade(relicId: string, options: Options, sealPosition: Vect
 		end)
 	end
 
-	-- —— Stage 3: DarkOrbSkill on the curse — spike ends → object becomes energy → vanishes ——
-	-- White CaptureAnimation relic only starts after this (SealBurst.RevealAt = orb done).
-	if PREMADE.ENABLE_ORB and sealPosition then
+	-- —— Stage 3: dome rises over the curse, holds, then collapses onto it (the seal) ——
+	-- CaptureAnimation's relic starts only after this (SealBurst.RevealAt = dome collapsed).
+	if orbSrc then
 		task.delay(T(PREMADE.ORB_AT), function()
 			if token ~= activeToken or not folder.Parent then
 				return
 			end
-			local orbAt = orbHoverAt(sealPosition)
-			popLight(folder, orbAt, token)
-			if orbSrc then
-				local orb = orbSrc:Clone()
-				armClone(orb, "orb")
-				if orb:IsA("Model") then
-					scaleModel(orb, PREMADE.ORB_SCALE)
+			local orb = orbSrc:Clone()
+			armClone(orb, "orb")
+			if orb:IsA("Model") then
+				scaleModel(orb, PREMADE.DOME_SCALE_START)
+			end
+			orb.Parent = folder
+			placeDome(orb, at.X, ground, at.Z, 0)
+			dumpOrbTree(orb)
+			setBeams(orb, true)
+			setParticles(orb, true)
+			local orbT0 = os.clock()
+			local collapseAt = T(PREMADE.ORB_PLAY_SECONDS)
+			local collapseDur = T(PREMADE.DOME_COLLAPSE)
+			local sealed = false
+			local lastScale = PREMADE.DOME_SCALE_START
+			track(RunService.RenderStepped:Connect(function()
+				if token ~= activeToken or not orb.Parent then
+					return
 				end
-				orb.Parent = folder
-				placeOrbCentered(orb, orbAt, 0)
-				dumpOrbTree(orb)
-				-- Authored orb as-is at the curse: swirl, then fade out.
-				setBeams(orb, true)
-				setParticles(orb, true)
-				local orbT0 = os.clock()
-				track(RunService.RenderStepped:Connect(function()
-					if token ~= activeToken or not orb.Parent then
-						return
-					end
-					-- Re-raycast lightly in case terrain differs; keep XZ on the seal.
-					local hover = orbHoverAt(sealPosition)
-					local yaw = (os.clock() - orbT0) * PREMADE.ORB_SPIN
-					placeOrbCentered(orb, hover, yaw)
-				end))
-				local playFor = T(PREMADE.ORB_PLAY_SECONDS)
-				task.delay(playFor, function()
-					if token ~= activeToken or not orb.Parent then
-						return
-					end
+				local elapsed = os.clock() - orbT0
+				local riseU = span(elapsed, 0, T(PREMADE.DOME_RISE))
+				local scale = PREMADE.DOME_SCALE_START
+					+ (PREMADE.ORB_SCALE - PREMADE.DOME_SCALE_START) * easeOutBack(riseU)
+				local collapseU = span(elapsed, collapseAt, collapseAt + collapseDur)
+				if collapseU > 0 then
+					scale = PREMADE.ORB_SCALE * (1 - collapseU * collapseU) + 0.01
+				end
+				-- ScaleTo walks every descendant: skip it while the dome holds still.
+				if orb:IsA("Model") and math.abs(scale - lastScale) > 1e-3 then
+					lastScale = scale
+					scaleModel(orb, scale)
+				end
+				placeDome(orb, at.X, ground, at.Z, elapsed * PREMADE.ORB_SPIN)
+				if not sealed and collapseU >= 1 then
+					sealed = true
 					setParticles(orb, false)
 					setBeams(orb, false)
-				end)
-			end
-			if options.Personal then
-				HuntFX.shake(0.28, 0.3)
-			end
-			local color = tierLook(relicId)
-			ChainRig.SealFlash(orbAt, 8)
-			HuntFX.shockwave(Vector3.new(orbAt.X, at.Y, orbAt.Z), color, 14, 0.45)
+					orb:Destroy()
+					popLight(folder, curseAt, token)
+					ChainRig.SealFlash(curseAt, 6)
+					HuntFX.shockwave(Vector3.new(at.X, ground, at.Z), tierLook(relicId), 18, 0.5)
+					if options.Personal then
+						HuntFX.shake(0.3, 0.3)
+					end
+				end
+			end))
 		end)
 	end
 

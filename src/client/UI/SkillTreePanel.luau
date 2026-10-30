@@ -9,11 +9,16 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Formulas = require(ReplicatedStorage.Shared.Formulas)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
+
+local function coreLuckCostOverride(): SkillConfig.CostOverride?
+	return BalanceTrials.coreLuckCostOverride()
+end
 local Motion = require(script.Parent.Motion)
 local Spring = require(script.Parent.Spring)
 local UIKit = require(script.Parent.UIKit)
@@ -38,7 +43,8 @@ end
 -- What a node does at `rank`, in a few words.
 local function effectText(nodeId: string, rank: number): string
 	if nodeId == "CoreLuck" then
-		return `x{Format.number(Formulas.coreLuck(rank))} luck`
+		local trial = BalanceTrials.current()
+		return `x{Format.number(Formulas.coreLuck(rank, if trial then trial.LuckDivisor else nil))} luck`
 	elseif nodeId == "ScanSpeed" then
 		return `scan every {Format.seconds(SkillConfig.scanInterval(rank))}`
 	elseif nodeId == "FrequencyFocus" then
@@ -203,13 +209,18 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			end
 		end
 		local order = 0
+		local rebirths = player:GetAttribute("Rebirths") or 0
 		for _, node in SkillConfig.Nodes do
 			if node.Branch ~= branch then
 				continue
 			end
+			if not BalanceTrials.skillNodeEnabled(node.Id) then
+				continue
+			end
 			order += 1
 			local rank = ranks[node.Id] or 0
-			local maxed = rank >= node.MaxRank
+			local trialMax = BalanceTrials.skillMaxRank(node.Id, rebirths)
+			local maxed = rank >= trialMax
 			local slot = UIKit.slot(list, node.Id, UDim2.new(1, -10, 0, ROW_HEIGHT), order)
 			local card = UIKit.create("Frame", {
 				Name = "Card",
@@ -241,7 +252,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			})
 			local rankLabel = UIKit.label({
 				Name = "Rank",
-				Text = `Rank {rank}/{node.MaxRank}`,
+				Text = `Rank {rank}/{trialMax}`,
 				TextSize = 14,
 				TextColor3 = if maxed then colors.Gold else colors.SubText,
 				TextXAlignment = Enum.TextXAlignment.Right,
@@ -279,7 +290,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 			local fill = UIKit.create("Frame", {
 				Name = "Fill",
-				Size = UDim2.fromScale(math.clamp(rank / node.MaxRank, 0, 1), 1),
+				Size = UDim2.fromScale(math.clamp(rank / trialMax, 0, 1), 1),
 				BackgroundColor3 = if maxed then colors.Gold else colors.Accent,
 				BorderSizePixel = 0,
 				Parent = track,
@@ -289,7 +300,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 					Color = ColorSequence.new(Color3.fromRGB(200, 200, 210), Color3.new(1, 1, 1)),
 				}),
 			})
-			rows[node.Id] = { Card = card, Fill = fill, Rank = rankLabel, MaxRank = node.MaxRank }
+			rows[node.Id] = { Card = card, Fill = fill, Rank = rankLabel, MaxRank = trialMax }
 			card:SetAttribute("PopIn", true)
 			if popNext then
 				Motion.pop(card, (order - 1) * STAGGER, 0.6)
@@ -312,12 +323,12 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				UIKit.corner(8).Parent = tag
 				continue
 			end
-			local cost = SkillConfig.cost(node, rank) or 0
+			local cost = SkillConfig.cost(node, rank, if nodeId == "CoreLuck" then coreLuckCostOverride() else nil) or 0
 			rowButton(card, "Max", 46, -8, cost, function()
 				send("Buy", nodeId, "Max")
 			end)
 			local nextX = -60
-			if node.MaxRank - rank > 1 then
+			if trialMax - rank > 1 then
 				rowButton(card, "+10", 46, nextX, cost, function()
 					send("Buy", nodeId, 10)
 				end)

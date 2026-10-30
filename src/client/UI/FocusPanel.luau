@@ -16,6 +16,7 @@ local UIKit = require(script.Parent.UIKit)
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local SetRarityFocus = Remotes:WaitForChild("SetRarityFocus") :: RemoteEvent
 local SetFrequency = Remotes:WaitForChild("SetFrequency") :: RemoteEvent
+local CollectionAction = Remotes:FindFirstChild("CollectionAction") :: RemoteFunction?
 
 local FocusPanel = {}
 
@@ -31,8 +32,16 @@ for _, family in RelicConfig.Families do
 	table.insert(FREQUENCY_OPTIONS, { Id = family, Label = family })
 end
 
-local WATCHED_ATTRIBUTES =
-	{ "FullLuck", "EffectiveLuck", "RarityFocus", "Frequency", "FrequencyRank", "MutationRank", "FrequenciesUnlocked" }
+local WATCHED_ATTRIBUTES = {
+	"FullLuck",
+	"EffectiveLuck",
+	"RarityFocus",
+	"Frequency",
+	"FrequencyRank",
+	"MutationRank",
+	"FrequenciesUnlocked",
+	"AttuneScansLeft",
+}
 
 local function sectionLabel(parent: Instance, text: string, y: number)
 	UIKit.heading({
@@ -135,23 +144,62 @@ function FocusPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		})
 	end
 
+	sectionLabel(body, "Attune (Codex soft-lock / collection)", 474)
+	local attuneStatus = UIKit.label({
+		TextSize = 13,
+		TextColor3 = colors.SubText,
+		Position = UDim2.fromOffset(0, 494),
+		Size = UDim2.new(1, -12, 0, 18),
+		Parent = body,
+	})
+	UIKit.button({
+		Name = "ActivateAttune",
+		Text = "Use Attune (Focus Common)",
+		TextSize = 14,
+		Position = UDim2.fromOffset(0, 516),
+		Size = UDim2.new(0.48, -4, 0, 32),
+		Parent = body,
+	}, function()
+		if CollectionAction then
+			pcall(function()
+				CollectionAction:InvokeServer("ActivateAttune")
+			end)
+		end
+		SetRarityFocus:FireServer("Common")
+	end)
+	UIKit.button({
+		Name = "FocusCommon",
+		Text = "Focus Common now",
+		TextSize = 14,
+		Position = UDim2.new(0.52, 0, 0, 516),
+		Size = UDim2.new(0.48, -4, 0, 32),
+		Parent = body,
+	}, function()
+		SetRarityFocus:FireServer("Common")
+	end)
+
 	local mutationLabel = UIKit.label({
 		TextSize = 13,
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		TextColor3 = colors.SubText,
-		Position = UDim2.fromOffset(0, 474),
+		Position = UDim2.fromOffset(0, 560),
 		Size = UDim2.new(1, -12, 0, 40),
 		Parent = body,
 	})
+	body.CanvasSize = UDim2.fromOffset(0, 620)
 
 	local function refresh()
 		local ctx = Odds.current()
 		local fullLuck = player:GetAttribute("FullLuck") or 1
 		local focus = player:GetAttribute("RarityFocus") or "MaxLuck"
 		local frequency = player:GetAttribute("Frequency") or "All"
+		local attuneLeft = player:GetAttribute("AttuneScansLeft") or 0
 		local capped = if ctx.Luck < fullLuck then "  (capped by focus)" else ""
 		luckLabel.Text = `Luck {Format.number(fullLuck)}x  |  used {Format.number(ctx.Luck)}x{capped}`
+		attuneStatus.Text = if attuneLeft > 0
+			then `Attune active: {attuneLeft} Focused Common scans left`
+			else "High luck erases Commons — Focus Common or spend an Attune ticket."
 		highlight(focusChips, focus)
 		highlight(frequencyChips, frequency)
 		local unlocked = {}

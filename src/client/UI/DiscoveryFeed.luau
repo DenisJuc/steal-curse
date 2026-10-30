@@ -1,7 +1,8 @@
 -- Top-middle feed of recent discoveries, newest on top. Lines fade out on their own and never block anything.
 -- Batches arrive through RollReel, after the roll reel has landed. Hunt batches roll on the hunt
 -- papers (HuntRolls) instead.
--- Base odds come from RollMath (via Odds), the same math the server rolls with.
+-- Routine Common/Uncommon Normal duplicates collapse into one currency summary per batch.
+-- Exceptional finds (new base / mutation / size / Huge / Titanic / Epic+) stay individual.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -10,6 +11,8 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RewardPresentation = require(ReplicatedStorage.Shared.RewardPresentation)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local Odds = require(script.Parent.Odds)
 local RollReel = require(script.Parent.RollReel)
 local Motion = require(script.Parent.Motion)
@@ -17,20 +20,17 @@ local UIKit = require(script.Parent.UIKit)
 
 local DiscoveryFeed = {}
 
-type Result = {
-	Uid: number,
-	Id: string,
-	Mutation: string?,
-	Source: string,
-	First: boolean?,
-	NewVariant: boolean?,
-	Sold: number?,
-	SoldReason: string?,
-}
+type Result = RewardPresentation.Result
 
 local LINE_HEIGHT = 44
+local MUTED_HEIGHT = 26
 local order = 0
 local maxLines = Config.Feed.MaxLines
+
+local function tierOf(result: Result): string?
+	local relic = RelicConfig.ById[result.Id]
+	return if relic then relic.Tier else nil
+end
 
 local function tierIndex(relicId: string): number
 	local relic = RelicConfig.ById[relicId]
@@ -55,52 +55,7 @@ local function fadeLater(line: Frame)
 	end)
 end
 
-local function makeLine(list: Frame, title: string, subtitle: string, color: Color3, highlight: boolean)
-	order -= 1
-	local line = UIKit.create("Frame", {
-		Name = "Line",
-		LayoutOrder = order,
-		Size = UDim2.new(1, 0, 0, LINE_HEIGHT),
-		BackgroundColor3 = UIKit.Colors.Card,
-		BackgroundTransparency = 0.15,
-		Parent = list,
-	}, {
-		UIKit.corner(10),
-		UIKit.stroke(color, if highlight then 2 else 1, if highlight then 0 else 0.6),
-	})
-	UIKit.create("Frame", {
-		Name = "TierBar",
-		Size = UDim2.new(0, 5, 1, -12),
-		Position = UDim2.fromOffset(6, 6),
-		BackgroundColor3 = color,
-		BorderSizePixel = 0,
-		Parent = line,
-	}, { UIKit.corner(3) })
-	UIKit.label({
-		Name = "Title",
-		Text = title,
-		TextSize = 16,
-		TextColor3 = if highlight then color else UIKit.Colors.Text,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		Position = UDim2.fromOffset(18, 4),
-		Size = UDim2.new(1, -24, 0, 20),
-		Parent = line,
-	})
-	UIKit.label({
-		Name = "Subtitle",
-		Text = subtitle,
-		TextSize = 13,
-		TextColor3 = color,
-		Position = UDim2.fromOffset(18, 23),
-		Size = UDim2.new(1, -24, 0, 16),
-		Parent = line,
-	})
-	UIKit.skinCard(line)
-	if highlight then
-		Motion.flash(line, color, 0.3)
-		Motion.shine(line, 0.6)
-	end
-
+local function trimFeed(list: Frame)
 	local lines = {}
 	for _, child in list:GetChildren() do
 		if child:IsA("Frame") then
@@ -113,34 +68,136 @@ local function makeLine(list: Frame, title: string, subtitle: string, color: Col
 	for index = maxLines + 1, #lines do
 		lines[index]:Destroy()
 	end
+end
+
+local function makeLine(list: Frame, title: string, subtitle: string, color: Color3, highlight: boolean, muted: boolean?)
+	order -= 1
+	local height = if muted then MUTED_HEIGHT else LINE_HEIGHT
+	local line = UIKit.create("Frame", {
+		Name = "Line",
+		LayoutOrder = order,
+		Size = UDim2.new(1, 0, 0, height),
+		BackgroundColor3 = UIKit.Colors.Card,
+		BackgroundTransparency = if muted then 0.62 else 0.15,
+		Parent = list,
+	}, {
+		UIKit.corner(10),
+		UIKit.stroke(color, if highlight then 2.5 else 1, if highlight then 0 elseif muted then 0.9 else 0.55),
+	})
+	UIKit.create("Frame", {
+		Name = "TierBar",
+		Size = UDim2.new(0, if muted then 3 else 5, 1, -12),
+		Position = UDim2.fromOffset(6, 6),
+		BackgroundColor3 = color,
+		BackgroundTransparency = if muted then 0.5 else 0,
+		BorderSizePixel = 0,
+		Parent = line,
+	}, { UIKit.corner(3) })
+	UIKit.label({
+		Name = "Title",
+		Text = title,
+		TextSize = if muted then 12 else 16,
+		TextColor3 = if highlight then color elseif muted then UIKit.Colors.SubText else UIKit.Colors.Text,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Position = UDim2.fromOffset(18, 4),
+		Size = UDim2.new(1, -24, 0, if muted then 18 else 20),
+		Parent = line,
+	})
+	if not muted then
+		UIKit.label({
+			Name = "Subtitle",
+			Text = subtitle,
+			TextSize = 13,
+			TextColor3 = color,
+			Position = UDim2.fromOffset(18, 23),
+			Size = UDim2.new(1, -24, 0, 16),
+			Parent = line,
+		})
+	elseif subtitle ~= "" then
+		UIKit.label({
+			Name = "Subtitle",
+			Text = subtitle,
+			TextSize = 11,
+			TextColor3 = UIKit.Colors.SubText,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			Position = UDim2.fromOffset(18, 4),
+			Size = UDim2.new(1, -24, 0, 18),
+			Parent = line,
+		})
+	end
+	UIKit.skinCard(line)
+	if highlight then
+		Motion.flash(line, color, 0.35)
+		Motion.shine(line, 0.7)
+		Motion.punch(line, 1.5)
+	end
+	trimFeed(list)
 	fadeLater(line)
 end
 
-local function showRelic(list: Frame, result: Result)
+local function showExceptional(list: Frame, result: Result)
 	local relic = RelicConfig.ById[result.Id]
 	if not relic then
 		return
 	end
-	local highlightIndex = RarityConfig.IndexById[Config.Feed.HighlightTier] or math.huge
-	local highlight = tierIndex(relic.Id) >= highlightIndex or result.Mutation ~= nil
-	local title = Odds.displayName(relic.Id, result.Mutation)
+	local sizeId = SizeConfig.normalize(result.Size)
+	local title = Odds.displayName(relic.Id, result.Mutation, sizeId)
 	if result.First then
 		title = "NEW! " .. title
+	elseif result.NewSize then
+		title = "NEW SIZE! " .. title
 	elseif result.NewVariant then
 		title = "NEW VARIANT! " .. title
+	elseif sizeId == "Titanic" then
+		title = "TITANIC! " .. title
+	elseif sizeId == "Huge" then
+		title = "HUGE! " .. title
 	end
-	local color = if result.Mutation then UIKit.mutationColor(result.Mutation) else UIKit.tierColor(relic.Tier)
-	local subtitle = Odds.describe(relic.Id, result.Mutation)
+	local color = if sizeId == "Titanic"
+		then Color3.fromRGB(255, 210, 90)
+		elseif sizeId == "Huge"
+		then Color3.fromRGB(160, 210, 255)
+		elseif result.Mutation
+		then UIKit.mutationColor(result.Mutation)
+		else UIKit.tierColor(relic.Tier)
+	local worth = RewardPresentation.worthKeeping(result, relic.Tier)
+	local subtitle = worth
+	if subtitle == "" then
+		subtitle = Odds.describe(relic.Id, result.Mutation)
+	end
+	if sizeId and not string.find(subtitle, sizeId, 1, true) then
+		subtitle ..= `  ·  {SizeConfig.Label[sizeId]}`
+	end
 	if result.Sold then
 		local reason = AutoSell.ReasonText[result.SoldReason or ""] or "auto-sell"
-		subtitle ..= `  |  sold +{Format.number(result.Sold)} CE ({reason})`
+		subtitle ..= `  ·  sold +{Format.number(result.Sold)} CE ({reason})`
 	end
-	makeLine(list, title, subtitle, color, highlight)
+	makeLine(list, title, subtitle, color, true, false)
 end
 
--- Sort key: tier first, mutated above plain within a tier.
+local function showNotable(list: Frame, result: Result)
+	local relic = RelicConfig.ById[result.Id]
+	if not relic then
+		return
+	end
+	local sizeId = SizeConfig.normalize(result.Size)
+	local title = Odds.displayName(relic.Id, result.Mutation, sizeId)
+	local color = if result.Mutation then UIKit.mutationColor(result.Mutation) else UIKit.tierColor(relic.Tier)
+	local worth = RewardPresentation.worthKeeping(result, relic.Tier)
+	local subtitle = if worth ~= "" then worth else Odds.describe(relic.Id, result.Mutation)
+	if result.Sold then
+		local reason = AutoSell.ReasonText[result.SoldReason or ""] or "auto-sell"
+		subtitle ..= `  ·  +{Format.number(result.Sold)} CE ({reason})`
+	end
+	makeLine(list, title, subtitle, color, tierIndex(relic.Id) >= (RarityConfig.IndexById[Config.Feed.HighlightTier] or 99), false)
+end
+
 local function rarityKey(result: Result): number
-	return tierIndex(result.Id) * 2 + (if result.Mutation then 1 else 0)
+	local bonus = SizeConfig.rank(result.Size) * 4
+	if result.First or result.NewVariant or result.NewSize then
+		bonus += 8
+	end
+	return tierIndex(result.Id) * 2 + (if result.Mutation then 1 else 0) + bonus
 end
 
 function DiscoveryFeed.Start(screen: ScreenGui)
@@ -165,35 +222,56 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 	end)
 
 	RollReel.OnResults(function(results: { Result }, hunt: boolean)
-		-- A hunt's finds were just rolled on the hunt papers; no banners for them.
 		if type(results) ~= "table" or hunt then
 			return
 		end
-		if #results <= maxLines then
-			for _, result in results do
-				showRelic(list, result)
-			end
-			return
-		end
-		-- Big batches: show the rarest few plus one summary line instead of flooding the feed.
-		local sorted = table.clone(results)
-		table.sort(sorted, function(a, b)
-			return rarityKey(a) < rarityKey(b)
+		local plan = RewardPresentation.planFeed(results, tierOf)
+		-- Exceptionals first (rarest), then notables, then one routine summary.
+		local exceptional = table.clone(plan.Exceptional)
+		table.sort(exceptional, function(a, b)
+			return rarityKey(a) > rarityKey(b)
 		end)
-		local shown = maxLines - 1
-		local soldCount, soldCE = 0, 0
-		for _, result in results do
-			if result.Sold then
-				soldCount += 1
-				soldCE += result.Sold
-			end
+		local notable = table.clone(plan.Notable)
+		table.sort(notable, function(a, b)
+			return rarityKey(a) > rarityKey(b)
+		end)
+
+		local budget = maxLines
+		local routineLine = if plan.RoutineCount > 0 then 1 else 0
+		budget -= routineLine
+
+		local showExc = math.min(#exceptional, budget)
+		budget -= showExc
+		local showNot = math.min(#notable, budget)
+
+		for i = 1, showExc do
+			showExceptional(list, exceptional[i])
 		end
-		local summary = if soldCount > 0
-			then `Batch summary  |  {soldCount} auto-sold for {Format.number(soldCE)} CE`
-			else "Batch summary"
-		makeLine(list, `+{#results - shown} more discoveries`, summary, UIKit.Colors.SubText, false)
-		for index = #sorted - shown + 1, #sorted do
-			showRelic(list, sorted[index])
+		for i = 1, showNot do
+			showNotable(list, notable[i])
+		end
+		local hidden = (#exceptional - showExc) + (#notable - showNot)
+		if plan.RoutineSummaryTitle and plan.RoutineSummarySubtitle then
+			local subtitle = plan.RoutineSummarySubtitle
+			if hidden > 0 then
+				subtitle ..= `  ·  +{hidden} other`
+			end
+			-- Format CE in summary with Format.number when sold
+			local title = plan.RoutineSummaryTitle
+			if plan.RoutineSoldCE > 0 then
+				title = if plan.RoutineKeptCount > 0
+					then `· {plan.RoutineCount} common finds`
+					else `· +{Format.number(plan.RoutineSoldCE)} CE`
+				subtitle = if plan.RoutineKeptCount > 0
+					then `+{Format.number(plan.RoutineSoldCE)} CE sold · {plan.RoutineKeptCount} kept`
+					else `{plan.RoutineSoldCount} common duplicate{if plan.RoutineSoldCount == 1 then "" else "s"} sold`
+				if hidden > 0 then
+					subtitle ..= `  ·  +{hidden} other`
+				end
+			end
+			makeLine(list, title, subtitle, UIKit.Colors.SubText, false, true)
+		elseif hidden > 0 then
+			makeLine(list, `+{hidden} more`, "see Journal", UIKit.Colors.SubText, false, true)
 		end
 	end)
 end

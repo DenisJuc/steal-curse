@@ -1,0 +1,4 @@
+Elapsed,ElapsedSec,System,Item,RankBefore,RankAfter,Price,Currency,CE_Before,CE_After,Essence_Before,Essence_After,Luck,IncomePerSec,Rebirths,SecSincePrev,Kind,Ok,Reason
+00:37,37.241354800004046,Fusion,HuntarLicense,0,1,16,Essence,33552,33552,159,143,1,0,0,0,Purchase,true,Fusion rank 1 — choose a Charm.
+01:13,73.40591090000817,Charm,HuntarLicense:Shrine,,,0,Essence,33552,33552,143,143,1,0,0,36.16454810000141,Purchase,true,Shrine Charm chosen.
+01:15,74.77250420000928,Fusion,HuntarLicense,1,2,29,Essence,33552,33552,143,114,1,0,0,1.366598900000099,Purchase,true,Fusion rank 2.

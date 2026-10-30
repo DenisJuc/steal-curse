@@ -13,6 +13,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Presentation = require(ReplicatedStorage.Shared.Presentation)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local AutoSellService = require(script.Parent.Services.AutoSellService)
 local CodexService = require(script.Parent.Services.CodexService)
 local DataService = require(script.Parent.Services.DataService)
@@ -28,6 +29,7 @@ local DiscoveryPipeline = {}
 export type Entry = {
 	Id: string,
 	Mutation: string?,
+	Size: string?,
 	Source: string,
 }
 
@@ -35,9 +37,11 @@ export type Result = {
 	Uid: number,
 	Id: string,
 	Mutation: string?,
+	Size: string?,
 	Source: string,
 	First: boolean,
 	NewVariant: boolean,
+	NewSize: boolean,
 	-- Set when the find was auto-sold: CE earned and why.
 	Sold: number?,
 	SoldReason: string?,
@@ -54,14 +58,18 @@ local function tierIndex(relicId: string): number
 	return if relic then RarityConfig.IndexById[relic.Tier] or 1 else 1
 end
 
--- Applies one entry to a data table. Returns the stored item, whether it was a first Codex
--- discovery, whether it should trigger a priority save, and whether this mutation of this
--- relic was seen for the first time.
-function DiscoveryPipeline.ApplyEntry(data: any, entry: Entry, now: number): (any, boolean, boolean, boolean)
+-- Applies one entry. Returns item, first base discovery, priority save, new mutation stamp, new size stamp.
+function DiscoveryPipeline.ApplyEntry(
+	data: any,
+	entry: Entry,
+	now: number
+): (any, boolean, boolean, boolean, boolean)
+	local size = SizeConfig.normalize(entry.Size)
 	local item = {
 		Uid = data.NextUid,
 		Id = entry.Id,
 		Mutation = entry.Mutation,
+		Size = size,
 		At = now,
 		Source = entry.Source,
 	}
@@ -86,12 +94,30 @@ function DiscoveryPipeline.ApplyEntry(data: any, entry: Entry, now: number): (an
 		end
 	end
 
+	local newSize = false
+	if size then
+		if type(data.CodexSizes) ~= "table" then
+			data.CodexSizes = {}
+		end
+		local seenSizes = data.CodexSizes[entry.Id]
+		if not seenSizes then
+			seenSizes = {}
+			data.CodexSizes[entry.Id] = seenSizes
+		end
+		if seenSizes[size] == nil then
+			seenSizes[size] = now
+			newSize = true
+		end
+	end
+
 	local index = tierIndex(entry.Id)
 	local mutatedRare = entry.Mutation ~= nil and index >= PRIORITY_MUTATED_INDEX
-	if index >= HISTORY_INDEX or mutatedRare then
+	local sizedRare = size ~= nil
+	if index >= HISTORY_INDEX or mutatedRare or sizedRare then
 		table.insert(data.RareHistory, 1, {
 			Id = entry.Id,
 			Mutation = entry.Mutation,
+			Size = size,
 			At = now,
 			Source = entry.Source,
 		})
@@ -100,8 +126,8 @@ function DiscoveryPipeline.ApplyEntry(data: any, entry: Entry, now: number): (an
 		end
 	end
 
-	local priority = first or index >= PRIORITY_INDEX or mutatedRare
-	return item, first, priority, newVariant
+	local priority = first or index >= PRIORITY_INDEX or mutatedRare or sizedRare
+	return item, first, priority, newVariant, newSize
 end
 
 -- Grants every entry as one batch: one data update, at most one save request, one client message.
@@ -117,20 +143,27 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 	local firsts: { [number]: boolean } = {}
 	local needsSave, codexChanged = false, false
 	for _, entry in entries do
-		local item, first, priority, newVariant = DiscoveryPipeline.ApplyEntry(data, entry, now)
+		local item, first, priority, newVariant, newSize = DiscoveryPipeline.ApplyEntry(data, entry, now)
 		needsSave = needsSave or priority
-		codexChanged = codexChanged or first or newVariant
+		codexChanged = codexChanged or first or newVariant or newSize
 		firsts[item.Uid] = first
 		table.insert(items, item)
 		table.insert(results, {
 			Uid = item.Uid,
 			Id = item.Id,
 			Mutation = item.Mutation,
+			Size = item.Size,
 			Source = item.Source,
 			First = first,
 			NewVariant = newVariant,
+			NewSize = newSize,
 		})
 		GameEvents.Fire("Discovery", player, item, first)
+		-- SoftCap_P4 MutationLedger: first mutated sighting of this relic id this life (not lifetime Codex).
+		if entry.Mutation then
+			local CollectionService = require(script.Parent.Services.CollectionService)
+			CollectionService.GrantPursuitMutEssence(player, entry.Id)
+		end
 	end
 
 	local shown: { [number]: boolean } = {}

@@ -119,7 +119,7 @@ local function payGift(player: Player, state: State, reason: string): (string, s
 		local rolls = RollService.RollMany(player, reward.Rolls)
 		local entries = table.create(#rolls)
 		for index, roll in rolls do
-			entries[index] = { Id = roll.Id, Mutation = roll.Mutation, Source = "Offering" }
+			entries[index] = { Id = roll.Id, Mutation = roll.Mutation, Size = roll.Size, Source = "Offering" }
 		end
 		DiscoveryPipeline.GrantBatch(player, entries)
 		table.insert(lines, `+{reward.Rolls} discoveries`)

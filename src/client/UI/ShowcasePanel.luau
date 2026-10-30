@@ -95,7 +95,7 @@ function ShowcasePanel.Start(
 	local ceBars: { { Bar: Frame, Price: number } } = {}
 
 	local panel, content =
-		UIKit.modal(screen, "ShowcaseMenu", "SHOWCASES", colors.Gold, Vector2.new(560, 640), "Shrine")
+		UIKit.modal(screen, "ShowcaseMenu", "SHOWCASES", colors.Gold, Vector2.new(560, 640), "Pedestals")
 
 	local activeLabel = UIKit.label({
 		TextSize = 15,

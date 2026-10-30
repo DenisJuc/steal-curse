@@ -89,7 +89,7 @@ local function pay(player: Player, reward: Bounties.Reward, reason: string)
 		local rolls = RollService.RollMany(player, reward.Rolls)
 		local entries = table.create(#rolls)
 		for index, roll in rolls do
-			entries[index] = { Id = roll.Id, Mutation = roll.Mutation, Source = "Bounty" }
+			entries[index] = { Id = roll.Id, Mutation = roll.Mutation, Size = roll.Size, Source = "Bounty" }
 		end
 		DiscoveryPipeline.GrantBatch(player, entries)
 	end

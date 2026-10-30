@@ -1,0 +1,14 @@
+Elapsed,ElapsedSec,System,Item,RankBefore,RankAfter,Price,Currency,CE_Before,CE_After,Essence_Before,Essence_After,Luck,IncomePerSec,Rebirths,SecSincePrev,Kind,Ok,Reason
+00:15,15.494731099999626,Fusion,Kunay,0,1,16,Essence,50079,50079,260,244,1,0,0,0,Purchase,true,Fusion rank 1 — choose a Charm.
+00:17,16.862489799998002,Charm,Kunay:Hunt,,,0,Essence,50079,50079,244,244,1,0,0,1.3677464999927906,Purchase,true,Hunt Charm chosen.
+00:23,23.361438399995677,Fusion,Kunay,1,2,29,Essence,50079,50079,244,215,1,0,0,6.498957500007236,Purchase,true,Fusion rank 2.
+01:03,63.47624549998727,Skill,MutationResonance,0,1,250000,CE,550079,300079,215,215,1,0,0,40.11479710000276,Purchase,true,
+01:13,72.74363289999019,Skill,MutationResonance,1,5,42105000000,CE,inf,inf,215,215,1,0,0,9.26739669998642,Purchase,true,
+01:37,97.35795129998587,Fusion,PaladynsNecklace,0,1,16,Essence,inf,inf,215,199,1,0,0,24.61431590000575,Purchase,true,Fusion rank 1 — choose a Charm.
+01:39,99.00858979999612,Charm,PaladynsNecklace:Workshop,,,0,Essence,inf,inf,199,199,1,0,0,1.6506315000005998,Purchase,true,Workshop Charm chosen.
+01:40,99.80867569999828,Charm,PaladynsNecklace:Workshop,,,0,Essence,inf,inf,199,199,1,0,0,0.8000869999959832,Purchase,true,Workshop Charm chosen.
+01:42,102.39114829999744,Charm,PaladynsNecklace:Workshop,,,0,Essence,inf,inf,199,199,1,0,0,2.5824652000010246,Purchase,true,Workshop Charm chosen.
+01:43,102.74117099998693,Charm,PaladynsNecklace:Workshop,,,0,Essence,inf,inf,199,199,1,0,0,0.3500310000090394,Purchase,true,Workshop Charm chosen.
+01:43,103.00823339998897,Charm,PaladynsNecklace:Hunt,,,0,Essence,inf,inf,199,199,1,0,0,0.26706249998824205,Purchase,true,Hunt Charm chosen.
+01:50,109.79145809999318,Fusion,PaladynsNecklace,1,2,29,Essence,inf,inf,199,170,1,0,0,6.783229400010896,Purchase,true,Fusion rank 2.
+01:51,110.64214379999612,Fusion,PaladynsNecklace,2,3,48,Essence,inf,inf,170,122,1,0,0,0.8506892000004882,Purchase,true,Fusion rank 3.

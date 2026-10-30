@@ -7,6 +7,7 @@ local TextService = game:GetService("TextService")
 local TweenService = game:GetService("TweenService")
 
 local Format = require(ReplicatedStorage.Shared.Format)
+local Banner = require(script.Parent.Banner)
 local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
 
@@ -19,6 +20,8 @@ local KIND_COLORS = {
 	Error = UIKit.Colors.Red,
 	Offline = UIKit.Colors.Gold,
 	Item = Color3.fromRGB(120, 235, 140),
+	Jade = UIKit.Colors.Jade,
+	Milestone = UIKit.Colors.Accent,
 }
 local MAX_SHOWN = 4
 local MAX_WIDTH = 520
@@ -101,9 +104,22 @@ function Toasts.Start(screen: ScreenGui)
 	holder = list
 
 	Notify.OnClientEvent:Connect(function(text: string, kind: string?)
-		if type(text) == "string" then
-			Toasts.Show(text, kind)
+		if type(text) ~= "string" then
+			return
 		end
+		if kind == "Milestone" then
+			-- Meaningful beats: Banner + toast so they are not missed during AFK scanning.
+			local title = "PROGRESS"
+			if string.find(text, "Rebirth", 1, true) then
+				title = "REBIRTH"
+			elseif string.find(text, "Fusion", 1, true) or string.find(text, "Fused", 1, true) then
+				title = "FUSION"
+			elseif string.find(text, "unlocked", 1, true) or string.find(text, "complete", 1, true) then
+				title = "GOAL"
+			end
+			Banner.Show(title, text, KIND_COLORS.Milestone)
+		end
+		Toasts.Show(text, kind)
 	end)
 
 	Motion.Denied:Connect(function(button: GuiButton)

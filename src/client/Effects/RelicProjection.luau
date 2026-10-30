@@ -9,6 +9,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local Presentation = require(ReplicatedStorage.Shared.Presentation)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local MutationVFX = require(script.Parent.MutationVFX)
 
 local RelicProjection = {}
@@ -23,7 +24,8 @@ function RelicProjection.Spawn(
 	mutation: string?,
 	category: Presentation.Category,
 	seconds: number,
-	lowEffects: boolean
+	lowEffects: boolean,
+	sizeId: string?
 )
 	local relic = RelicConfig.ById[relicId]
 	local character = Players.LocalPlayer.Character
@@ -44,7 +46,7 @@ function RelicProjection.Spawn(
 	local part = RelicModels.build(
 		relicId,
 		CFrame.new(root.Position + Vector3.new(0, HEIGHT, 0)),
-		SCALE[category],
+		SCALE[category] * SizeConfig.scaleOf(sizeId),
 		{ Spectral = true }
 	)
 	if not part then

@@ -11,17 +11,26 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local DataService = require(script.Parent.DataService)
 local GameEvents = require(script.Parent.GameEvents)
 
 local CosmeticEquipService = {}
 
 local MODEL_NAME = "FloatingRelic"
+local BASE_FLOAT_SCALE = 0.55
 
 function CosmeticEquipService.DisplayName(item: any): string
 	local relic = RelicConfig.ById[item.Id]
 	local name = if relic then relic.Name else item.Id
-	return if item.Mutation then `{item.Mutation} {name}` else name
+	if item.Mutation then
+		name = `{item.Mutation} {name}`
+	end
+	local size = SizeConfig.normalize(item.Size)
+	if size then
+		name = `{SizeConfig.Label[size]} {name}`
+	end
+	return name
 end
 
 local function onPedestal(data: any, uid: number): boolean
@@ -60,12 +69,13 @@ function CosmeticEquipService.IsFloating(player: Player, uid: number): boolean
 	return data ~= nil and uid ~= 0 and data.Cosmetic.Uid == uid
 end
 
-local function build(character: Model, relicId: string, mutationId: string?)
+local function build(character: Model, relicId: string, mutationId: string?, sizeId: string?)
 	local root = character:FindFirstChild("HumanoidRootPart")
 	if not root or not root:IsA("BasePart") then
 		return
 	end
-	local part = RelicModels.build(relicId, root.CFrame * CFrame.new(2.4, 1.8, 0.6), 0.55)
+	local scale = BASE_FLOAT_SCALE * SizeConfig.scaleOf(sizeId)
+	local part = RelicModels.build(relicId, root.CFrame * CFrame.new(2.4, 1.8, 0.6), scale)
 	if not part then
 		return
 	end
@@ -85,6 +95,23 @@ local function build(character: Model, relicId: string, mutationId: string?)
 		emitter.SpreadAngle = Vector2.new(180, 180)
 		emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.25), NumberSequenceKeypoint.new(1, 0) })
 		emitter.Parent = part
+	end
+	local size = SizeConfig.normalize(sizeId)
+	if size then
+		local accent = if size == "Titanic" then Color3.fromRGB(255, 210, 90) else Color3.fromRGB(180, 220, 255)
+		local ring = Instance.new("ParticleEmitter")
+		ring.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+		ring.Color = ColorSequence.new(accent)
+		ring.LightEmission = 1
+		ring.Rate = if size == "Titanic" then 14 else 9
+		ring.Lifetime = NumberRange.new(0.5, 1.0)
+		ring.Speed = NumberRange.new(0.2, 0.8)
+		ring.SpreadAngle = Vector2.new(180, 180)
+		ring.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, if size == "Titanic" then 0.45 else 0.3),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		ring.Parent = part
 	end
 	local weld = Instance.new("WeldConstraint")
 	weld.Part0 = root
@@ -112,7 +139,7 @@ function CosmeticEquipService.Apply(player: Player)
 	end
 	player:SetAttribute("FloatingRelic", CosmeticEquipService.DisplayName(item))
 	if character then
-		build(character, item.Id, item.Mutation)
+		build(character, item.Id, item.Mutation, item.Size)
 	end
 end
 
@@ -143,7 +170,13 @@ function CosmeticEquipService.Stop(player: Player)
 end
 
 -- From the Backpack: float a copy of a relic + mutation, or put it away. Returns a menu message.
-function CosmeticEquipService.FloatGroup(player: Player, relicId: any, mutationId: any, on: any): string?
+function CosmeticEquipService.FloatGroup(
+	player: Player,
+	relicId: any,
+	mutationId: any,
+	on: any,
+	sizeId: any?
+): string?
 	local data = DataService.Get(player)
 	if not data or type(relicId) ~= "string" or not RelicConfig.ById[relicId] or type(on) ~= "boolean" then
 		return nil
@@ -151,16 +184,31 @@ function CosmeticEquipService.FloatGroup(player: Player, relicId: any, mutationI
 	if mutationId ~= nil and (type(mutationId) ~= "string" or not MutationConfig.ById[mutationId]) then
 		return nil
 	end
+	local wantSize = if sizeId == "Huge" or sizeId == "Titanic" then sizeId else nil
+	local function matchSize(itemSize: any): boolean
+		local have = if itemSize == "Huge" or itemSize == "Titanic" then itemSize else nil
+		return have == wantSize
+	end
 	local floating = CosmeticEquipService.FloatingItem(player)
 	if not on then
-		if floating and floating.Id == relicId and floating.Mutation == mutationId then
+		if
+			floating
+			and floating.Id == relicId
+			and floating.Mutation == mutationId
+			and matchSize(floating.Size)
+		then
 			CosmeticEquipService.Stop(player)
 			return "You put the relic away."
 		end
 		return nil
 	end
 	for _, item in data.Inventory do
-		if item.Id == relicId and item.Mutation == mutationId and not onPedestal(data, item.Uid) then
+		if
+			item.Id == relicId
+			and item.Mutation == mutationId
+			and matchSize(item.Size)
+			and not onPedestal(data, item.Uid)
+		then
 			CosmeticEquipService.Float(player, item.Uid)
 			return `{CosmeticEquipService.DisplayName(item)} floats beside you.`
 		end

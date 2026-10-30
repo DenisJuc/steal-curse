@@ -7,6 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local ItemConfig = require(ReplicatedStorage.Shared.ItemConfig)
+local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
 local Sounds = require(script.Parent.Parent.Sounds)
@@ -85,20 +86,26 @@ function ItemsTab.Build(page: Frame): { Refresh: () -> () }
 			Parent = list,
 		}, { UIKit.corner(10), UIKit.stroke(color, 2, 0.4) })
 		UIKit.skinCard(frame)
-		UIKit.create("Frame", {
-			Name = "Icon",
-			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, 12, 0.5, 0),
-			Size = UDim2.fromOffset(44, 44),
-			BackgroundColor3 = color,
-			Parent = frame,
-		}, {
-			UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
-			UIKit.create("UIGradient", {
-				Rotation = 90,
-				Transparency = NumberSequence.new(0, 0.5),
-			}),
-		})
+		local image = Icons.image(frame, `Potion{item.Effect}`, 48)
+		if image then
+			image.AnchorPoint = Vector2.new(0, 0.5)
+			image.Position = UDim2.new(0, 10, 0.5, 0)
+		else
+			UIKit.create("Frame", {
+				Name = "Icon",
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0, 12, 0.5, 0),
+				Size = UDim2.fromOffset(44, 44),
+				BackgroundColor3 = color,
+				Parent = frame,
+			}, {
+				UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+				UIKit.create("UIGradient", {
+					Rotation = 90,
+					Transparency = NumberSequence.new(0, 0.5),
+				}),
+			})
+		end
 		UIKit.label({
 			Name = "Title",
 			Text = item.Name,

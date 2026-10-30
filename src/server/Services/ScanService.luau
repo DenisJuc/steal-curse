@@ -92,7 +92,7 @@ end
 local function performScans(player: Player, count: number, source: string)
 	local entries = {}
 	for _, rolled in RollService.RollMany(player, count) do
-		table.insert(entries, { Id = rolled.Id, Mutation = rolled.Mutation, Source = source })
+		table.insert(entries, { Id = rolled.Id, Mutation = rolled.Mutation, Size = rolled.Size, Source = source })
 	end
 	DataService.Increment(player, "TotalScans", count)
 	DiscoveryPipeline.GrantBatch(player, entries)

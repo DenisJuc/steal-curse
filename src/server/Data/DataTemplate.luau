@@ -4,12 +4,14 @@
 
 local DataTemplate = {}
 
-DataTemplate.Version = 6
+DataTemplate.Version = 8
 
 export type Item = {
 	Uid: number,
 	Id: string,
 	Mutation: string?,
+	-- SoftCap Studio size stamp; nil / missing = Normal (save-compatible).
+	Size: string?,
 	At: number,
 	Source: string,
 	-- Locked copies can't be sold by any path.
@@ -19,6 +21,7 @@ export type Item = {
 export type RareFind = {
 	Id: string,
 	Mutation: string?,
+	Size: string?,
 	At: number,
 	Source: string,
 }
@@ -52,6 +55,8 @@ export type Data = {
 	Discovered: { [string]: number },
 	-- Mutations seen per base relic id (item-detail flags, prestige titles): [id][mutation] = time.
 	CodexMutations: { [string]: { [string]: number } },
+	-- SoftCap Studio size stamps: [relicId]["Huge"|"Titanic"] = unix time first seen.
+	CodexSizes: { [string]: { [string]: number } },
 	-- Milestones reached but not yet claimed (kept even if a bigger roster raises the threshold).
 	CodexReady: { [string]: number },
 	-- Claimed Codex milestones; only these give rewards (never removed): [milestoneId] = time.
@@ -133,6 +138,30 @@ export type Data = {
 		-- Days in a row with every daily claimed.
 		Streak: { Count: number, LastDay: number },
 	},
+	-- Phase 2 collection prototype (Essence / fusion / Charms / Resonance). Always present;
+	-- gameplay only when BalanceTrials.collectionEnabled().
+	Collection: {
+		Essence: number,
+		Fusion: { [string]: { Rank: number, Charm: string? } },
+		FusionPins: { [string]: boolean },
+		ResonanceStacks: { [string]: number },
+		PendingResonance: boolean,
+		MutationGoalsClaimed: { [string]: number },
+		AttuneCharges: number,
+		AttuneScansLeft: number,
+		AttuneChargeCap: number,
+		LastDailyAttuneDay: number,
+		QuickBindReadyAt: number,
+		FreeSignalAt: number,
+		EpicCatalysts: { [string]: boolean },
+		TargetedAttuneTier: string?,
+		FamilyAttune: string?,
+		MutationFocusScansLeft: number,
+		ActivePursuit: string?,
+		PursuitMutSeen: { [string]: boolean },
+		HuntQuarryId: string?,
+		HuntQuarrySetAt: number?,
+	},
 }
 
 DataTemplate.Template = {
@@ -155,6 +184,7 @@ DataTemplate.Template = {
 	Rebirths = 0,
 	Discovered = {},
 	CodexMutations = {},
+	CodexSizes = {},
 	CodexReady = {},
 	CodexMilestones = {},
 	Favorites = {},
@@ -213,6 +243,7 @@ DataTemplate.Template = {
 		FrequencyFocus = 0,
 		MutationResonance = 0,
 		EnergyConduction = 0,
+		PedestalMastery = 0,
 		SpiritMerchant = 0,
 		SpiritReservoir = 0,
 		SpiritSight = 0,
@@ -245,6 +276,32 @@ DataTemplate.Template = {
 		Rerolled = false,
 		Weekly = { Week = 0, Id = "", Progress = 0, Claimed = false },
 		Streak = { Count = 0, LastDay = 0 },
+	},
+	Collection = {
+		Essence = 0,
+		Fusion = {},
+		FusionPins = {},
+		ResonanceStacks = {
+			Collector = 0,
+			Binder = 0,
+			Seeker = 0,
+		},
+		PendingResonance = false,
+		MutationGoalsClaimed = {},
+		AttuneCharges = 0,
+		AttuneScansLeft = 0,
+		AttuneChargeCap = 3,
+		LastDailyAttuneDay = 0,
+		QuickBindReadyAt = 0,
+		FreeSignalAt = 0,
+		EpicCatalysts = {},
+		TargetedAttuneTier = nil,
+		FamilyAttune = nil,
+		MutationFocusScansLeft = 0,
+		ActivePursuit = nil,
+		PursuitMutSeen = {},
+		HuntQuarryId = nil,
+		HuntQuarrySetAt = nil,
 	},
 } :: Data
 

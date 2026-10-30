@@ -36,12 +36,14 @@ function SellService.SellWhere(player: Player, shouldSell: (any) -> boolean): (n
 	end
 	local kept = table.create(#data.Inventory)
 	local sold, earned = 0, 0
+	local soldIds = {}
 	for _, item in data.Inventory do
 		if SellService.IsSellable(player, item) and shouldSell(item) then
 			local value = SellService.SellValue(player, item)
 			sold += 1
 			earned += value
 			values[item.Uid] = value
+			table.insert(soldIds, item.Id)
 		else
 			table.insert(kept, item)
 		end
@@ -51,18 +53,59 @@ function SellService.SellWhere(player: Player, shouldSell: (any) -> boolean): (n
 	end
 	data.Inventory = kept
 	EconomyService.Add(player, earned)
+	local CollectionService = require(script.Parent.CollectionService)
+	for _, relicId in soldIds do
+		CollectionService.GrantEssenceFromSale(player, relicId)
+	end
 	DataService.MirrorAttributes(player)
 	return sold, earned, values
 end
 
 -- Sells up to `count` sellable copies of one relic + mutation. Returns (sold, CE earned).
-function SellService.Sell(player: Player, relicId: string, mutationId: string?, count: number): (number, number)
+local function sizeMatch(itemSize: any, want: any): boolean
+	local a = if itemSize == "Huge" or itemSize == "Titanic" then itemSize else nil
+	local b = if want == "Huge" or want == "Titanic" then want else nil
+	return a == b
+end
+
+function SellService.Sell(
+	player: Player,
+	relicId: string,
+	mutationId: string?,
+	count: number,
+	sizeId: string?
+): (number, number)
 	if count <= 0 then
 		return 0, 0
 	end
+	local data = DataService.Get(player)
+	if not data then
+		return 0, 0
+	end
+	local sized = sizeId == "Huge" or sizeId == "Titanic"
+	-- Keep at least one owned copy of each sized identity (backpack + pedestal).
+	local owned = 0
+	if sized then
+		for _, item in data.Inventory do
+			if item.Id == relicId and item.Mutation == mutationId and sizeMatch(item.Size, sizeId) then
+				owned += 1
+			end
+		end
+	end
 	local remaining = count
 	local sold, earned = SellService.SellWhere(player, function(item)
-		if remaining > 0 and item.Id == relicId and item.Mutation == mutationId then
+		if
+			remaining > 0
+			and item.Id == relicId
+			and item.Mutation == mutationId
+			and sizeMatch(item.Size, sizeId)
+		then
+			if sized then
+				if owned <= 1 then
+					return false
+				end
+				owned -= 1
+			end
 			remaining -= 1
 			return true
 		end

@@ -18,6 +18,8 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
+local Icons = require(script.Parent.Icons)
 local ItemsTab = require(script.Parent.ItemsTab)
 local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
@@ -75,7 +77,12 @@ local function escape(text: string): string
 end
 
 local function groupKey(group: any): string
-	return `{group.Id}|{group.Mutation or ""}`
+	local size = if group.Size == "Huge" or group.Size == "Titanic" then group.Size else ""
+	return `{group.Id}|{group.Mutation or ""}|{size}`
+end
+
+local function groupSized(group: any): boolean
+	return group.Size == "Huge" or group.Size == "Titanic"
 end
 
 local function marker(parent: Instance, text: string, color: Color3, anchor: Vector2, position: UDim2)
@@ -294,6 +301,13 @@ function InventoryPanel.Start(
 		Size = UDim2.new(0.4, -4, 1, 0),
 		Parent = footer,
 	})
+	local countPadding = UIKit.create("UIPadding", { Parent = countLabel })
+	local fullIcon = Icons.image(countLabel, "Warning", 20)
+	if fullIcon then
+		fullIcon.AnchorPoint = Vector2.new(0, 0.5)
+		fullIcon.Position = UDim2.new(0, -24, 0.5, 0)
+		fullIcon.Visible = false
+	end
 	local equipBest = UIKit.button({
 		Name = "EquipBest",
 		Text = "Equip Best",
@@ -454,25 +468,25 @@ function InventoryPanel.Start(
 		return instance
 	end
 	local equipButton = actionButton(1, function(group)
-		ShrineAction:FireServer("EquipGroup", group.Id, group.Mutation)
+		ShrineAction:FireServer("EquipGroup", group.Id, group.Mutation, group.Size)
 	end)
 	local floatButton = actionButton(2, function(group)
-		send("Float", group.Id, group.Mutation, not group.Floating)
+		send("Float", group.Id, group.Mutation, not group.Floating, group.Size)
 	end)
 	local sellOneButton, sellAllButton
 	sellOneButton = actionButton(3, function(group)
 		Motion.markCoinSource(sellOneButton)
-		send("Sell", group.Id, group.Mutation, 1)
+		send("Sell", group.Id, group.Mutation, 1, group.Size)
 	end)
 	sellAllButton = actionButton(4, function(group)
 		Motion.markCoinSource(sellAllButton)
-		send("Sell", group.Id, group.Mutation, "All")
+		send("Sell", group.Id, group.Mutation, "All", group.Size)
 	end)
 	local lockButton = actionButton(5, function(group)
-		send("Lock", group.Id, group.Mutation, group.Locked < group.Count)
+		send("Lock", group.Id, group.Mutation, group.Locked < group.Count, group.Size)
 	end)
 	local favButton = actionButton(6, function(group)
-		send("Favorite", group.Id, group.Mutation, not group.Favorite)
+		send("Favorite", group.Id, group.Mutation, not group.Favorite, group.Size)
 	end)
 
 	local function styleAction(instance: TextButton, text: string, enabled: boolean, color: Color3?)
@@ -507,23 +521,32 @@ function InventoryPanel.Start(
 			return
 		end
 		local color = relicColor(group.Id, group.Mutation)
-		if detailView:GetAttribute("RelicId") ~= group.Id then
-			RelicViewport.show(detailView, group.Id)
+		local sizeId = SizeConfig.normalize(group.Size)
+		if detailView:GetAttribute("RelicId") ~= group.Id or detailView:GetAttribute("Size") ~= (sizeId or "") then
+			RelicViewport.show(detailView, group.Id, sizeId)
 		end
 		detailView.Visible = true
-		sideStroke.Color = color
-		detailName.Text = `{if group.Favorite then "* " else ""}{Odds.displayName(group.Id, group.Mutation)}`
-		detailName.TextColor3 = color
+		sideStroke.Color = if sizeId == "Titanic" then colors.Gold elseif sizeId then Color3.fromRGB(160, 210, 255) else color
+		detailName.Text = `{if group.Favorite then "* " else ""}{Odds.displayName(group.Id, group.Mutation, sizeId)}`
+		detailName.TextColor3 = sideStroke.Color
 		local relic = RelicConfig.ById[group.Id]
 		local tier = relic and RarityConfig.Get(relic.Tier)
 		local yours = RollMath.comboProbability(Odds.current(), group.Id, group.Mutation)
+		local sizeLine = if sizeId
+			then `Size <b>{SizeConfig.Label[sizeId]}</b>  |  income ×{SizeConfig.incomeMult(sizeId)}  |  keep 1`
+			else "Size Normal"
 		local lines = {
 			`<b>{if tier then tier.Name else "?"}</b>{if group.Mutation then `  |  {group.Mutation}` else ""}`,
+			sizeLine,
 			`In backpack x{group.Count}{if group.Locked > 0 then `  |  {group.Locked} locked` else ""}{if group.Floating
 				then "  |  1 floating"
 				else ""}`,
 			`Income +{Format.rate(group.IncomePerSec)} CE`,
-			`Sells for {Format.number(group.SellValue)} CE`,
+			`Sells for {Format.number(group.SellValue)} CE{if sizeId and group.Sellable <= 0
+				then " (last copy kept)"
+				elseif sizeId
+				then " (extras only)"
+				else ""}`,
 			`Base {Format.odds(Odds.baseItem(group.Id))}  |  Yours {Format.odds(yours)}`,
 		}
 		if relic and relic.Description then
@@ -535,6 +558,7 @@ function InventoryPanel.Start(
 		detailInfo.Text = table.concat(lines, "\n")
 
 		local allLocked = group.Locked >= group.Count
+		local canSell = group.Sellable > 0
 		styleAction(equipButton, "Equip", true)
 		styleAction(
 			floatButton,
@@ -542,8 +566,8 @@ function InventoryPanel.Start(
 			true,
 			if group.Floating then colors.Gold else colors.Panel
 		)
-		styleAction(sellOneButton, "Sell 1", group.Sellable > 0)
-		styleAction(sellAllButton, "Sell all", group.Sellable > 0)
+		styleAction(sellOneButton, "Sell 1", canSell)
+		styleAction(sellAllButton, if sizeId then "Sell extras" else "Sell all", canSell)
 		styleAction(lockButton, if allLocked then "Unlock" else "Lock", true, if allLocked then colors.Gold else colors.Panel)
 		styleAction(favButton, if group.Favorite then "Unfavorite" else "Favorite", true, if group.Favorite
 			then colors.Gold
@@ -553,7 +577,7 @@ function InventoryPanel.Start(
 	local function onCardClicked(group: any)
 		local slot = pickSlot
 		if slot then
-			ShrineAction:FireServer("DisplayGroup", slot, group.Id, group.Mutation)
+			ShrineAction:FireServer("DisplayGroup", slot, group.Id, group.Mutation, group.Size)
 			endPick()
 			return
 		end
@@ -575,7 +599,8 @@ function InventoryPanel.Start(
 			local y = card.AbsolutePosition.Y
 			local slot = card:FindFirstChild("RenderSlot")
 			if slot and y + card.AbsoluteSize.Y >= top - CELL.Y and y <= bottom + CELL.Y then
-				local viewport = renders.Get(groupKey(group), group.Id)
+				local sizeId = SizeConfig.normalize(group.Size)
+				local viewport = renders.Get(groupKey(group), group.Id, sizeId)
 				viewport.Parent = slot
 				cards[card] = nil
 			end
@@ -584,6 +609,12 @@ function InventoryPanel.Start(
 	local function makeCard(index: number, group: any)
 		local selected = pickSlot == nil and groupKey(group) == selectedKey
 		local color = relicColor(group.Id, group.Mutation)
+		local sizeId = SizeConfig.normalize(group.Size)
+		local strokeColor = if sizeId == "Titanic"
+			then colors.Gold
+			elseif sizeId
+			then Color3.fromRGB(160, 210, 255)
+			else color
 		local cell = UIKit.slot(grid, "Cell", UDim2.new(), index)
 		local card = UIKit.create("TextButton", {
 			Name = "Card",
@@ -592,10 +623,10 @@ function InventoryPanel.Start(
 			Parent = cell,
 		}, {
 			UIKit.corner(10),
-			UIKit.stroke(if selected then colors.Gold else color, if selected then 3 else 2, if selected then 0 else 0.35),
+			UIKit.stroke(if selected then colors.Gold else strokeColor, if selected or sizeId then 3 else 2, if selected then 0 else 0.35),
 			UIKit.create("UIGradient", {
 				Rotation = 90,
-				Color = ColorSequence.new(colors.Card, color:Lerp(colors.Card, 0.7)),
+				Color = ColorSequence.new(colors.Card, strokeColor:Lerp(colors.Card, 0.7)),
 			}),
 		})
 		UIKit.fill(card)
@@ -617,12 +648,12 @@ function InventoryPanel.Start(
 		})
 		UIKit.label({
 			Name = "RelicName",
-			Text = Odds.displayName(group.Id, group.Mutation),
+			Text = Odds.displayName(group.Id, group.Mutation, sizeId),
 			TextSize = 12,
 			TextWrapped = true,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			TextColor3 = color,
+			TextColor3 = strokeColor,
 			Position = UDim2.fromOffset(3, 74),
 			Size = UDim2.new(1, -6, 0, 28),
 			Parent = card,
@@ -647,22 +678,40 @@ function InventoryPanel.Start(
 			Size = UDim2.new(0.4, 0, 0, 16),
 			Parent = card,
 		})
+		local leftBadge = 4
+		if sizeId then
+			marker(
+				card,
+				if sizeId == "Titanic" then "T" else "H",
+				if sizeId == "Titanic" then colors.Gold else Color3.fromRGB(160, 210, 255),
+				Vector2.new(0, 0),
+				UDim2.fromOffset(leftBadge, 4)
+			)
+			leftBadge += 22
+		end
 		if group.Mutation then
-			marker(card, string.sub(group.Mutation, 1, 1), color, Vector2.new(0, 0), UDim2.fromOffset(4, 4))
+			marker(card, string.sub(group.Mutation, 1, 1), color, Vector2.new(0, 0), UDim2.fromOffset(leftBadge, 4))
 		end
 		local right = 4
-		local function corner(text: string, badgeColor: Color3)
-			marker(card, text, badgeColor, Vector2.new(1, 0), UDim2.new(1, -right, 0, 4))
+		local function corner(text: string, badgeColor: Color3, iconKey: string?)
+			local image = if iconKey then Icons.image(card, iconKey, 22) else nil
+			if image then
+				image.AnchorPoint = Vector2.new(1, 0)
+				image.Position = UDim2.new(1, -right + 1, 0, 3)
+				image.ZIndex = 3
+			else
+				marker(card, text, badgeColor, Vector2.new(1, 0), UDim2.new(1, -right, 0, 4))
+			end
 			right += 22
 		end
 		if group.Floating then
 			corner("F", colors.Accent)
 		end
 		if group.Locked > 0 then
-			corner("L", colors.SubText)
+			corner("L", colors.SubText, "Lock")
 		end
 		if group.Favorite then
-			corner("*", colors.Red)
+			corner("*", colors.Red, "Favorite")
 		end
 		cards[card] = group
 	end
@@ -683,6 +732,10 @@ function InventoryPanel.Start(
 			then ` (+{over})`
 			else ""}`
 		countLabel.TextColor3 = if full then colors.Red else colors.Gold
+		if fullIcon then
+			fullIcon.Visible = full
+			countPadding.PaddingLeft = UDim.new(0, if full then 24 else 0)
+		end
 		refreshSellAll()
 		if not selectedGroup() then
 			selectedKey = nil

@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local ClientSettings = require(ReplicatedStorage.Shared.ClientSettings)
 local HUD = require(script.Parent.UI.HUD)
 local AutoSellPanel = require(script.Parent.UI.AutoSellPanel)
@@ -11,12 +12,14 @@ local Banner = require(script.Parent.UI.Banner)
 local BountyPanel = require(script.Parent.UI.BountyPanel)
 local BuffTimers = require(script.Parent.UI.BuffTimers)
 local CodexPanel = require(script.Parent.UI.CodexPanel)
+local CollectionPanel = require(script.Parent.UI.CollectionPanel)
 local DiscoveryFeed = require(script.Parent.UI.DiscoveryFeed)
 local FocusPanel = require(script.Parent.UI.FocusPanel)
 local InventoryPanel = require(script.Parent.UI.InventoryPanel)
 local JournalPanel = require(script.Parent.UI.JournalPanel)
 local MenuMotion = require(script.Parent.UI.MenuMotion)
 local Onboarding = require(script.Parent.UI.Onboarding)
+local PlaytestAnalyticsPanel = require(script.Parent.UI.PlaytestAnalyticsPanel)
 local RebirthPanel = require(script.Parent.UI.RebirthPanel)
 local RollBar = require(script.Parent.UI.RollBar)
 local RollReel = require(script.Parent.UI.RollReel)
@@ -31,6 +34,7 @@ local UIKit = require(script.Parent.UI.UIKit)
 local WardrobePanel = require(script.Parent.UI.WardrobePanel)
 local WelcomeBack = require(script.Parent.UI.WelcomeBack)
 local ZoneLabel = require(script.Parent.UI.ZoneLabel)
+local SoundMixer = require(script.Parent.UI.SoundMixer)
 local Announcements = require(script.Parent.Announcements)
 local AfkController = require(script.Parent.Controllers.AfkController)
 local GamepadController = require(script.Parent.Controllers.GamepadController)
@@ -38,6 +42,7 @@ local KioskController = require(script.Parent.Controllers.KioskController)
 local PedestalPrompts = require(script.Parent.Controllers.PedestalPrompts)
 local SprintController = require(script.Parent.Controllers.SprintController)
 local Ambience = require(script.Parent.Effects.Ambience)
+local SealBurst = require(script.Parent.Effects.SealBurst)
 local MapLightLOD = require(script.Parent.Effects.MapLightLOD)
 local OtherBinds = require(script.Parent.Effects.OtherBinds)
 local ShowcaseLOD = require(script.Parent.Effects.ShowcaseLOD)
@@ -52,6 +57,7 @@ local WildFinds = require(script.Parent.Effects.WildFinds)
 local LightningAura = require(script.Parent.Effects.LightningAura)
 local PlayerTitles = require(script.Parent.Effects.PlayerTitles)
 local CursedShrines = require(script.Parent.Effects.CursedShrines)
+local ShrineCharmPulse = require(script.Parent.Effects.ShrineCharmPulse)
 local RevealController = require(script.Parent.Controllers.RevealController)
 local HuntController = require(script.Parent.Hunt.HuntController)
 local Settings = require(script.Parent.Settings)
@@ -104,6 +110,7 @@ end)
 local focusPanel = FocusPanel.Start(screen)
 local skillPanel = SkillTreePanel.Start(screen)
 local codexPanel = CodexPanel.Start(screen)
+local collectionPanel = CollectionPanel.Start(screen)
 local journalPanel = JournalPanel.Start(screen)
 local bountyPanel = BountyPanel.Start(screen)
 local wardrobePanel = WardrobePanel.Start(screen)
@@ -119,6 +126,7 @@ menus = {
 	autoSellPanel,
 	skillPanel,
 	codexPanel,
+	collectionPanel,
 	journalPanel,
 	bountyPanel,
 	wardrobePanel,
@@ -139,6 +147,7 @@ local openers = {
 	Luck = toggleOnly(focusPanel),
 	Relics = toggleOnly(inventoryPanel),
 	Skills = toggleOnly(skillPanel),
+	Collection = toggleOnly(collectionPanel),
 	Codex = toggleOnly(codexPanel),
 	Journal = toggleOnly(journalPanel),
 	Bounties = toggleOnly(bountyPanel),
@@ -146,10 +155,13 @@ local openers = {
 	Settings = toggleOnly(settingsPanel),
 	Rebirth = toggleOnly(rebirthPanel),
 }
+local coreLoop = BalanceTrials.coreLoopPresentation()
 local hud = HUD.Start(screen, {
 	OnShrine = openers.Shrine,
 	OnLuck = openers.Luck,
 	OnRebirth = openers.Rebirth,
+	-- Studio Core Loop: Collection / Fusion Board hidden (implementation kept).
+	OnCollection = if coreLoop then nil else openers.Collection,
 	OnCodex = openers.Codex,
 	OnJournal = openers.Journal,
 	OnSettings = openers.Settings,
@@ -167,6 +179,8 @@ RollReel.Start(screen, rollBar.Frame)
 HuntRolls.Start(screen)
 DiscoveryFeed.Start(screen)
 RevealController.Start(screen)
+-- SealBurst.Start only wires AFK scan seals when PREMADE.PLAY_ON_SCAN (off by default).
+SealBurst.Start()
 Toasts.Start(screen)
 Banner.Start(screen)
 Announcements.Start()
@@ -189,6 +203,7 @@ HuntController.Start(screen, {
 		end
 	end,
 })
+ShrineCharmPulse.Start()
 GamepadController.Start(screen, function()
 	return screen:FindFirstChild("Buttons", true)
 end)
@@ -213,4 +228,13 @@ local afk = AfkController.Start()
 
 if RunService:IsStudio() then
 	StudioCommands.Start({ SkipToHopWarning = afk.SkipToHopWarning })
+	-- TEMP: SFX volume mixer (bottom-right "SFX" button). Remove with SoundMixer.luau when done.
+	SoundMixer.Start(screen)
+	-- After TravelBar/HUD exist; never block gameplay if analytics UI fails.
+	task.defer(function()
+		local ok, err = pcall(PlaytestAnalyticsPanel.Start, screen)
+		if not ok then
+			warn(`[PlaytestAnalytics] HUD skipped: {err}`)
+		end
+	end)
 end

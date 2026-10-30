@@ -147,6 +147,77 @@ Migrations.Steps = {
 		end
 		data.Cosmetic = { Uid = uid }
 	end,
+	-- 6 -> 7: Phase 2 collection fields (Essence, fusion, Resonance). Reconcile also fills these.
+	[7] = function(data: any)
+		if type(data.Collection) ~= "table" then
+			data.Collection = {
+				Essence = 0,
+				Fusion = {},
+				FusionPins = {},
+				ResonanceStacks = {
+					Collector = 0,
+					Binder = 0,
+					Seeker = 0,
+				},
+				PendingResonance = false,
+				MutationGoalsClaimed = {},
+				AttuneCharges = 0,
+				AttuneScansLeft = 0,
+				AttuneChargeCap = 3,
+				LastDailyAttuneDay = 0,
+				QuickBindReadyAt = 0,
+				FreeSignalAt = 0,
+				EpicCatalysts = {},
+				TargetedAttuneTier = nil,
+				FamilyAttune = nil,
+				MutationFocusScansLeft = 0,
+				ActivePursuit = nil,
+				PursuitMutSeen = {},
+				HuntQuarryId = nil,
+				HuntQuarrySetAt = nil,
+			}
+		elseif type(data.Collection) == "table" then
+			-- Fill fields added after the first v7 prototype.
+			if data.Collection.AttuneScansLeft == nil then
+				data.Collection.AttuneScansLeft = 0
+			end
+			if data.Collection.AttuneChargeCap == nil then
+				data.Collection.AttuneChargeCap = 3
+			end
+			if data.Collection.LastDailyAttuneDay == nil then
+				data.Collection.LastDailyAttuneDay = 0
+			end
+			if data.Collection.QuickBindReadyAt == nil then
+				data.Collection.QuickBindReadyAt = 0
+			end
+			if data.Collection.FreeSignalAt == nil then
+				data.Collection.FreeSignalAt = 0
+			end
+			if type(data.Collection.EpicCatalysts) ~= "table" then
+				data.Collection.EpicCatalysts = {}
+			end
+			if data.Collection.MutationFocusScansLeft == nil then
+				data.Collection.MutationFocusScansLeft = 0
+			end
+			if type(data.Collection.PursuitMutSeen) ~= "table" then
+				data.Collection.PursuitMutSeen = {}
+			end
+			-- ActivePursuit may be nil (pre-choice); leave as-is when missing.
+		end
+	end,
+	-- 7 -> 8: SoftCap Studio size stamps (nil Size on items = Normal).
+	[8] = function(data)
+		if type(data.CodexSizes) ~= "table" then
+			data.CodexSizes = {}
+		end
+		if type(data.Inventory) == "table" then
+			for _, item in data.Inventory do
+				if type(item) == "table" and item.Size ~= nil and item.Size ~= "Huge" and item.Size ~= "Titanic" then
+					item.Size = nil
+				end
+			end
+		end
+	end,
 } :: { [number]: (any) -> () }
 
 export type Outcome = "Current" | "Migrated" | "Newer"

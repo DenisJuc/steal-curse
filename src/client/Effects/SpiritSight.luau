@@ -377,7 +377,9 @@ function SpiritSight.Update(dt: number, viewer: Vector3?)
 	-- Follows respawns (a new character has a new head).
 	setListener(true)
 	local rank = Players.LocalPlayer:GetAttribute("Skill_SpiritSight")
-	local revealRange = SkillConfig.sightRange(if type(rank) == "number" then rank else 0) * rangeFactor()
+	local seeker = Players.LocalPlayer:GetAttribute("SeekerSightBonus")
+	local seekerBonus = if type(seeker) == "number" then seeker else 0
+	local revealRange = SkillConfig.sightRange(if type(rank) == "number" then rank else 0) * rangeFactor() + seekerBonus
 	for _, signal in signals do
 		local isBound = bound ~= nil and bound.Signal == signal
 		signal.Flare = math.max(0, signal.Flare - dt)

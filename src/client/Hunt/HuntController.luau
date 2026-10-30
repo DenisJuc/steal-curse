@@ -488,6 +488,30 @@ function HuntController.GetSignalIds(): { number }
 	return ids
 end
 
+function HuntController.GetSignalPosition(id: number): Vector3?
+	return signals[id]
+end
+
+-- Nearest signal by world distance (no bind LockRange). Used by Shrine Charm pulse.
+function HuntController.GetNearestSignalAny(): (number?, Vector3?)
+	local rootPart = getRoot()
+	if not rootPart then
+		return nil, nil
+	end
+	local bestId: number? = nil
+	local bestPos: Vector3? = nil
+	local bestDistance = math.huge
+	for id, position in signals do
+		local distance = (position - rootPart.Position).Magnitude
+		if distance < bestDistance then
+			bestId = id
+			bestPos = position
+			bestDistance = distance
+		end
+	end
+	return bestId, bestPos
+end
+
 function HuntController.GetNearestSignalId(): number?
 	return nearestInRange()
 end

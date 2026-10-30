@@ -1,10 +1,8 @@
 -- Top-left column: the Spirit Resonator box (totals; the charge lives on the ROLL button), then
--- the Cursed Energy coin counter, then the Shrine (pedestal), Luck (cursed lucky flower), Rebirth
--- (cycle ring; shines once affordable), Codex (book), Journal (scroll) and Settings (gear)
--- buttons, one under the other: names hang on each button's bottom edge, values (luck, Rebirths,
--- Codex count) sit in a corner chip. Backpack and Upgrades
--- sit in the bottom RollBar. On small (phone) screens the buttons wrap into rows of three. Reads
--- player attributes only; one UIScale keeps the whole column readable on phones.
+-- the Cursed Energy coin counter, then Pedestals, Luck, Rebirth, Collection (Essence chip;
+-- fuse-ready badge; Studio prototype), Codex, Journal and Settings. Backpack and Upgrades sit in
+-- the bottom RollBar. On small (phone) screens the buttons wrap into rows of three. Reads player
+-- attributes only; one UIScale keeps the whole column readable on phones.
 -- CE rolls up instead of jumping; a windfall (more than a few seconds of passive income at once,
 -- e.g. a sale) also bursts coins into the counter, from the button that earned it (Sell) or the
 -- screen center.
@@ -12,6 +10,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
@@ -26,6 +25,7 @@ export type Callbacks = {
 	OnShrine: () -> (),
 	OnLuck: () -> (),
 	OnRebirth: () -> (),
+	OnCollection: (() -> ())?,
 	OnCodex: () -> (),
 	OnJournal: () -> (),
 	OnSettings: () -> (),
@@ -92,6 +92,58 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		}),
 	})
 	UIKit.scaler(column)
+
+	-- Next objective (Collection Studio): one line from server-authoritative ProgressObjective.
+	local objectiveCard = UIKit.create("Frame", {
+		Name = "NextObjective",
+		LayoutOrder = 0,
+		Size = UDim2.fromOffset(280, 56),
+		Visible = false,
+		Parent = column,
+	}, { UIKit.corner(10), UIKit.padding(8) })
+	UIKit.skinPanel(objectiveCard, colors.Accent)
+	local objectiveTitle = UIKit.label({
+		Name = "Title",
+		Size = UDim2.new(1, 0, 0, 14),
+		Text = "NEXT",
+		TextSize = 11,
+		TextColor3 = colors.Accent,
+		FontFace = UIKit.TitleFont,
+		Parent = objectiveCard,
+	})
+	local objectiveBody = UIKit.label({
+		Name = "Body",
+		Position = UDim2.fromOffset(0, 14),
+		Size = UDim2.new(1, 0, 0, 28),
+		Text = "",
+		TextSize = 13,
+		TextWrapped = true,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		TextTruncate = Enum.TextTruncate.AtEnd,
+		Parent = objectiveCard,
+	})
+	local function refreshObjective()
+		local text = player:GetAttribute("NextObjectiveText")
+		local detail = player:GetAttribute("NextObjectiveDetail")
+		local hasCollection = type(player:GetAttribute("Essence")) == "number"
+		if not hasCollection or type(text) ~= "string" or text == "" then
+			objectiveCard.Visible = false
+			return
+		end
+		objectiveCard.Visible = true
+		local lift = player:GetAttribute("BoardIncomeMult")
+		objectiveTitle.Text = if type(lift) == "number" and lift > 1 + 1e-9
+			then `NEXT · Board ×{string.format("%.2f", lift)}`
+			else "NEXT"
+		objectiveBody.Text = if type(detail) == "string" and detail ~= "" and detail ~= text
+			then `{text}\n{detail}`
+			else text
+	end
+	player:GetAttributeChangedSignal("NextObjectiveText"):Connect(refreshObjective)
+	player:GetAttributeChangedSignal("NextObjectiveDetail"):Connect(refreshObjective)
+	player:GetAttributeChangedSignal("BoardIncomeMult"):Connect(refreshObjective)
+	player:GetAttributeChangedSignal("Essence"):Connect(refreshObjective)
+	refreshObjective()
 
 	local panel = UIKit.create("Frame", {
 		Name = "ResonatorPanel",
@@ -200,7 +252,7 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		Parent = buttons,
 	})
 
-	local shrineButton = iconButton(buttons, "ShrineButton", 3, "Shrine", "Shrine")
+	local shrineButton = iconButton(buttons, "ShrineButton", 3, "Pedestals", "Pedestals")
 	shrineButton.Activated:Connect(callbacks.OnShrine)
 
 	local luckButton, _, luckChip = iconButton(buttons, "LuckButton", 4, "Luck", "Luck")
@@ -222,8 +274,10 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	end)
 	local function refreshRebirth()
 		local count = player:GetAttribute("Rebirths") or 0
-		local cost = Rebirth.cost(Config.Rebirth, count)
-		rebirthReady = (player:GetAttribute("CE") or 0) + 1e-9 >= cost
+		local settings = BalanceTrials.rebirthSettings(Config.Rebirth)
+		local cost = Rebirth.cost(settings, count)
+		local ce = player:GetAttribute("CE") or 0
+		rebirthReady = ce + 1e-9 >= cost
 		rebirthChip.Visible = count > 0
 		rebirthChip.Text = tostring(count)
 		rebirthCaption.TextColor3 = if rebirthReady then colors.Jade else colors.Text
@@ -236,6 +290,70 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	player:GetAttributeChangedSignal("CE"):Connect(refreshRebirth)
 	refreshRebirth()
 
+	-- Collection (Studio prototype): Essence chip + fuse-ready badge. Hidden when collection is off.
+	local collectionSlot: Frame? = nil
+	local collectionVisible = false
+	if callbacks.OnCollection then
+		local collectionButton, _, collectionChip = iconButton(buttons, "CollectionButton", 6, "Collection", "Collection")
+		collectionSlot = collectionButton.Parent :: Frame
+		collectionButton.Activated:Connect(callbacks.OnCollection)
+		collectionChip.Visible = true
+		collectionChip.Text = "—"
+		local fuseBadge = UIKit.label({
+			Name = "FuseBadge",
+			Text = "!",
+			TextSize = 18,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			BackgroundTransparency = 0,
+			BackgroundColor3 = colors.Accent,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.new(1, -4, 0, 4),
+			Size = UDim2.fromOffset(24, 24),
+			ZIndex = 10,
+			Visible = false,
+			Parent = collectionButton,
+		})
+		UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = fuseBadge })
+		UIKit.stroke(colors.Text, 2, 0).Parent = fuseBadge
+		Motion.badge(fuseBadge)
+		local collectionStroke = collectionButton:FindFirstChildOfClass("UIStroke")
+		local fuseReady = false
+		Motion.shineLoop(collectionButton, 2.5, function()
+			return fuseReady and collectionVisible
+		end)
+		local function refreshCollection()
+			local essence = player:GetAttribute("Essence")
+			collectionVisible = type(essence) == "number"
+			if collectionSlot then
+				collectionSlot.Visible = collectionVisible
+			end
+			if not collectionVisible then
+				fuseReady = false
+				fuseBadge.Visible = false
+				return
+			end
+			collectionChip.Text = Format.number(essence :: number)
+			local ready = (player:GetAttribute("FuseReadyCount") or 0) > 0
+				or (player:GetAttribute("CharmNeededCount") or 0) > 0
+			if ready and not fuseReady then
+				Motion.pop(fuseBadge, 0, 0.2)
+			end
+			fuseReady = ready
+			fuseBadge.Visible = ready
+			fuseBadge.Text = if (player:GetAttribute("CharmNeededCount") or 0) > 0 and (player:GetAttribute("FuseReadyCount") or 0) <= 0
+				then "★"
+				else "!"
+			if collectionStroke then
+				collectionStroke.Color = if ready then colors.Accent else colors.Trim
+				collectionStroke.Thickness = if ready then 3 else 2
+			end
+		end
+		player:GetAttributeChangedSignal("Essence"):Connect(refreshCollection)
+		player:GetAttributeChangedSignal("FuseReadyCount"):Connect(refreshCollection)
+		player:GetAttributeChangedSignal("CharmNeededCount"):Connect(refreshCollection)
+		refreshCollection()
+	end
+
 	local codexButton, _, codexChip = iconButton(buttons, "CodexButton", 7, "Codex", "Codex")
 	codexButton.Activated:Connect(callbacks.OnCodex)
 	codexChip.Visible = true
@@ -246,16 +364,29 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local settingsButton = iconButton(buttons, "SettingsButton", 9, "Settings", "Settings")
 	settingsButton.Activated:Connect(callbacks.OnSettings)
 
-	local buttonCount = 6
-	UIKit.watchCompact(function(compact: boolean)
+	local function liveButtonCount(): number
+		return if collectionVisible then 7 else 6
+	end
+	local function layoutButtons(compact: boolean)
 		local perRow = if compact then COMPACT_PER_ROW else 1
-		local rows = math.ceil(buttonCount / perRow)
+		local count = liveButtonCount()
+		local rows = math.ceil(count / perRow)
 		grid.FillDirectionMaxCells = perRow
 		buttons.Size = UDim2.fromOffset(
 			perRow * ICON_BUTTON_SIZE + (perRow - 1) * (ICON_GAP + 6),
 			rows * ICON_BUTTON_SIZE + (rows - 1) * ROW_GAP + ROW_GAP / 2
 		)
+	end
+	local compactLayout = false
+	UIKit.watchCompact(function(compact: boolean)
+		compactLayout = compact
+		layoutButtons(compact)
 	end)
+	if callbacks.OnCollection then
+		player:GetAttributeChangedSignal("Essence"):Connect(function()
+			layoutButtons(compactLayout)
+		end)
+	end
 	local function refreshCodex()
 		codexChip.Text = `{player:GetAttribute("DiscoveredCount") or 0}/{#CodexBook.AllIds}`
 	end
@@ -313,9 +444,18 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	refreshStats()
 
 	local panelStroke = panel:FindFirstChildOfClass("UIStroke")
+	local warning = Icons.image(panel, "Warning", 24)
+	if warning then
+		warning.AnchorPoint = Vector2.new(1, 0)
+		warning.Position = UDim2.new(1, 0, 0, -4)
+		warning.Visible = false
+	end
 	local wasPaused = false
 	local function refreshPaused()
 		local paused = player:GetAttribute("ScanPaused") == true
+		if warning then
+			warning.Visible = paused
+		end
 		titleLabel.Text = if paused then "INVENTORY FULL - PAUSED" else "SPIRIT RESONATOR"
 		titleLabel.TextColor3 = if paused then colors.Red else colors.Gold
 		if panelStroke then

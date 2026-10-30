@@ -14,6 +14,7 @@ local TweenService = game:GetService("TweenService")
 local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
+local IconAssets = require(script.Parent.IconAssets)
 local Motion = require(script.Parent.Motion)
 
 local UIKit = {}
@@ -331,8 +332,25 @@ function UIKit.skinButton(button: GuiButton, kind: string)
 	end
 end
 
--- A gold "mon" coin (round with a square hole), the CE currency mark.
+-- The CE currency mark: the Cursed Energy gem image once its id is set, otherwise a gold "mon" coin
+-- (round with a square hole).
 function UIKit.coin(size: number): Frame
+	local gem = IconAssets.Color.CursedEnergy
+	if gem and gem ~= "" then
+		return UIKit.create("Frame", {
+			Name = "Coin",
+			Size = UDim2.fromOffset(size, size),
+			BackgroundTransparency = 1,
+		}, {
+			UIKit.create("ImageLabel", {
+				Name = "Image",
+				Image = gem,
+				BackgroundTransparency = 1,
+				ScaleType = Enum.ScaleType.Fit,
+				Size = UDim2.fromScale(1, 1),
+			}),
+		})
+	end
 	local coin = UIKit.create("Frame", {
 		Name = "Coin",
 		Size = UDim2.fromOffset(size, size),

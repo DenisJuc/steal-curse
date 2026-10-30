@@ -31,6 +31,7 @@ local InventoryService = {}
 export type Group = {
 	Id: string,
 	Mutation: string?,
+	Size: string?,
 	-- Copies in the backpack (pedestal copies are not listed).
 	Count: number,
 	Locked: number,
@@ -45,14 +46,20 @@ export type Group = {
 
 -- Uids the "Sell all" button would sell right now (AutoSell.sellAll).
 local function sellAllUids(player: Player, data: any): { number }
+	local CollectionService = require(script.Parent.CollectionService)
+	local reserved = CollectionService.FusionReserveByUid(player)
 	local copies = {}
 	for _, item in data.Inventory do
+		local key = AutoSell.favoriteKey(item.Id, item.Mutation, item.Size)
 		table.insert(copies, {
 			Uid = item.Uid,
 			Displayed = PedestalService.IsDisplayed(player, item.Uid),
 			Locked = item.Locked == true,
-			Favorite = data.Favorites[AutoSell.favoriteKey(item.Id, item.Mutation)] == true,
+			Favorite = data.Favorites[key] == true,
 			Floating = CosmeticEquipService.IsFloating(player, item.Uid),
+			FusionReserve = reserved[item.Uid] == true,
+			Sized = item.Size == "Huge" or item.Size == "Titanic",
+			IdentityKey = key,
 		})
 	end
 	return AutoSell.sellAll(copies)
@@ -85,12 +92,13 @@ function InventoryService.Groups(player: Player): { Group }
 		if PedestalService.IsDisplayed(player, item.Uid) then
 			continue
 		end
-		local key = AutoSell.favoriteKey(item.Id, item.Mutation)
+		local key = AutoSell.favoriteKey(item.Id, item.Mutation, item.Size)
 		local group = byKey[key]
 		if not group then
 			group = {
 				Id = item.Id,
 				Mutation = item.Mutation,
+				Size = item.Size,
 				Count = 0,
 				Locked = 0,
 				Sellable = 0,
@@ -109,7 +117,16 @@ function InventoryService.Groups(player: Player): { Group }
 		if CosmeticEquipService.IsFloating(player, item.Uid) then
 			group.Floating = true
 		elseif not item.Locked then
+			-- Sized groups keep one copy; extras are sellable.
 			group.Sellable += 1
+		end
+	end
+	for _, group in list do
+		local sized = group.Size == "Huge" or group.Size == "Titanic"
+		if sized and group.Sellable > 0 then
+			-- Reserve one owned copy (floating counts as the keep).
+			local reserve = if group.Floating then 0 else 1
+			group.Sellable = math.max(0, group.Sellable - reserve)
 		end
 	end
 	table.sort(list, function(a, b)
@@ -122,7 +139,7 @@ function InventoryService.Groups(player: Player): { Group }
 		if a.IncomePerSec ~= b.IncomePerSec then
 			return a.IncomePerSec > b.IncomePerSec
 		end
-		return AutoSell.favoriteKey(a.Id, a.Mutation) < AutoSell.favoriteKey(b.Id, b.Mutation)
+		return AutoSell.favoriteKey(a.Id, a.Mutation, a.Size) < AutoSell.favoriteKey(b.Id, b.Mutation, b.Size)
 	end)
 	return list
 end
@@ -141,36 +158,46 @@ function InventoryService.State(player: Player)
 	}
 end
 
-local function validGroup(relicId: any, mutationId: any): boolean
+local function validGroup(relicId: any, mutationId: any, sizeId: any): boolean
 	if type(relicId) ~= "string" or not RelicConfig.ById[relicId] then
 		return false
 	end
-	return mutationId == nil or (type(mutationId) == "string" and MutationConfig.ById[mutationId] ~= nil)
+	if not (mutationId == nil or (type(mutationId) == "string" and MutationConfig.ById[mutationId] ~= nil)) then
+		return false
+	end
+	return sizeId == nil or sizeId == "" or sizeId == "Huge" or sizeId == "Titanic"
+end
+
+local function sizeMatch(itemSize: any, want: any): boolean
+	local a = if itemSize == "Huge" or itemSize == "Titanic" then itemSize else nil
+	local b = if want == "Huge" or want == "Titanic" then want else nil
+	return a == b
 end
 
 local ACTIONS: { [string]: (Player, any, ...any) -> string? } = {
-	Favorite = function(_player, data, relicId, mutationId, on)
-		if not validGroup(relicId, mutationId) or type(on) ~= "boolean" then
+	Favorite = function(_player, data, relicId, mutationId, on, sizeId)
+		if not validGroup(relicId, mutationId, sizeId) or type(on) ~= "boolean" then
 			return nil
 		end
-		data.Favorites[AutoSell.favoriteKey(relicId, mutationId)] = if on then true else nil
+		local size = if sizeId == "Huge" or sizeId == "Titanic" then sizeId else nil
+		data.Favorites[AutoSell.favoriteKey(relicId, mutationId, size)] = if on then true else nil
 		return nil
 	end,
 
-	Lock = function(_player, data, relicId, mutationId, on)
-		if not validGroup(relicId, mutationId) or type(on) ~= "boolean" then
+	Lock = function(_player, data, relicId, mutationId, on, sizeId)
+		if not validGroup(relicId, mutationId, sizeId) or type(on) ~= "boolean" then
 			return nil
 		end
 		for _, item in data.Inventory do
-			if item.Id == relicId and item.Mutation == mutationId then
+			if item.Id == relicId and item.Mutation == mutationId and sizeMatch(item.Size, sizeId) then
 				item.Locked = if on then true else nil
 			end
 		end
 		return nil
 	end,
 
-	Sell = function(player, _data, relicId, mutationId, amount)
-		if not validGroup(relicId, mutationId) then
+	Sell = function(player, _data, relicId, mutationId, amount, sizeId)
+		if not validGroup(relicId, mutationId, sizeId) then
 			return nil
 		end
 		local count
@@ -181,13 +208,17 @@ local ACTIONS: { [string]: (Player, any, ...any) -> string? } = {
 		else
 			return nil
 		end
-		local sold, earned = SellService.Sell(player, relicId, mutationId, count)
+		local sold, earned = SellService.Sell(player, relicId, mutationId, count, sizeId)
 		if sold == 0 then
-			return "Nothing to sell (locked and floating copies are kept)."
+			local sized = sizeId == "Huge" or sizeId == "Titanic"
+			return if sized
+				then "Keeping your last Huge/Titanic of this kind (locked/floating also stay)."
+				else "Nothing to sell (locked and floating copies are kept)."
 		end
 		local relic = RelicConfig.ById[relicId]
+		local sizeLabel = if sizeId == "Huge" or sizeId == "Titanic" then `{sizeId} ` else ""
 		local name = if mutationId then `{mutationId} {relic.Name}` else relic.Name
-		return `Sold {sold} x {name} for {Format.number(earned)} CE`
+		return `Sold {sold} x {sizeLabel}{name} for {Format.number(earned)} CE`
 	end,
 
 	SellAll = function(player, data)
@@ -210,8 +241,8 @@ local ACTIONS: { [string]: (Player, any, ...any) -> string? } = {
 	end,
 
 	-- on: float a copy beside the player, or put it away (display only, GDD 9.1).
-	Float = function(player, _data, relicId, mutationId, on)
-		return CosmeticEquipService.FloatGroup(player, relicId, mutationId, on)
+	Float = function(player, _data, relicId, mutationId, on, sizeId)
+		return CosmeticEquipService.FloatGroup(player, relicId, mutationId, on, sizeId)
 	end,
 }
 

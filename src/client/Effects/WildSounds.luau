@@ -46,8 +46,9 @@ function WildSounds.Start()
 	local player = Players.LocalPlayer
 	local cfg = Config.Ambience.DistantSounds
 	local nextSound = os.clock() + cfg.Every[1]
-	local defaults: { [Sound]: { Id: string, Speed: number } } = {}
+	local defaults: { [Sound]: { Id: string, Speed: number, Volume: number } } = {}
 	local lastMaterial: Enum.Material? = nil
+	local stepVolume = Config.FootstepVolumeScale
 
 	RunService.Heartbeat:Connect(function()
 		local character = player.Character
@@ -70,7 +71,8 @@ function WildSounds.Start()
 			return
 		end
 		if not defaults[running] then
-			defaults[running] = { Id = running.SoundId, Speed = running.PlaybackSpeed }
+			defaults[running] = { Id = running.SoundId, Speed = running.PlaybackSpeed, Volume = running.Volume }
+			running.Volume = defaults[running].Volume * stepVolume
 		end
 		local base = character:GetAttribute("BaseWalkSpeed")
 		local pace = if typeof(base) == "number" and base > 0 then humanoid.WalkSpeed / base else 1

@@ -1,5 +1,10 @@
 -- Server entry point: builds the map first, then starts every service in dependency order.
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
+local RelicIncome = require(ReplicatedStorage.Shared.RelicIncome)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
+local SoftCapRarity = require(ReplicatedStorage.Shared.SoftCapRarity)
 local MapBuilder = require(script.Parent.World.MapBuilder)
 local RemoteGuard = require(script.Parent.Services.RemoteGuard)
 local AfkService = require(script.Parent.Services.AfkService)
@@ -32,9 +37,18 @@ local WildFindsService = require(script.Parent.Services.WildFindsService)
 local TitleService = require(script.Parent.Services.TitleService)
 local TravelService = require(script.Parent.Services.TravelService)
 local BindService = require(script.Parent.Services.BindService)
+local CollectionService = require(script.Parent.Services.CollectionService)
+local PlaytestAnalyticsService = require(script.Parent.Services.PlaytestAnalyticsService)
 local DebugCommands = require(script.Parent.DebugCommands)
 
 local map = MapBuilder.Build()
+
+-- First line of truth for Studio: is the trial module actually the one running?
+BalanceTrials.logStartup()
+SoftCapRarity.syncFromTrials()
+SizeConfig.syncFromTrials()
+RelicIncome.syncFromTrials()
+print(`[Main] RelicIncome source={RelicIncome.incomeSource()}`)
 
 RemoteGuard.Init()
 GamePassService.Init()
@@ -45,6 +59,8 @@ SellService.Init()
 CodexService.Init()
 SkillService.Init()
 RebirthService.Init()
+CollectionService.Init()
+PlaytestAnalyticsService.Init()
 ShowcaseService.Init()
 CosmeticEquipService.Init()
 InventoryService.Init()
@@ -69,4 +85,14 @@ BindService.Init()
 TravelService.Init()
 DebugCommands.Init(map)
 
+local trial = BalanceTrials.current()
+local balanceId = if trial then trial.Id else "LIVE"
+local collectionOn = BalanceTrials.collectionEnabled()
+local sampler = BalanceTrials.raritySampler()
+local maxBonus = if trial and trial.Hunt.MaxBonusRolls then trial.Hunt.MaxBonusRolls else nil
+local maxTotal = if maxBonus then 1 + maxBonus else nil
+print(`[Main] Balance={balanceId} Collection={collectionOn} RaritySampler={sampler}`)
+if maxTotal then
+	print(`[Main] Hunt cap: MaxBonusRolls={maxBonus} → maxTotalRolls={maxTotal} per spirit capture`)
+end
 print("[Main] Supernatural Relic Collector server ready.")

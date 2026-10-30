@@ -143,6 +143,7 @@ function TravelBar.Start(screen: ScreenGui): { SetVisible: (boolean) -> () }
 	UIKit.fill(shrineButton)
 	UIKit.skinButton(shrineButton, "Dark")
 	shrineButton.BackgroundColor3 = colors.Panel
+	Icons.inline(shrineButton, "Shrine", 22)
 	table.insert(buttons, shrineButton)
 	player:GetAttributeChangedSignal("Cleansed"):Connect(function()
 		if menu.Visible then

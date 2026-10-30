@@ -9,6 +9,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Format = require(ReplicatedStorage.Shared.Format)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local DataService = require(script.Parent.DataService)
@@ -70,29 +71,95 @@ local function buy(player: Player, nodeId: any, amount: any): string?
 	if not data or not node then
 		return nil
 	end
+	local Analytics = require(script.Parent.PlaytestAnalyticsService)
+	if not BalanceTrials.skillNodeEnabled(node.Id) then
+		local msg = `{node.Name} is not available in this build.`
+		Analytics.RecordPurchase(player, {
+			System = "Skill",
+			Item = node.Id,
+			RankBefore = data.Skills[node.Id] or 0,
+			RankAfter = data.Skills[node.Id] or 0,
+			Price = 0,
+			Ok = false,
+			Reason = msg,
+			Kind = "Failed",
+		})
+		return msg
+	end
+	local rebirths = data.Rebirths or 0
+	local maxRank = BalanceTrials.skillMaxRank(node.Id, rebirths)
 	local limit
 	if amount == "Max" then
-		limit = node.MaxRank
+		limit = maxRank
 	elseif amount == 1 or amount == 10 then
 		limit = amount
 	else
 		return nil
 	end
 	local rank = data.Skills[node.Id] or 0
-	if rank >= node.MaxRank then
-		return `{node.Name} is already maxed.`
+	if rank >= maxRank then
+		local msg = if maxRank < node.MaxRank and node.Id == "CoreLuck" and rebirths < 1
+			then `{node.Name} caps at rank {maxRank} until Rebirth.`
+			elseif maxRank < node.MaxRank and node.Id == "PedestalMastery" and rebirths < 1
+			then `{node.Name} caps at rank {maxRank} until Rebirth.`
+			else `{node.Name} is already maxed.`
+		Analytics.RecordPurchase(player, {
+			System = "Skill",
+			Item = node.Id,
+			RankBefore = rank,
+			RankAfter = rank,
+			Price = 0,
+			Ok = false,
+			Reason = msg,
+			Kind = "Failed",
+		})
+		return msg
 	end
-	local ranks, cost = SkillConfig.affordable(node, rank, data.CE, limit)
+	-- Bulk buy must not cross the trial cap.
+	limit = math.min(limit, maxRank - rank)
+	local costOverride = if node.Id == "CoreLuck" then BalanceTrials.coreLuckCostOverride() else nil
+	local ranks, cost = SkillConfig.affordable(node, rank, data.CE, limit, costOverride)
 	if ranks == 0 then
-		local nextCost = SkillConfig.cost(node, rank) or 0
-		return `{node.Name} rank {rank + 1} costs {Format.number(nextCost)} CE.`
+		local nextCost = SkillConfig.cost(node, rank, costOverride) or 0
+		local msg = `{node.Name} rank {rank + 1} costs {Format.number(nextCost)} CE.`
+		Analytics.RecordPurchase(player, {
+			System = "Skill",
+			Item = node.Id,
+			RankBefore = rank,
+			RankAfter = rank,
+			Price = nextCost,
+			Ok = false,
+			Reason = msg,
+			Kind = "Failed",
+		})
+		return msg
 	end
 	if not EconomyService.TrySpend(player, cost) then
-		return "Not enough CE."
+		local msg = "Not enough CE."
+		Analytics.RecordPurchase(player, {
+			System = "Skill",
+			Item = node.Id,
+			RankBefore = rank,
+			RankAfter = rank,
+			Price = cost,
+			Ok = false,
+			Reason = msg,
+			Kind = "Failed",
+		})
+		return msg
 	end
 	data.Skills[node.Id] = rank + ranks
 	applied(player, node.Id)
 	DataService.RequestSave(player)
+	Analytics.RecordPurchase(player, {
+		System = "Skill",
+		Item = node.Id,
+		RankBefore = rank,
+		RankAfter = rank + ranks,
+		Price = cost,
+		Ok = true,
+		Kind = if rank == 0 then "Unlock" else "Routine",
+	})
 	local word = if ranks == 1 then "rank" else "ranks"
 	return `{node.Name} +{ranks} {word} -> rank {rank + ranks} ({Format.number(cost)} CE)`
 end
@@ -117,7 +184,15 @@ function SkillService.SetRank(player: Player, nodeId: string, rank: number): num
 	if not data or not node then
 		return nil
 	end
-	data.Skills[nodeId] = math.clamp(math.floor(rank), 0, node.MaxRank)
+	local maxRank = BalanceTrials.skillMaxRank(nodeId, data.Rebirths or 0)
+	if maxRank <= 0 and not BalanceTrials.skillNodeEnabled(nodeId) then
+		data.Skills[nodeId] = 0
+		applied(player, nodeId)
+		return 0
+	end
+	data.Skills[nodeId] = math.clamp(math.floor(rank), 0, math.max(maxRank, node.MaxRank))
+	-- Still clamp to node MaxRank for save safety; trial caps only gate purchases.
+	data.Skills[nodeId] = math.clamp(data.Skills[nodeId], 0, node.MaxRank)
 	applied(player, nodeId)
 	return data.Skills[nodeId]
 end

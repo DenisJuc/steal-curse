@@ -28,6 +28,13 @@ export type Summary = {
 	-- "Purified", event names...).
 	BonusMultiplier: number?,
 	Tags: { string }?,
+	-- SoftCap Collection: Essence granted for this capture (visibility only; amount already applied).
+	CollectionEssence: number?,
+	-- SoftCap_P4 Hunt Quarry: exact-relic chase target for this bind batch.
+	HuntQuarryId: string?,
+	HuntQuarryHits: number?,
+	HuntQuarryUseful: boolean?,
+	HuntQuarryNeed: string?,
 }
 
 -- results[1] is the captured relic, the rest are bonus discoveries. tierOf(relicId) -> tier index.

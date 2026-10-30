@@ -32,7 +32,9 @@ return {
 			for id in DataTemplate.Template.Skills do
 				expect.truthy(nodes[id], `DataTemplate.Skills.{id} is not a skill node`)
 			end
-			expect.equal(count, 11, "GDD 6.6 nodes + Swift Step")
+			expect.equal(count, 12, "GDD 6.6 nodes + Swift Step + Studio PedestalMastery")
+			expect.truthy(nodes.PedestalMastery ~= nil, "PedestalMastery node exists")
+			expect.equal(nodes.PedestalMastery.MaxRank, 5, "PedestalMastery max")
 		end,
 	},
 	{
@@ -52,6 +54,7 @@ return {
 			end
 			expect.equal(SkillConfig.cost(nodes.ScanSpeed, 0), 250, "Scan Speed first rank")
 			expect.equal(SkillConfig.cost(nodes.EnergyConduction, 0), 500, "Energy Conduction first rank")
+			expect.equal(SkillConfig.cost(nodes.PedestalMastery, 0), 180000, "Pedestal Mastery first rank")
 			expect.equal(SkillConfig.cost(nodes.SpiritReservoir, 0), 1000000, "Spirit Reservoir rank 1")
 			expect.equal(SkillConfig.cost(nodes.SpiritReservoir, 1), 50000000, "Spirit Reservoir rank 2")
 			expect.equal(SkillConfig.cost(nodes.CoreLuck, 0), 100, "Core Luck first rank")

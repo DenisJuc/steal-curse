@@ -3,9 +3,12 @@
 -- (saved), and turning it back On in Settings replays the tips.
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Settings = require(script.Parent.Parent.Settings)
+local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
 
@@ -44,6 +47,11 @@ local STEPS: { Step } = {
 		Text = "The Codex records every relic you discover. Milestones give permanent Luck and income.",
 	},
 	{
+		Target = "CollectionButton",
+		Side = "Right",
+		Text = "Fusion: collect 3 copies of one relic, open Collection, tap it, and Fuse. Then pick a Charm. Auto-sell keeps your closest fusion target.",
+	},
+	{
 		Target = "SpiritSight",
 		Side = "Left",
 		Text = "Spirit Sight lets you hunt your own signals. Each bind gives a relic plus bonus discoveries.",
@@ -60,6 +68,16 @@ local ANCHORS: { [Side]: Vector2 } = {
 function Onboarding.Start(screen: ScreenGui)
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
+	-- Core Loop: skip Fusion Collection tip (button hidden); keep seal / index / pedestals.
+	local activeSteps = STEPS
+	if BalanceTrials.coreLoopPresentation() then
+		activeSteps = {}
+		for _, step in STEPS do
+			if step.Target ~= "CollectionButton" then
+				table.insert(activeSteps, step)
+			end
+		end
+	end
 
 	local bubble = UIKit.create("Frame", {
 		Name = "HintBubble",
@@ -72,6 +90,11 @@ function Onboarding.Start(screen: ScreenGui)
 	}, { UIKit.corner(12), UIKit.padding(10), UIKit.stroke(colors.Gold, 2, 0) })
 	UIKit.skinPanel(bubble, colors.Gold)
 	UIKit.scaler(bubble)
+	local infoIcon = Icons.image(bubble, "Info", 30)
+	if infoIcon then
+		infoIcon.Position = UDim2.fromOffset(-24, -24)
+		infoIcon.ZIndex = 27
+	end
 	local textLabel = UIKit.label({
 		TextSize = 15,
 		TextWrapped = true,
@@ -103,17 +126,17 @@ function Onboarding.Start(screen: ScreenGui)
 
 	local showStep: (number) -> ()
 	function showStep(stepIndex: number)
-		if stepIndex > #STEPS then
+		if stepIndex > #activeSteps then
 			finish()
 			return
 		end
 		index = stepIndex
 		token += 1
 		local myToken = token
-		textLabel.Text = STEPS[stepIndex].Text
-		stepLabel.Text = `Tip {stepIndex}/{#STEPS}`
+		textLabel.Text = activeSteps[stepIndex].Text
+		stepLabel.Text = `Tip {stepIndex}/{#activeSteps}`
 		Motion.shine(bubble, 0.6)
-		bubble.AnchorPoint = ANCHORS[STEPS[stepIndex].Side]
+		bubble.AnchorPoint = ANCHORS[activeSteps[stepIndex].Side]
 		task.delay(STEP_SECONDS, function()
 			if running and token == myToken then
 				showStep(stepIndex + 1)
@@ -168,7 +191,7 @@ function Onboarding.Start(screen: ScreenGui)
 		if not running then
 			return
 		end
-		local step = STEPS[index]
+		local step = activeSteps[index]
 		local target = step and screen:FindFirstChild(step.Target, true)
 		if not target or not target:IsA("GuiObject") or not shown(target) then
 			bubble.Visible = false

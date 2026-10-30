@@ -1,0 +1,37 @@
+{
+  "name": "AuraGallery",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": { "$path": "src/shared" },
+      "RelicModels": { "$path": "assets/RelicModels" },
+      "AuraCandidates": { "$path": "assets/VFX-candidates/Auras" }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "AuraGallery": { "$path": "tools/gallery/AuraGallery.client.luau" },
+        "RelicAura": { "$path": "src/client/Effects/RelicAura.luau" }
+      }
+    },
+    "Lighting": {
+      "$properties": { "ClockTime": 20, "Brightness": 1, "Ambient": [0.25, 0.25, 0.3] }
+    },
+    "Workspace": {
+      "$properties": { "Gravity": 196.2 },
+      "Baseplate": {
+        "$className": "Part",
+        "$properties": {
+          "Anchored": true,
+          "Size": [400, 2, 400],
+          "Position": [0, -1, 0],
+          "Color": [0.12, 0.12, 0.14],
+          "Material": "Slate"
+        }
+      },
+      "SpawnLocation": {
+        "$className": "SpawnLocation",
+        "$properties": { "Anchored": true, "Size": [6, 1, 6], "Position": [56, 0.5, -20], "Neutral": true }
+      }
+    }
+  }
+}

@@ -13,6 +13,9 @@ export type Tier = { Id: string, Denominator: number }
 export type Relic = { Id: string, Tier: string, Weight: number, Family: string }
 export type Mutation = { Id: string, UnlockRank: number, Weight: number }
 
+-- Sampler: "Ladder" (live Soft A+C tier masses) | "SoftCap" (Studio SoftCap trial).
+export type Sampler = "Ladder" | "SoftCap"
+
 export type Context = {
 	Tiers: { Tier },
 	ByTier: { [string]: { Relic } },
@@ -22,6 +25,10 @@ export type Context = {
 	Mutations: { Mutation },
 	MutationRank: number,
 	MutationChance: number,
+	Sampler: Sampler,
+	-- SoftCap hunt-only: exact relic SoftCap bias (nil on AFK scans).
+	HuntQuarryId: string?,
+	HuntQuarryMult: number?,
 }
 
 export type Outcome = {
@@ -80,6 +87,9 @@ function RollMath.newContext(params: {
 	Mutations: { Mutation }?,
 	MutationRank: number?,
 	MutationChance: number?,
+	Sampler: Sampler?,
+	HuntQuarryId: string?,
+	HuntQuarryMult: number?,
 }): Context
 	return {
 		Tiers = params.Tiers,
@@ -90,6 +100,9 @@ function RollMath.newContext(params: {
 		Mutations = params.Mutations or {},
 		MutationRank = params.MutationRank or 0,
 		MutationChance = params.MutationChance or 0,
+		Sampler = params.Sampler or "Ladder",
+		HuntQuarryId = params.HuntQuarryId,
+		HuntQuarryMult = params.HuntQuarryMult,
 	}
 end
 
@@ -110,6 +123,7 @@ export type PlayerState = {
 	Frequency: string?,
 	FrequencyRank: number?,
 	MutationRank: number?,
+	Sampler: Sampler?,
 }
 
 -- The server rolls with this context and the UI shows odds from the same context.
@@ -132,6 +146,7 @@ function RollMath.contextFor(rules: Rules, state: PlayerState): Context
 		Mutations = rules.Mutations,
 		MutationRank = mutationRank,
 		MutationChance = rules.MutationChanceByRank[mutationRank] or 0,
+		Sampler = state.Sampler or "Ladder",
 	})
 end
 
@@ -214,6 +229,19 @@ function RollMath.itemProbability(ctx: Context, relicId: string): number
 	if not relic then
 		return 0
 	end
+	if ctx.Sampler == "SoftCap" then
+		local SoftCapRarity = if script ~= nil
+			then require(script.Parent.SoftCapRarity)
+			else require("./SoftCapRarity")
+		local p = SoftCapRarity.probabilities(
+			ctx.Luck,
+			ctx.Frequency,
+			ctx.FrequencyMultiplier,
+			ctx.HuntQuarryId,
+			ctx.HuntQuarryMult
+		)
+		return p[relicId] or 0
+	end
 	local index = RollMath.tierIndexOf(ctx.Tiers, relic.Tier)
 	if not index then
 		return 0
@@ -257,8 +285,30 @@ end
 -- Every possible (relic, mutation) outcome with its probability.
 function RollMath.distribution(ctx: Context): { Outcome }
 	local outcomes = {}
-	local masses = RollMath.tierMasses(ctx.Tiers, ctx.Luck)
 	local mutationOdds = RollMath.mutationProbabilities(ctx)
+	if ctx.Sampler == "SoftCap" then
+		local SoftCapRarity = if script ~= nil
+			then require(script.Parent.SoftCapRarity)
+			else require("./SoftCapRarity")
+		local p = SoftCapRarity.probabilities(
+			ctx.Luck,
+			ctx.Frequency,
+			ctx.FrequencyMultiplier,
+			ctx.HuntQuarryId,
+			ctx.HuntQuarryMult
+		)
+		for relicId, itemP in p do
+			for mutationId, mutationP in mutationOdds do
+				table.insert(outcomes, {
+					RelicId = relicId,
+					Mutation = if mutationId == "Normal" then nil else mutationId,
+					Probability = itemP * mutationP,
+				})
+			end
+		end
+		return outcomes
+	end
+	local masses = RollMath.tierMasses(ctx.Tiers, ctx.Luck)
 	for index, tier in ctx.Tiers do
 		local list = ctx.ByTier[tier.Id] or {}
 		local weightSum = tierWeightSum(ctx, tier.Id)
@@ -324,6 +374,24 @@ function RollMath.rollMutation(ctx: Context, nextNumber: () -> number): string?
 end
 
 function RollMath.roll(ctx: Context, nextNumber: () -> number): (Relic, string?)
+	if ctx.Sampler == "SoftCap" then
+		local SoftCapRarity = if script ~= nil
+			then require(script.Parent.SoftCapRarity)
+			else require("./SoftCapRarity")
+		local relicId = SoftCapRarity.roll(
+			ctx.Luck,
+			nextNumber,
+			ctx.Frequency,
+			ctx.FrequencyMultiplier,
+			ctx.HuntQuarryId,
+			ctx.HuntQuarryMult
+		)
+		local relic = findRelic(ctx, relicId)
+		if not relic then
+			error(`[RollMath] SoftCap returned unknown relic {relicId}`)
+		end
+		return relic, RollMath.rollMutation(ctx, nextNumber)
+	end
 	local index = RollMath.rollTierIndex(ctx.Tiers, ctx.Luck, nextNumber)
 	-- validate() guarantees every tier has relics; walking down only guards a broken config.
 	while index > 1 and not ctx.ByTier[ctx.Tiers[index].Id] do

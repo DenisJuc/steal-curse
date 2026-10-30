@@ -9,6 +9,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local Format = require(ReplicatedStorage.Shared.Format)
 local ItemConfig = require(ReplicatedStorage.Shared.ItemConfig)
+local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
 
@@ -27,7 +28,7 @@ local SHORT_NAMES = {
 	Fortune = "Fortune +50%",
 }
 
-type Buff = { Id: string, Color: Color3, Label: (Player) -> string }
+type Buff = { Id: string, Icon: string, Color: Color3, Label: (Player) -> string }
 
 local function buffList(): { Buff }
 	local list: { Buff } = {}
@@ -35,6 +36,7 @@ local function buffList(): { Buff }
 		local label = SHORT_NAMES[item.Effect] or item.Name
 		table.insert(list, {
 			Id = item.Id,
+			Icon = `Potion{item.Effect}`,
 			Color = Color3.fromRGB(item.Color[1], item.Color[2], item.Color[3]),
 			Label = function()
 				return label
@@ -43,6 +45,7 @@ local function buffList(): { Buff }
 	end
 	table.insert(list, {
 		Id = "Lightning",
+		Icon = "Lightning",
 		Color = Color3.fromRGB(255, 228, 120),
 		Label = function(player)
 			local factor = player:GetAttribute("LightningLuck")
@@ -91,14 +94,20 @@ function BuffTimers.Start(screen: ScreenGui)
 		UIKit.create("UIPadding", { PaddingRight = UDim.new(0, 12), PaddingLeft = UDim.new(0, 30), Parent = pill })
 		UIKit.skinPanel(pill, buff.Color)
 		slots[buff.Id] = slot
-		UIKit.create("Frame", {
-			Name = "Dot",
-			AnchorPoint = Vector2.new(0, 0.5),
-			Position = UDim2.new(0, -22, 0.5, 0),
-			Size = UDim2.fromOffset(14, 14),
-			BackgroundColor3 = buff.Color,
-			Parent = pill,
-		}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+		local icon = Icons.image(pill, buff.Icon, 24)
+		if icon then
+			icon.AnchorPoint = Vector2.new(0, 0.5)
+			icon.Position = UDim2.new(0, -26, 0.5, 0)
+		else
+			UIKit.create("Frame", {
+				Name = "Dot",
+				AnchorPoint = Vector2.new(0, 0.5),
+				Position = UDim2.new(0, -22, 0.5, 0),
+				Size = UDim2.fromOffset(14, 14),
+				BackgroundColor3 = buff.Color,
+				Parent = pill,
+			}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+		end
 		pills[buff.Id] = pill
 	end
 

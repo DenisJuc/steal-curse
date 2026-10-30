@@ -15,6 +15,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Economy = require(ReplicatedStorage.Shared.Economy)
 local Format = require(ReplicatedStorage.Shared.Format)
@@ -43,7 +44,7 @@ local settings = Config.Economy
 local displayed: { [Player]: { [number]: any } } = {}
 
 local function relicIncome(item: any): number
-	return RelicIncome.of(item.Id, item.Mutation)
+	return RelicIncome.of(item.Id, item.Mutation, item.Size)
 end
 PedestalService.RelicIncome = relicIncome
 
@@ -95,10 +96,17 @@ function PedestalService.Contributions(player: Player): { number }
 	if not data or not cache then
 		return list
 	end
+	-- Lazy require avoids CollectionService ↔ PedestalService cycles.
+	local CollectionService = require(script.Parent.CollectionService)
+	local mastery = BalanceTrials.pedestalMasteryIncomeMult(data.Skills.PedestalMastery or 0)
 	for slot, pedestal in data.Pedestals do
 		local item = cache[slot]
 		if item then
-			table.insert(list, relicIncome(item) * multiplier(pedestal))
+			-- SoftCap_P3: per-pedestal FusionIncomeMult. SoftCap_P4: returns 1 here;
+			-- board-global best-rank mult is applied once in EconomyService.GetIncomeMultiplier.
+			-- Mastery is Studio Phase 3+ only (×1 live).
+			local fusion = CollectionService.FusionIncomeMult(player, item.Id)
+			table.insert(list, relicIncome(item) * multiplier(pedestal) * fusion * mastery)
 		end
 	end
 	return list
@@ -133,6 +141,7 @@ function PedestalService.Snapshot(player: Player): { [string]: any }?
 				Multiplier = mult,
 				Id = item and item.Id,
 				Mutation = item and item.Mutation,
+				Size = item and item.Size,
 				IncomePerSec = if item then relicIncome(item) * mult else 0,
 				MaxLevel = settings.PedestalMaxLevel,
 				UpgradeCost = if pedestal.Level < settings.PedestalMaxLevel
@@ -167,6 +176,10 @@ function PedestalService.Refresh(player: Player)
 	PedestalVisuals.Apply(PlotService.GetPlot(player), snapshot.Slots)
 	EconomyService.Mirror(player)
 	DataService.MirrorAttributes(player)
+	-- Hunt / Shrine Charms gate on pedestal occupancy — refresh Collection attributes.
+	if BalanceTrials.collectionEnabled() then
+		GameEvents.Fire("CollectionChanged", player)
+	end
 end
 
 -- Placing the floating copy on a pedestal ends its float.
@@ -237,18 +250,32 @@ local function validSlot(data: any, slot: any): number?
 	return slot
 end
 
-local function validGroup(relicId: any, mutationId: any): boolean
+local function validGroup(relicId: any, mutationId: any, sizeId: any?): boolean
 	if type(relicId) ~= "string" or not RelicConfig.ById[relicId] then
 		return false
 	end
-	return mutationId == nil or (type(mutationId) == "string" and MutationConfig.ById[mutationId] ~= nil)
+	if not (mutationId == nil or (type(mutationId) == "string" and MutationConfig.ById[mutationId] ~= nil)) then
+		return false
+	end
+	return sizeId == nil or sizeId == "" or sizeId == "Huge" or sizeId == "Titanic"
 end
 
--- A backpack copy of a relic + mutation, preferring one that isn't floating.
-local function spareCopy(player: Player, data: any, relicId: string, mutationId: string?): any?
+local function sizeMatch(itemSize: any, want: any): boolean
+	local a = if itemSize == "Huge" or itemSize == "Titanic" then itemSize else nil
+	local b = if want == "Huge" or want == "Titanic" then want else nil
+	return a == b
+end
+
+-- A backpack copy of a relic + mutation + size, preferring one that isn't floating.
+local function spareCopy(player: Player, data: any, relicId: string, mutationId: string?, sizeId: string?): any?
 	local floating = nil
 	for _, item in data.Inventory do
-		if item.Id == relicId and item.Mutation == mutationId and not PedestalService.IsDisplayed(player, item.Uid) then
+		if
+			item.Id == relicId
+			and item.Mutation == mutationId
+			and sizeMatch(item.Size, sizeId)
+			and not PedestalService.IsDisplayed(player, item.Uid)
+		then
 			if not CosmeticEquipService.IsFloating(player, item.Uid) then
 				return item
 			end
@@ -260,31 +287,74 @@ end
 
 local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 	BuyPedestal = function(player, data)
+		local Analytics = require(script.Parent.PlaytestAnalyticsService)
 		local slot = #data.Pedestals + 1
 		local price = settings.SlotPrices[slot]
 		if slot > Config.Plots.MaxPedestals or not price then
-			fail(player, "All pedestal slots are already unlocked.")
+			local msg = "All pedestal slots are already unlocked."
+			Analytics.RecordPurchase(player, {
+				System = "Pedestal",
+				Item = "Slot",
+				RankBefore = #data.Pedestals,
+				RankAfter = #data.Pedestals,
+				Ok = false,
+				Reason = msg,
+				Kind = "Failed",
+			})
+			fail(player, msg)
 			return
 		end
 		if not EconomyService.TrySpend(player, price) then
-			fail(player, `Pedestal {slot} costs {Format.number(price)} CE.`)
+			local msg = `Pedestal {slot} costs {Format.number(price)} CE.`
+			Analytics.RecordPurchase(player, {
+				System = "Pedestal",
+				Item = `Slot{slot}`,
+				RankBefore = slot - 1,
+				RankAfter = slot - 1,
+				Price = price,
+				Ok = false,
+				Reason = msg,
+				Kind = "Failed",
+			})
+			fail(player, msg)
 			return
 		end
 		table.insert(data.Pedestals, { Level = 1, Locked = false })
 		PedestalService.AutoEquip(player)
 		DataService.RequestSave(player)
+		Analytics.RecordPurchase(player, {
+			System = "Pedestal",
+			Item = `Slot{slot}`,
+			RankBefore = slot - 1,
+			RankAfter = slot,
+			Price = price,
+			Ok = true,
+			Kind = "Unlock",
+		})
 	end,
 
 	Upgrade = function(player, data, slotArg, mode)
+		local Analytics = require(script.Parent.PlaytestAnalyticsService)
 		local slot = validSlot(data, slotArg)
 		if not slot or (mode ~= "One" and mode ~= "Max") then
 			return
 		end
 		local pedestal = data.Pedestals[slot]
 		if pedestal.Level >= settings.PedestalMaxLevel then
-			fail(player, "This pedestal is already at max level.")
+			local msg = "This pedestal is already at max level."
+			Analytics.RecordPurchase(player, {
+				System = "Pedestal",
+				Item = `Upgrade{slot}`,
+				RankBefore = pedestal.Level,
+				RankAfter = pedestal.Level,
+				Ok = false,
+				Reason = msg,
+				Kind = "Failed",
+			})
+			fail(player, msg)
 			return
 		end
+		local before = pedestal.Level
 		local levels, cost
 		if mode == "One" then
 			levels, cost = 1, Economy.upgradeCost(settings, pedestal.Level)
@@ -292,19 +362,40 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 			levels, cost = Economy.maxAffordableUpgrades(settings, pedestal.Level, data.CE)
 		end
 		if levels <= 0 or not EconomyService.TrySpend(player, cost) then
-			fail(player, `Next level costs {Format.number(Economy.upgradeCost(settings, pedestal.Level))} CE.`)
+			local msg = `Next level costs {Format.number(Economy.upgradeCost(settings, pedestal.Level))} CE.`
+			Analytics.RecordPurchase(player, {
+				System = "Pedestal",
+				Item = `Upgrade{slot}`,
+				RankBefore = before,
+				RankAfter = before,
+				Price = Economy.upgradeCost(settings, pedestal.Level),
+				Ok = false,
+				Reason = msg,
+				Kind = "Failed",
+			})
+			fail(player, msg)
 			return
 		end
 		pedestal.Level += levels
 		PedestalService.AutoEquip(player)
+		Analytics.RecordPurchase(player, {
+			System = "Pedestal",
+			Item = `Upgrade{slot}`,
+			RankBefore = before,
+			RankAfter = pedestal.Level,
+			Price = cost,
+			Ok = true,
+			Kind = "Routine",
+		})
+		Analytics.RecordClientActivity(player, "Pedestal")
 	end,
 
-	DisplayGroup = function(player, data, slotArg, relicId, mutationId)
+	DisplayGroup = function(player, data, slotArg, relicId, mutationId, sizeId)
 		local slot = validSlot(data, slotArg)
-		if not slot or not validGroup(relicId, mutationId) then
+		if not slot or not validGroup(relicId, mutationId, sizeId) then
 			return
 		end
-		local item = spareCopy(player, data, relicId, mutationId)
+		local item = spareCopy(player, data, relicId, mutationId, sizeId)
 		if item then
 			setDisplay(player, slot, item)
 		else
@@ -313,11 +404,11 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 	end,
 
 	-- From the Relics menu: one spare copy goes on the unlocked pedestal where it adds the most CE/sec.
-	EquipGroup = function(player, data, relicId, mutationId)
-		if not validGroup(relicId, mutationId) then
+	EquipGroup = function(player, data, relicId, mutationId, sizeId)
+		if not validGroup(relicId, mutationId, sizeId) then
 			return
 		end
-		local item = spareCopy(player, data, relicId, mutationId)
+		local item = spareCopy(player, data, relicId, mutationId, sizeId)
 		if not item then
 			fail(player, "Every copy of that relic is already on a pedestal.")
 			return

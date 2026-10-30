@@ -70,6 +70,16 @@ SkillConfig.Nodes = {
 		Summary = "More pedestal income: +2% per rank (up to +40%).",
 	},
 	{
+		-- Studio Phase 3 trial only (BalanceTrials.pedestalMasteryEnabled). +4%/rank on pedestal income.
+		Id = "PedestalMastery",
+		Branch = "Sanctuary",
+		Name = "Pedestal Mastery",
+		MaxRank = 5,
+		CostBase = 180000,
+		CostGrowth = 2.8,
+		Summary = "Studio: deeper pedestal craft — +4% pedestal income per rank (2 ranks pre-Rebirth, 5 after).",
+	},
+	{
 		Id = "SpiritMerchant",
 		Branch = "Sanctuary",
 		Name = "Spirit Merchant",
@@ -134,6 +144,8 @@ SkillConfig.Effects = {
 	ScanBaseSeconds = 4,
 	ScanFastestSeconds = 1,
 	IncomePerConductionRank = 0.02,
+	-- Studio Pedestal Mastery (Phase 3): additive with Energy Conduction, applied in PedestalService.
+	IncomePerMasteryRank = 0.04,
 	SellPerMerchantRank = 0.10,
 	OfflineBaseSeconds = 2 * 3600,
 	OfflineSecondsPerReservoirRank = 3600,
@@ -148,10 +160,31 @@ SkillConfig.Effects = {
 	WalkSpeedPerRank = 4,
 }
 
+export type CostOverride = {
+	Base: number,
+	Growth: number,
+	SoftK: number?,
+	SoftPower: number?,
+}
+
 -- CE to buy rank `rank + 1`; nil when the node is maxed.
-function SkillConfig.cost(node: Node, rank: number): number?
+-- Optional costOverride (base, growth[, softK]) is used by balance trials for CoreLuck.
+function SkillConfig.cost(node: Node, rank: number, costOverride: CostOverride?): number?
 	if rank >= node.MaxRank then
 		return nil
+	end
+	if costOverride and node.Id == "CoreLuck" then
+		local Formulas = if script ~= nil then require(script.Parent.Formulas) else require("./Formulas")
+		if costOverride.SoftK then
+			return Formulas.coreLuckCostSoft(
+				rank,
+				costOverride.Base,
+				costOverride.Growth,
+				costOverride.SoftK,
+				costOverride.SoftPower
+			)
+		end
+		return Formulas.coreLuckCost(rank, costOverride.Base, costOverride.Growth)
 	end
 	if node.Costs then
 		return node.Costs[rank + 1]
@@ -160,10 +193,16 @@ function SkillConfig.cost(node: Node, rank: number): number?
 end
 
 -- How many ranks `budget` buys from `rank` (at most `limit`), checking every intermediate cost.
-function SkillConfig.affordable(node: Node, rank: number, budget: number, limit: number): (number, number)
+function SkillConfig.affordable(
+	node: Node,
+	rank: number,
+	budget: number,
+	limit: number,
+	costOverride: CostOverride?
+): (number, number)
 	local bought, total = 0, 0
 	while bought < limit do
-		local nextCost = SkillConfig.cost(node, rank + bought)
+		local nextCost = SkillConfig.cost(node, rank + bought, costOverride)
 		if not nextCost or total + nextCost > budget + 1e-9 then
 			break
 		end

@@ -159,8 +159,9 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			})
 		end
 		UIKit.label({
-			Text = `{if tier then tier.Name else relic.Tier}  {Format.odds(Odds.baseItem(relicId))}`,
-			TextSize = 11,
+			-- Effective 1/p_i at current luck (SoftCap/Ladder); base rarity stays in the tier name.
+			Text = Odds.indexLine(relicId),
+			TextSize = 10,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextColor3 = tierColor,
 			TextTruncate = Enum.TextTruncate.AtEnd,
@@ -352,7 +353,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	end
 
 	local refreshQueued = false
-	player:GetAttributeChangedSignal("DiscoveredCount"):Connect(function()
+	local function queueRefresh()
 		if not panel.Visible or refreshQueued then
 			return
 		end
@@ -363,7 +364,12 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 				load()
 			end
 		end)
-	end)
+	end
+	player:GetAttributeChangedSignal("DiscoveredCount"):Connect(queueRefresh)
+	-- Index odds are 1/p_i at current luck — refresh when luck or sampler changes.
+	player:GetAttributeChangedSignal("EffectiveLuck"):Connect(queueRefresh)
+	player:GetAttributeChangedSignal("FullLuck"):Connect(queueRefresh)
+	player:GetAttributeChangedSignal("RaritySampler"):Connect(queueRefresh)
 
 	return {
 		Toggle = function()

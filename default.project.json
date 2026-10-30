@@ -128,6 +128,15 @@
         },
         "Rebirth": {
           "$className": "RemoteFunction"
+        },
+        "CollectionAction": {
+          "$className": "RemoteFunction"
+        },
+        "AnalyticsAction": {
+          "$className": "RemoteFunction"
+        },
+        "AnalyticsStatus": {
+          "$className": "RemoteEvent"
         }
       }
     },

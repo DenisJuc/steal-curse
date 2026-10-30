@@ -33,9 +33,16 @@ local function tierIndex(relicId: string): number
 end
 
 -- Finds that may go over the inventory limit instead of being sold.
-function AutoSellService.KeepsOnOverflow(item: any, first: boolean): boolean
+-- Sized stamps only overflow-keep when they are the first owned copy of that identity
+-- (excess Huge/Titanic sell under InventoryFull so the bag cannot brick acquisitions).
+function AutoSellService.KeepsOnOverflow(item: any, first: boolean, sizedDuplicate: boolean?): boolean
 	local index = tierIndex(item.Id)
-	return first or index >= KEEP_TIER or (item.Mutation ~= nil and index >= KEEP_MUTATED_TIER)
+	local sized = item.Size == "Huge" or item.Size == "Titanic"
+	local keepSized = sized and not sizedDuplicate
+	return first
+		or keepSized
+		or index >= KEEP_TIER
+		or (item.Mutation ~= nil and index >= KEEP_MUTATED_TIER)
 end
 
 function AutoSellService.Rules(player: Player): AutoSell.Rules
@@ -77,8 +84,10 @@ function AutoSellService.Apply(
 		inBatch[item.Uid] = true
 	end
 	-- Best income already held per base relic (items held before this batch, plus displayed ones).
+	-- Identity counts for keep-1 sized stamps (backpack + pedestal).
 	-- `held` counts backpack slots only: relics on pedestals don't use them.
 	local bestHeld: { [string]: number } = {}
+	local identityHeld: { [string]: number } = {}
 	local held = 0
 	for _, item in data.Inventory do
 		if not inBatch[item.Uid] or shown[item.Uid] then
@@ -87,6 +96,8 @@ function AutoSellService.Apply(
 			end
 			local income = PedestalService.RelicIncome(item)
 			bestHeld[item.Id] = math.max(bestHeld[item.Id] or -1, income)
+			local ikey = AutoSell.favoriteKey(item.Id, item.Mutation, item.Size)
+			identityHeld[ikey] = (identityHeld[ikey] or 0) + 1
 		end
 	end
 
@@ -98,16 +109,27 @@ function AutoSellService.Apply(
 		local relic = RelicConfig.ById[item.Id]
 		local income = PedestalService.RelicIncome(item)
 		local first = firsts[item.Uid] == true
+		local ikey = AutoSell.favoriteKey(item.Id, item.Mutation, item.Size)
+		local sized = item.Size == "Huge" or item.Size == "Titanic"
+		local sizedDuplicate = sized and (identityHeld[ikey] or 0) >= 1
+		local CollectionService = require(script.Parent.CollectionService)
 		local sell, reason = AutoSell.decide(rules, {
 			Tier = if relic then relic.Tier else "Common",
 			BaseOneIn = AutoSellService.BaseOneIn(item.Id),
 			First = first,
 			Mutated = item.Mutation ~= nil,
-			Duplicate = (bestHeld[item.Id] or -1) >= income,
-			Favorite = data.Favorites[AutoSell.favoriteKey(item.Id, item.Mutation)] == true,
+			Sized = sized,
+			SizedDuplicate = sizedDuplicate,
+			Duplicate = (bestHeld[item.Id] or -1) >= income or sizedDuplicate,
+			Favorite = data.Favorites[ikey] == true,
+			FusionReserve = CollectionService.IsFusionReserved(player, item.Id, item.Mutation),
 		})
 		local finalReason: string = reason
-		if not sell and held + 1 > Config.Inventory.Capacity and not AutoSellService.KeepsOnOverflow(item, first) then
+		if
+			not sell
+			and held + 1 > Config.Inventory.Capacity
+			and not AutoSellService.KeepsOnOverflow(item, first, sizedDuplicate)
+		then
 			sell, finalReason = true, "InventoryFull"
 		end
 		if sell then
@@ -115,6 +137,7 @@ function AutoSellService.Apply(
 		else
 			held += 1
 			bestHeld[item.Id] = math.max(bestHeld[item.Id] or -1, income)
+			identityHeld[ikey] = (identityHeld[ikey] or 0) + 1
 		end
 	end
 
@@ -124,8 +147,13 @@ function AutoSellService.Apply(
 	local _, _, values = SellService.SellWhere(player, function(item)
 		return reasons[item.Uid] ~= nil
 	end)
+	local Analytics = require(script.Parent.PlaytestAnalyticsService)
 	for uid, value in values do
-		sales[uid] = { Earned = value, Reason = reasons[uid] }
+		local reason = reasons[uid]
+		sales[uid] = { Earned = value, Reason = reason }
+		if reason == "Duplicate" then
+			Analytics.RecordDuplicateSell(player)
+		end
 	end
 	return sales
 end

@@ -305,12 +305,46 @@ local function onAction(player: Player, action: any, argument: any)
 		return nil
 	end
 	local message = nil
+	local rankBefore = 0
+	local price = 0
+	local id = if type(argument) == "string" then argument else ""
+	if action == "Unlock" or action == "Upgrade" then
+		local showcase = ShowcaseConfig.ById[id]
+		if showcase then
+			rankBefore = data.Showcases.Owned[id] or 0
+			if action == "Unlock" then
+				price = showcase.Unlock.Price or 0
+			else
+				price = Showcases.upgradeCost(LEVELS, rankBefore) or 0
+			end
+		end
+	end
 	if action ~= "Get" then
 		local handler = type(action) == "string" and ACTIONS[action]
 		if not handler then
 			return nil
 		end
 		message = handler(player, data, argument)
+		if (action == "Unlock" or action == "Upgrade") and type(message) == "string" then
+			local Analytics = require(script.Parent.PlaytestAnalyticsService)
+			local rankAfter = data.Showcases.Owned[id] or rankBefore
+			local ok = rankAfter > rankBefore
+			Analytics.RecordPurchase(player, {
+				System = "Showcase",
+				Item = `{action}:{id}`,
+				RankBefore = rankBefore,
+				RankAfter = rankAfter,
+				Price = price,
+				Currency = "CE",
+				Ok = ok,
+				Reason = message,
+				Kind = if not ok then "Failed" elseif action == "Unlock" then "Unlock" else "Routine",
+			})
+		elseif action == "Activate" and type(message) == "string" then
+			local Analytics = require(script.Parent.PlaytestAnalyticsService)
+			Analytics.RecordUnlockUsed(player, `Showcase:{id}`)
+			Analytics.RecordClientActivity(player, "UpgradeUI")
+		end
 	end
 	return { State = state(player), Message = message }
 end

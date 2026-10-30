@@ -17,6 +17,8 @@ local Presentation = require(ReplicatedStorage.Shared.Presentation)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
+local RewardPresentation = require(ReplicatedStorage.Shared.RewardPresentation)
+local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local MutationVFX = require(script.Parent.Parent.Effects.MutationVFX)
 local RelicProjection = require(script.Parent.Parent.Effects.RelicProjection)
 local Odds = require(script.Parent.Parent.UI.Odds)
@@ -235,12 +237,12 @@ local function build(screen: ScreenGui): Ui
 	}
 end
 
-local function setModel(relicId: string)
+local function setModel(relicId: string, sizeId: string?)
 	if model then
 		model:Destroy()
 		model = nil
 	end
-	local part = RelicModels.build(relicId, CFrame.new(), 1.15)
+	local part = RelicModels.build(relicId, CFrame.new(), 1.15 * SizeConfig.scaleOf(sizeId))
 	if not part then
 		return
 	end
@@ -280,32 +282,56 @@ local function play(entry: Presentation.Entry, dropped: number)
 	local category: Presentation.Category = entry.Category
 	local large = category == "Large"
 	local mutation: string? = result.Mutation
+	local sizeId = SizeConfig.normalize(result.Size)
 	local baseSeconds, mutationSeconds = Presentation.durations(category, mutation ~= nil, Config.Reveal)
+	if sizeId == "Titanic" then
+		baseSeconds += 0.6
+	elseif sizeId == "Huge" then
+		baseSeconds += 0.25
+	end
 	local tierColor = UIKit.tierColor(relic.Tier)
+	local accent = if sizeId == "Titanic"
+		then Color3.fromRGB(255, 210, 90)
+		elseif sizeId == "Huge"
+		then Color3.fromRGB(160, 210, 255)
+		else tierColor
 	local tier = RarityConfig.Get(relic.Tier)
 	local low = Settings.LowEffects()
+	local prefix = if result.First
+		then "NEW! "
+		elseif result.NewSize
+		then "NEW SIZE! "
+		elseif result.NewVariant
+		then "NEW VARIANT! "
+		else ""
 
 	skipRequested = false
 	showing = true
 	showingLarge = large
-	setModel(relic.Id)
-	ui.TierLabel.Text = string.upper(if tier then tier.Name else relic.Tier)
-	ui.TierLabel.TextColor3 = tierColor
-	ui.NameLabel.Text = (if result.First then "NEW! " else "") .. relic.Name
-	ui.NameLabel.TextColor3 = tierColor
+	setModel(relic.Id, sizeId)
+	ui.TierLabel.Text = string.upper(if sizeId then `{SizeConfig.Label[sizeId]} · {if tier then tier.Name else relic.Tier}` else (if tier then tier.Name else relic.Tier))
+	ui.TierLabel.TextColor3 = accent
+	ui.NameLabel.Text = prefix .. Odds.displayName(relic.Id, nil, sizeId)
+	ui.NameLabel.TextColor3 = accent
 	ui.OddsLabel.Text = `Base odds {Odds.describe(relic.Id, nil)}`
 	ui.MutationLabel.Visible = false
-	ui.Stroke.Color = tierColor
-	local note = SOURCE_TEXT[result.Source] or ""
+	ui.Stroke.Color = accent
+	local worth = RewardPresentation.worthKeeping(result, relic.Tier)
+	local note = worth
+	if note == "" then
+		note = SOURCE_TEXT[result.Source] or ""
+	elseif SOURCE_TEXT[result.Source] then
+		note = `{worth}  ·  {SOURCE_TEXT[result.Source]}`
+	end
 	if dropped > 0 then
 		note = `+{dropped} more rare find{if dropped == 1 then "" else "s"} in your Journal`
 	end
 	ui.NoteLabel.Text = note
 	ui.SkipButton.Visible = true
-	ui.Rays.Visible = large and not low
+	ui.Rays.Visible = (large or sizeId == "Titanic") and not low
 	for _, ray in ui.Rays:GetChildren() do
 		if ray:IsA("Frame") then
-			ray.BackgroundColor3 = tierColor
+			ray.BackgroundColor3 = accent
 		end
 	end
 
@@ -318,9 +344,9 @@ local function play(entry: Presentation.Entry, dropped: number)
 	ui.Card.BackgroundTransparency = 0.05
 	ui.Card.Visible = true
 	UIKit.tween(ui.Card, 0.22, { Size = UDim2.fromOffset(CARD_SIZE.X, CARD_SIZE.Y) }, Enum.EasingStyle.Back)
-	flash(tierColor, if large then 0.35 else 0.7, if large then 0.9 else 0.45)
+	flash(accent, if large then 0.35 else 0.7, if large then 0.9 else 0.45)
 	Sounds.Play(if large then "RevealLarge" else "RevealMedium")
-	RelicProjection.Spawn(relic.Id, mutation, category, baseSeconds + mutationSeconds, low)
+	RelicProjection.Spawn(relic.Id, mutation, category, baseSeconds + mutationSeconds, low, sizeId)
 
 	local camera = workspace.CurrentCamera
 	local baseFov = camera and camera.FieldOfView
@@ -332,12 +358,12 @@ local function play(entry: Presentation.Entry, dropped: number)
 	local finished = waitUnlessSkipped(baseSeconds)
 	if finished and mutation then
 		local mutationInfo = MutationConfig.ById[mutation]
-		local color = MutationVFX.Color(mutation) or tierColor
+		local color = MutationVFX.Color(mutation) or accent
 		ui.MutationLabel.Text = `+ {string.upper(mutation)} MUTATION`
 			.. (if mutationInfo then `  (x{mutationInfo.IncomeMultiplier} income)` else "")
 		ui.MutationLabel.TextColor3 = color
 		ui.MutationLabel.Visible = true
-		ui.NameLabel.Text = (if result.First then "NEW! " else "") .. Odds.displayName(relic.Id, mutation)
+		ui.NameLabel.Text = prefix .. Odds.displayName(relic.Id, mutation, sizeId)
 		ui.NameLabel.TextColor3 = color
 		ui.Stroke.Color = color
 		if model then
@@ -346,6 +372,11 @@ local function play(entry: Presentation.Entry, dropped: number)
 		flash(color, if large then 0.45 else 0.75, 0.5)
 		Sounds.Play("Mutation")
 		waitUnlessSkipped(mutationSeconds)
+	elseif finished and sizeId and not mutation then
+		ui.MutationLabel.Text = `+ {string.upper(sizeId)} SIZE  (×{SizeConfig.incomeMult(sizeId)} income)`
+		ui.MutationLabel.TextColor3 = accent
+		ui.MutationLabel.Visible = true
+		waitUnlessSkipped(0.45)
 	end
 
 	if zoom and camera and baseFov then
@@ -405,11 +436,18 @@ local function onResults(results: { any }, hunt: boolean)
 			continue
 		end
 		local index = tierIndex(result.Id)
-		local isNew = result.First == true or result.NewVariant == true
+		local sizeId = SizeConfig.normalize(result.Size)
+		local isNew = result.First == true or result.NewVariant == true or result.NewSize == true
 		local category = Presentation.category(index, MEDIUM_INDEX, LARGE_INDEX, isNew)
+		-- Size stamps always earn a centre-screen beat (Titanic matches Celestial drama).
+		if sizeId == "Titanic" then
+			category = "Large"
+		elseif sizeId == "Huge" and category == "Small" then
+			category = "Medium"
+		end
 		if hunt then
 			-- The hunt papers already showed every find: only new ones get their reveal, one by one.
-			if not isNew then
+			if not isNew and not sizeId then
 				continue
 			end
 			if category == "Small" then
@@ -421,17 +459,22 @@ local function onResults(results: { any }, hunt: boolean)
 			continue
 		end
 		if category == "Small" then
-			-- One projection per batch is enough (bind batches can hold dozens of finds). While a
-			-- capture plays, its own animation and summary are the presentation.
+			local relic = RelicConfig.ById[result.Id]
+			local tier = if relic then relic.Tier else nil
+			-- Ordinary Common/Uncommon Normal dupes: feed summary only — no spectral spam.
+			if RewardPresentation.isOrdinaryDupe(result, tier) then
+				continue
+			end
+			-- One soft projection per batch for notable Small finds (e.g. Rare).
 			if smallShown == 0 and os.clock() >= holdUntil then
-				RelicProjection.Spawn(result.Id, result.Mutation, "Small", Config.Reveal.SmallSeconds, low)
+				RelicProjection.Spawn(result.Id, result.Mutation, "Small", Config.Reveal.SmallSeconds, low, sizeId)
 				Sounds.Play("RevealSmall")
 			end
 			smallShown += 1
 		else
 			Presentation.push(queue, {
 				Category = category,
-				Score = Presentation.score(index, result.Mutation ~= nil),
+				Score = Presentation.score(index, result.Mutation ~= nil) + SizeConfig.rank(sizeId) * 3,
 				Seq = 0,
 				Result = result,
 			})

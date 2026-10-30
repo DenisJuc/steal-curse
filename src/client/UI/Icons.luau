@@ -259,8 +259,17 @@ function Icons.rebirth(parent: Instance): Frame
 	return icon
 end
 
--- Padlock centered in `parent`, `size` pixels square; `open` lifts the shackle to one side.
-function Icons.padlock(parent: Instance, size: number, color: Color3, open: boolean?): Frame
+-- Padlock centered in `parent`, `size` pixels square; `open` lifts the shackle to one side. With the
+-- Lock/Unlock images set, `color` only matters as SubText, which dims the image (an inactive lock).
+function Icons.padlock(parent: Instance, size: number, color: Color3, open: boolean?): GuiObject
+	local image = Icons.image(parent, if open then "Unlock" else "Lock", size)
+	if image then
+		image.Name = "Padlock"
+		image.AnchorPoint = Vector2.new(0.5, 0.5)
+		image.Position = UDim2.fromScale(0.5, 0.5)
+		image.ImageTransparency = if color == UIKit.Colors.SubText then 0.4 else 0
+		return image
+	end
 	local icon = UIKit.create("Frame", {
 		Name = "Padlock",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -302,9 +311,10 @@ function Icons.padlock(parent: Instance, size: number, color: Color3, open: bool
 end
 
 local DRAWN: { [string]: (Instance) -> Frame } = {
-	Shrine = Icons.pedestal,
+	Pedestals = Icons.pedestal,
 	Luck = Icons.cursedFlower,
 	Codex = Icons.book,
+	Collection = Icons.book,
 	Journal = Icons.scroll,
 	Settings = Icons.gear,
 	Backpack = Icons.chest,
@@ -372,6 +382,23 @@ end
 
 function Icons.has(key: string): boolean
 	return imageId(key) ~= nil
+end
+
+-- A full-color icon as a plain `size` px image in `parent`, or nil while its id is still empty
+-- (callers keep their text or drawn fallback).
+function Icons.image(parent: Instance, key: string, size: number): ImageLabel?
+	local id = IconAssets.Color[key]
+	if not id or id == "" then
+		return nil
+	end
+	return UIKit.create("ImageLabel", {
+		Name = `{key}Icon`,
+		Image = id,
+		BackgroundTransparency = 1,
+		ScaleType = Enum.ScaleType.Fit,
+		Size = UDim2.fromOffset(size, size),
+		Parent = parent,
+	})
 end
 
 -- The icon of a square button (top part; the caption sits below it).
