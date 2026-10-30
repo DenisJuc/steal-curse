@@ -77,7 +77,7 @@ SkillConfig.Nodes = {
 		MaxRank = 5,
 		CostBase = 180000,
 		CostGrowth = 2.8,
-		Summary = "Studio: deeper pedestal craft — +4% pedestal income per rank (2 ranks pre-Rebirth, 5 after).",
+		Summary = "Deeper pedestal craft — +4% pedestal income per rank (2 ranks pre-Rebirth, 5 after).",
 	},
 	{
 		Id = "SpiritMerchant",

@@ -26,7 +26,7 @@ local LIVE_KEEPS = {
 	"Codex, titles and bonuses",
 	"Showcases and lanterns",
 	"Zone mastery and potions",
-	"Collection Essence, fusions, Resonance (Studio)",
+	"Collection Essence, fusions, Resonance",
 }
 local BPLUS_RESETS = { "Current Cursed Energy only" }
 local BPLUS_KEEPS = {
@@ -246,7 +246,7 @@ function RebirthPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: 
 		local count = player:GetAttribute("Rebirths") or 0
 		local ce = player:GetAttribute("CE") or 0
 		local price = Rebirth.cost(settings, count)
-		local modeTag = if model == "BPlus" then " · B+ (Studio)" else ""
+		local modeTag = ""
 		heading.Text = `Rebirths: <b>{count}</b> {ARROW} <font color="{jade}">{count + 1}</font>{modeTag}`
 		incomeValue.Text = `x{Format.multiplier(Rebirth.incomeMultiplier(settings, count))} {ARROW} <font color="{jade}">x{Format.multiplier(
 			Rebirth.incomeMultiplier(settings, count + 1)

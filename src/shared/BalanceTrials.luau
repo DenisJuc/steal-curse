@@ -82,6 +82,12 @@ BalanceTrials.StudioCollectionPrototype = true
 -- Kill switch: force live defaults even inside Studio.
 BalanceTrials.StudioAutoDisabled = false
 
+-- Launch decision (2026-10-30): published servers run the same trial as Studio (StudioTrialId,
+-- collection, core-loop presentation), since every human playtest was on it. false = live
+-- servers fall back to the old Ladder defaults. Debug commands, playtest analytics and mock
+-- saves stay Studio-only (they check RunService:IsStudio() themselves). Lune never ships it.
+BalanceTrials.ShipTrial = true
+
 -- Studio Core Loop presentation: SoftCap rarity/size + Collection saves stay on, but Fusion Board,
 -- Charms, Hunt Quarry objectives, Attune/Resonance/Pursuits are hidden from the player-facing UX.
 -- Implementations remain; flip false to restore the full Collection Studio surface.
@@ -227,6 +233,14 @@ function BalanceTrials.isStudio(): boolean
 	return okStudio == true and inStudio == true
 end
 
+-- Where the trial applies: Studio, or a real Roblox server/client when ShipTrial is on.
+local function trialEnvironment(): boolean
+	if BalanceTrials.isStudio() then
+		return true
+	end
+	return BalanceTrials.ShipTrial == true and game ~= nil and script ~= nil
+end
+
 local function resolvedTrialId(): string?
 	if BalanceTrials.AllowNonStudioActive then
 		local id = BalanceTrials.Active
@@ -235,7 +249,7 @@ local function resolvedTrialId(): string?
 		end
 		return nil
 	end
-	if not BalanceTrials.isStudio() then
+	if not trialEnvironment() then
 		return nil
 	end
 	if BalanceTrials.StudioAutoDisabled then
@@ -293,7 +307,7 @@ function BalanceTrials.collectionEnabled(): boolean
 	if BalanceTrials.AllowNonStudioActive then
 		return BalanceTrials.current() ~= nil and BalanceTrials.CollectionPrototype == true
 	end
-	if not BalanceTrials.isStudio() or BalanceTrials.StudioAutoDisabled then
+	if not trialEnvironment() or BalanceTrials.StudioAutoDisabled then
 		return false
 	end
 	if BalanceTrials.current() == nil then
@@ -313,7 +327,7 @@ function BalanceTrials.coreLoopPresentation(): boolean
 	if BalanceTrials.AllowNonStudioActive then
 		return BalanceTrials.collectionEnabled()
 	end
-	if not BalanceTrials.isStudio() or BalanceTrials.StudioAutoDisabled then
+	if not trialEnvironment() or BalanceTrials.StudioAutoDisabled then
 		return false
 	end
 	return BalanceTrials.collectionEnabled()
