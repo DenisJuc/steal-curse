@@ -186,6 +186,16 @@ function Onboarding.Start(screen: ScreenGui)
 		return current == screen
 	end
 
+	-- Tips point at the HUD; over an open menu they only cover it.
+	local function menuOpen(): boolean
+		for _, child in screen:GetChildren() do
+			if child:IsA("GuiObject") and child.Visible and child:GetAttribute("Modal") then
+				return true
+			end
+		end
+		return false
+	end
+
 	-- Follow the target every frame (layouts move with screen size and UI scale).
 	RunService.RenderStepped:Connect(function()
 		if not running then
@@ -193,7 +203,7 @@ function Onboarding.Start(screen: ScreenGui)
 		end
 		local step = activeSteps[index]
 		local target = step and screen:FindFirstChild(step.Target, true)
-		if not target or not target:IsA("GuiObject") or not shown(target) then
+		if not target or not target:IsA("GuiObject") or not shown(target) or menuOpen() then
 			bubble.Visible = false
 			return
 		end
