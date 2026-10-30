@@ -1,6 +1,6 @@
 -- Shrine menu (GDD 6.3-6.5): one card per pedestal. A card shows the relic (tap it to swap), what
--- it earns per second and its level as a bar ("Lv 12/50"). The Upgrade side spells out what the
--- next level gives ("Lv 3 -> 4", income before and after) above the main price button: "Max +N Lv"
+-- it earns per second and its level as a bar ("Lv 12/50"). The Upgrade side shows the next level
+-- ("Lv 3 -> 4") and a small gold boost (+10%) above the main price button: "Max +N Lv"
 -- (every level the current CE buys) when that is 2 or more, else "Upgrade" for one level, with a
 -- small "+1 Lv" button under Max. The padlock keeps a pedestal's relic during Equip Best.
 -- The header holds the free Equip Best button and the Auto-equip toggle, a game pass (on: Equip
@@ -156,7 +156,7 @@ function ShrinePanel.Start(
 	local showcases = UIKit.button({
 		Name = "Showcases",
 		Text = "Showcases",
-		TextSize = 16,
+		TextSize = 18,
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -4, 0, 0),
 		Size = UDim2.fromOffset(136, 32),
@@ -167,7 +167,7 @@ function ShrinePanel.Start(
 	local equipBest = UIKit.button({
 		Name = "EquipBest",
 		Text = "Equip Best",
-		TextSize = 15,
+		TextSize = 18,
 		Position = UDim2.fromOffset(0, 40),
 		Size = UDim2.fromOffset(112, 30),
 		Parent = content,
@@ -178,7 +178,7 @@ function ShrinePanel.Start(
 	local autoEquip = UIKit.button({
 		Name = "AutoEquip",
 		Text = "",
-		TextSize = 15,
+		TextSize = 18,
 		Position = UDim2.fromOffset(120, 40),
 		Size = UDim2.fromOffset(196, 30),
 		Parent = content,
@@ -202,15 +202,6 @@ function ShrinePanel.Start(
 		autoEquip.TextColor3 = if not owned then colors.Panel elseif on then colors.Text else colors.SubText
 	end
 	refreshAutoEquip()
-	UIKit.label({
-		Text = "Hold E at a pedestal to take or place a relic. Padlock: Equip Best skips it.",
-		TextSize = 14,
-		TextColor3 = colors.SubText,
-		TextWrapped = true,
-		Position = UDim2.fromOffset(324, 38),
-		Size = UDim2.new(1, -324, 0, 34),
-		Parent = content,
-	})
 
 	local slotsFrame = UIKit.scrollList(content, 8)
 	slotsFrame.Name = "Slots"
@@ -365,15 +356,6 @@ function ShrinePanel.Start(
 			local income, incomeValue = UIKit.coinValue(frame, 20, 19)
 			income.Position = UDim2.fromOffset(INFO_X, 44)
 			incomeValue.Text = Format.rate(slot.IncomePerSec)
-		else
-			UIKit.label({
-				Text = "Place a relic to earn CE",
-				TextSize = 15,
-				TextColor3 = colors.SubText,
-				Position = UDim2.fromOffset(INFO_X, 46),
-				Size = infoWidth,
-				Parent = frame,
-			})
 		end
 		levelBar(frame, slot.Level)
 
@@ -411,19 +393,15 @@ function ShrinePanel.Start(
 
 		local nextLevel = slot.Level + 1
 		local jade = toHex(colors.Jade)
-		sideLabel(`Lv {slot.Level} {ARROW} <font color="{jade}">{nextLevel}</font>`, 4, 18, colors.Text)
-		local nextMultiplier = Economy.pedestalMultiplier(Config.Economy, nextLevel)
-		local gain
-		if slot.Id and slot.Multiplier > 0 then
-			local now = Format.number(slot.IncomePerSec)
-			local after = Format.rate(slot.IncomePerSec / slot.Multiplier * nextMultiplier)
-			gain = `{now} {ARROW} <font color="{jade}">{after}</font>`
-		else
-			local now = Format.multiplier(slot.Multiplier)
-			local after = Format.multiplier(nextMultiplier)
-			gain = `boost x{now} {ARROW} <font color="{jade}">x{after}</font>`
-		end
-		sideLabel(gain, 26, 15, colors.SubText)
+		local gold = toHex(colors.Gold)
+		-- Boost % is not shown elsewhere on upgradeable rows; keep it next to the level arrow.
+		local pct = math.floor((Config.Economy.LevelGrowth - 1) * 100 + 0.5)
+		sideLabel(
+			`Lv {slot.Level} {ARROW} <font color="{jade}">{nextLevel}</font>  <font color="{gold}">+{pct}%</font>`,
+			4,
+			18,
+			colors.Text
+		)
 
 		local entry
 		local upgrade = UIKit.priceButton({
@@ -431,7 +409,7 @@ function ShrinePanel.Start(
 			AnchorPoint = Vector2.new(1, 0),
 			Position = UDim2.new(1, -12, 0, 46),
 			Size = UDim2.fromOffset(SIDE_WIDTH, 34),
-			TextSize = 17,
+			TextSize = 18,
 			Parent = frame,
 		}, "Upgrade", slot.UpgradeCost, function()
 			ShrineAction:FireServer("Upgrade", slotNumber, entry.Mode)
@@ -441,7 +419,7 @@ function ShrinePanel.Start(
 			AnchorPoint = Vector2.new(1, 0),
 			Position = UDim2.new(1, -12, 0, 84),
 			Size = UDim2.fromOffset(SIDE_WIDTH, 24),
-			TextSize = 14,
+			TextSize = 18,
 			Visible = false,
 			Parent = frame,
 		}, "+1 Lv", slot.UpgradeCost, function()
@@ -458,28 +436,30 @@ function ShrinePanel.Start(
 		local textWidth = UDim2.new(1, -(LOCKED_CARD_HEIGHT + 4 + SIDE_WIDTH + 20), 0, 24)
 		UIKit.label({
 			Text = `Pedestal {slot.Slot}`,
-			TextSize = 19,
+			TextSize = 20,
 			TextColor3 = if slot.IsNext then colors.Text else colors.SubText,
 			Position = UDim2.fromOffset(LOCKED_CARD_HEIGHT + 4, 14),
 			Size = textWidth,
 			Parent = frame,
 		})
-		UIKit.label({
-			Text = if slot.IsNext then "Shows one more relic" else `Unlock pedestal {slot.Slot - 1} first`,
-			TextSize = 15,
-			TextColor3 = colors.SubText,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			Position = UDim2.fromOffset(LOCKED_CARD_HEIGHT + 4, 42),
-			Size = textWidth,
-			Parent = frame,
-		})
+		if not slot.IsNext then
+			UIKit.label({
+				Text = `Unlock pedestal {slot.Slot - 1} first`,
+				TextSize = 15,
+				TextColor3 = colors.SubText,
+				TextTruncate = Enum.TextTruncate.AtEnd,
+				Position = UDim2.fromOffset(LOCKED_CARD_HEIGHT + 4, 42),
+				Size = textWidth,
+				Parent = frame,
+			})
+		end
 		if slot.IsNext and slot.Price then
 			local buy = UIKit.priceButton({
 				Name = "Unlock",
 				AnchorPoint = Vector2.new(1, 0.5),
 				Position = UDim2.new(1, -12, 0.5, 0),
 				Size = UDim2.fromOffset(SIDE_WIDTH, 38),
-				TextSize = 17,
+				TextSize = 18,
 				Parent = frame,
 			}, "Unlock", slot.Price, function()
 				ShrineAction:FireServer("BuyPedestal")
