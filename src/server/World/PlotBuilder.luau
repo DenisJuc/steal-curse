@@ -21,8 +21,17 @@ local SPIRIT = Color3.fromRGB(170, 110, 255)
 local WARM = Color3.fromRGB(255, 190, 90)
 local DAIS = Color3.fromRGB(95, 88, 78)
 
+-- Sealing chamber dressing: dark walls, paper seals, the binding circle around the pedestals.
+local WALL = Color3.fromRGB(44, 40, 52)
+local WALL_PILLAR = Color3.fromRGB(30, 27, 36)
+local PAPER = Color3.fromRGB(228, 216, 184)
+local SEAL_INK = Color3.fromRGB(170, 24, 30)
+local ROPE = Color3.fromRGB(176, 146, 98)
+local SEAL_GLOW = Color3.fromRGB(150, 80, 255)
+local CIRCLE_CENTER = { 0, -12 }
+
 local FLOOR_TOP = 1.2
-local WALL_H = 3.6
+local WALL_H = 8
 local GATE_GAP = 16
 local PATH_W = 10
 local TERRACE_H = 1.0
@@ -60,7 +69,8 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 		Material = Enum.Material.Slate,
 		Color = STONE,
 	})
-	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + height + 0.05, z), 0.1, width * (if imported then 0.75 else 0.9), {
+	-- A small sigil under the relic (PedestalVisuals tints it by rarity), not a full neon plate.
+	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + height + 0.05, z), 0.1, width * 0.32, {
 		Name = "Glow",
 		Material = Enum.Material.Neon,
 		Color = SPIRIT,
@@ -244,7 +254,7 @@ local function buildWalls(parent: Instance, at: (number, number, number) -> CFra
 	local half = size / 2
 	local t = 1.0
 	local wing = (size - GATE_GAP) / 2
-	local wallColor = Color3.fromRGB(78, 80, 90)
+	local wallColor = WALL
 
 	local walls = {
 		-- Back
@@ -280,10 +290,102 @@ local function buildWalls(parent: Instance, at: (number, number, number) -> CFra
 			Name = "Capstone",
 			Size = cap[1],
 			CFrame = cap[2],
-			Material = Enum.Material.Concrete,
-			Color = STONE_TRIM,
+			Material = Enum.Material.Basalt,
+			Color = WALL_PILLAR,
 		})
 	end
+end
+
+-- A paper seal (ofuda) on a wall: `cframe` is the wall face point, facing into the chamber.
+local function buildOfuda(parent: Instance, cframe: CFrame)
+	local paper = BuildUtil.decor(BuildUtil.part(parent, {
+		Name = "Ofuda",
+		Size = Vector3.new(1, 2.6, 0.06),
+		CFrame = cframe * CFrame.new(0, 0, -0.04),
+		Material = Enum.Material.Fabric,
+		Color = PAPER,
+	}))
+	local label = BuildUtil.surfaceText(paper, Enum.NormalId.Front, "封", SEAL_INK)
+	label.Font = Enum.Font.Arial
+end
+
+-- Buttresses along the walls with a seal between each pair, so the yard reads as a sealed vault.
+local function buildWallSeals(parent: Instance, at: (number, number, number) -> CFrame)
+	local half = Config.Plots.Size / 2
+	local inner = half - 1
+	local spacing = 22
+	local pillarH = WALL_H + 1.2
+	local runs = {
+		-- {start, along, face}: start corner, direction along the wall, direction into the chamber.
+		{ Vector3.new(-half, 0, inner), Vector3.new(1, 0, 0), Vector3.new(0, 0, -1) },
+		{ Vector3.new(-inner, 0, -half), Vector3.new(0, 0, 1), Vector3.new(1, 0, 0) },
+		{ Vector3.new(inner, 0, -half), Vector3.new(0, 0, 1), Vector3.new(-1, 0, 0) },
+	}
+	for _, run in runs do
+		local start, along, face = run[1], run[2], run[3]
+		for i = 0, Config.Plots.Size / spacing do
+			local p = start + along * (i * spacing)
+			BuildUtil.part(parent, {
+				Name = "WallPillar",
+				Size = Vector3.new(2.4, pillarH, 2.4),
+				CFrame = at(p.X + face.X * 0.7, FLOOR_TOP + pillarH / 2, p.Z + face.Z * 0.7),
+				Material = Enum.Material.Basalt,
+				Color = WALL_PILLAR,
+			})
+			if i * spacing < Config.Plots.Size - 1 then
+				local mid = p + along * (spacing / 2)
+				local origin = at(mid.X, FLOOR_TOP + 5, mid.Z)
+				buildOfuda(parent, CFrame.lookAt(origin.Position, origin.Position + (at(face.X, 0, face.Z).Position - at(0, 0, 0).Position)))
+			end
+		end
+	end
+end
+
+-- Sacred rope (shimenawa) with paper streamers across the entrance, inside the gate.
+local function buildEntranceRope(parent: Instance, at: (number, number, number) -> CFrame)
+	local half = Config.Plots.Size / 2
+	local z = -half + 2.2
+	local y = FLOOR_TOP + WALL_H - 0.6
+	BuildUtil.decor(BuildUtil.cylinder(parent, at(0, y, z) * CFrame.Angles(0, 0, math.rad(90)), GATE_GAP + 2, 0.9, {
+		Name = "Shimenawa",
+		Material = Enum.Material.Fabric,
+		Color = ROPE,
+	}))
+	for i = -3, 3 do
+		local x = i * (GATE_GAP / 8)
+		local streamer = if i % 2 == 0 then 1.8 else 1.1
+		BuildUtil.decor(BuildUtil.part(parent, {
+			Name = "Shide",
+			Size = Vector3.new(0.5, streamer, 0.05),
+			CFrame = at(x, y - 0.4 - streamer / 2, z),
+			Material = Enum.Material.Fabric,
+			Color = PAPER,
+		}))
+	end
+end
+
+-- The binding circle around the pedestals: two glowing rings laid from short tangent segments
+-- (they sit on the floor and path, inside the pedestal daises) with rune marks between them.
+local function buildSealCircle(parent: Instance, at: (number, number, number) -> CFrame)
+	local cx, cz = CIRCLE_CENTER[1], CIRCLE_CENTER[2]
+	local function ring(name: string, radius: number, count: number, width: number, gap: number, transparency: number)
+		local length = 2 * math.pi * radius / count - gap
+		for i = 1, count do
+			local angle = (i - 0.5) / count * math.pi * 2
+			BuildUtil.decor(BuildUtil.part(parent, {
+				Name = name,
+				Size = Vector3.new(length, 0.1, width),
+				CFrame = at(cx + math.cos(angle) * radius, FLOOR_TOP + 0.2, cz + math.sin(angle) * radius)
+					* CFrame.Angles(0, -angle + math.pi / 2, 0),
+				Material = Enum.Material.Neon,
+				Color = SEAL_GLOW,
+				Transparency = transparency,
+			}))
+		end
+	end
+	ring("SealRing", 28.5, 40, 0.5, 0.05, 0.3)
+	ring("SealRing", 26.7, 36, 0.25, 0.05, 0.45)
+	ring("SealRune", 27.6, 16, 0.6, 9.4, 0.15)
 end
 
 local function buildResonatorTerrace(parent: Instance, at: (number, number, number) -> CFrame)
@@ -380,7 +482,10 @@ function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Mod
 	})
 
 	buildCourtyardFloor(model, at)
+	buildSealCircle(model, at)
 	buildWalls(model, at)
+	buildWallSeals(model, at)
+	buildEntranceRope(model, at)
 	buildGate(model, at)
 	buildResonatorTerrace(model, at)
 	buildResonator(model, at, FLOOR_TOP + TERRACE_H)

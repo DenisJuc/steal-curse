@@ -233,6 +233,14 @@ local function fillGround(terrain: Terrain, rng: Random, seed: number, shape: Wi
 			Vector3.new(plots.Size + 4, GROUND_DEPTH, plots.Size + 4),
 			Enum.Material.Slate
 		)
+		-- Smoothing puts a full top voxel's surface ~2 studs up, over the plot floor (top 1.26)
+		-- and its daises and binding circle; clear one voxel more so the surface sits below the Base.
+		local center = Vector3.new(x, 2, z)
+		terrain:FillBlock(
+			CFrame.lookAt(center, Vector3.new(0, 2, 0)),
+			Vector3.new(plots.Size - 2, 12, plots.Size - 2),
+			Enum.Material.Air
+		)
 	end
 end
 

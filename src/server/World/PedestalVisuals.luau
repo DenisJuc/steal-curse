@@ -21,6 +21,9 @@ local WHITE = Color3.fromRGB(245, 240, 255)
 local GREY = Color3.fromRGB(182, 170, 158)
 local GOLD = Color3.fromRGB(240, 194, 104)
 local INK = Color3.fromRGB(17, 13, 24)
+local SPIRIT = Color3.fromRGB(170, 110, 255)
+-- Relics on pedestals show larger than their base display size so they fill the 7.5-stud stand.
+local DISPLAY_SCALE = 1.7
 local RIM_COLOR = Color3.fromRGB(190, 215, 255)
 local KEY_COLOR = Color3.fromRGB(255, 225, 190)
 -- Pedestal-top local offsets (studs) of the rim light (behind) and the key light (gate side).
@@ -76,7 +79,7 @@ local function addRimLight(part: BasePart, top: BasePart, relicId: string)
 end
 
 local function buildDisplay(pedestal: Model, top: BasePart, relicId: string, mutationId: string?, sizeId: string?)
-	local scale = SizeConfig.scaleOf(sizeId)
+	local scale = SizeConfig.scaleOf(sizeId) * DISPLAY_SCALE
 	local yLift = 2.4 + (scale - 1) * 0.9
 	local part = RelicModels.build(relicId, CFrame.new(top.Position + Vector3.new(0, yLift, 0)), scale)
 	if not part then
@@ -296,6 +299,10 @@ function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 		glow.Transparency = if state.Owned
 			then 0.8 - 0.6 * (level - 1) / (Config.Economy.PedestalMaxLevel - 1)
 			else 1
+		-- The sigil under the relic takes its rarity colour (spirit purple when empty).
+		local relic = state.Owned and state.Id and RelicConfig.ById[state.Id]
+		local tier = relic and RarityConfig.Get(relic.Tier)
+		glow.Color = if tier then Color3.fromHex(tier.Color) else SPIRIT
 
 		local key = if state.Owned and state.Id
 			then `{state.Id}|{state.Mutation or ""}|{state.Size or ""}`
