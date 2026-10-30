@@ -1,6 +1,9 @@
--- First-minute hints (GDD 15.1 onboarding): a short sequence of tips, each pointing at the HUD
--- element it explains. Shown while the "Hints" setting is On; finishing or skipping turns it Off
--- (saved), and turning it back On in Settings replays the tips.
+-- First-run tutorial (GDD 15.1 onboarding), in the style of the big RNG games: each step points
+-- an arrow at one thing and waits until the player has actually done it (press ROLL, turn on
+-- Auto Roll, open the Backpack, Equip Best, open Pedestals, buy an upgrade), then a few short
+-- tips with a Next button. Shown while the "Hints" setting is On; finishing or skipping turns it
+-- Off (saved), and turning it back On in Settings replays it. New players start with Auto Roll
+-- off (DataTemplate), so the first rolls are theirs.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,46 +18,110 @@ local UIKit = require(script.Parent.UIKit)
 local Onboarding = {}
 
 type Side = "Right" | "Below" | "Above" | "Left"
-type Step = { Target: string, Side: Side, Text: string }
+-- Target: a descendant name under the screen, or "Menu/Name" for a name inside that menu.
+-- Done: polled while the step shows; nil means the step waits for Next (or STEP_SECONDS).
+-- Fallback: shown instead while Target is hidden (e.g. its menu is closed).
+type Step = {
+	Target: string,
+	Side: Side,
+	Text: string,
+	Done: ((Player) -> boolean)?,
+	Fallback: { Target: string, Side: Side, Text: string }?,
+	Skip: boolean?,
+}
 
 local STEP_SECONDS = 9
-local GAP = 12
+local GAP = 16
+local ROLLS_TO_LEARN = 3
+
+local function number(player: Player, name: string): number
+	local value = player:GetAttribute(name)
+	return if type(value) == "number" then value else 0
+end
+
+-- Values captured when a step starts, for steps that wait for a change.
+local startScans = 0
+-- Set when CE goes down (something was bought) since the step started.
+local spent = false
 
 local STEPS: { Step } = {
 	{
+		Target = "RollButton",
+		Side = "Above",
+		Text = "Tap ROLL to seal your first cursed relic!",
+		Done = function(player)
+			return number(player, "TotalScans") >= startScans + 1
+		end,
+	},
+	{
+		Target = "RollButton",
+		Side = "Above",
+		Text = `Nice! Roll {ROLLS_TO_LEARN - 1} more times. Rarer relics are worth far more.`,
+		Done = function(player)
+			return number(player, "TotalScans") >= ROLLS_TO_LEARN
+		end,
+	},
+	{
 		Target = "AutoRoll",
 		Side = "Above",
-		Text = "You roll a relic every few seconds. Auto Roll does it for you; tap here to turn it off and press ROLL yourself.",
-	},
-	{
-		Target = "DiscoveryFeed",
-		Side = "Below",
-		Text = "Every find shows up here. Rare ones get a big reveal, and rare finds are saved in your Journal.",
-	},
-	{
-		Target = "ShrineButton",
-		Side = "Right",
-		Text = "Relics on your shrine pedestals earn Cursed Energy (CE). Buy and upgrade pedestals here.",
+		Text = "Now let it roll for you: turn on Auto Roll.",
+		Done = function(player)
+			return player:GetAttribute("AutoRoll") ~= false
+		end,
 	},
 	{
 		Target = "BackpackButton",
 		Side = "Above",
-		Text = "Open your Backpack and press Equip Best to put your best finds on the pedestals. Sell, lock and Auto-Sell live here too.",
+		Text = "Open your Backpack to see your relics.",
+		Done = function(player)
+			local ui = player:FindFirstChildOfClass("PlayerGui")
+			local menu = ui and ui:FindFirstChild("RelicsMenu", true)
+			return number(player, "IncomePerSec") > 0 or (menu ~= nil and (menu :: GuiObject).Visible)
+		end,
+	},
+	{
+		Target = "RelicsMenu/EquipBest",
+		Side = "Above",
+		Text = "Press Equip Best: your best relics go on your pedestals and start earning CE.",
+		Done = function(player)
+			return number(player, "IncomePerSec") > 0
+		end,
+		Fallback = { Target = "BackpackButton", Side = "Above", Text = "Open your Backpack and press Equip Best." },
+	},
+	{
+		Target = "ShrineButton",
+		Side = "Right",
+		Text = "Your relics earn Cursed Energy (CE). Open Pedestals to spend it.",
+		Done = function(player)
+			local ui = player:FindFirstChildOfClass("PlayerGui")
+			local menu = ui and ui:FindFirstChild("ShrineMenu", true)
+			return menu ~= nil and (menu :: GuiObject).Visible
+		end,
+	},
+	{
+		Target = "ShrineMenu/Upgrade",
+		Side = "Below",
+		Text = "Upgrade a pedestal: it earns more CE every second. Save up if you can't afford it yet.",
+		Done = function()
+			return spent
+		end,
+		Fallback = { Target = "ShrineButton", Side = "Right", Text = "When you have enough CE, open Pedestals and upgrade one." },
 	},
 	{
 		Target = "CodexButton",
 		Side = "Right",
-		Text = "The Codex records every relic you discover. Milestones give permanent Luck and income.",
+		Text = "The Codex tracks every relic you find. Milestones give permanent Luck and income.",
 	},
 	{
 		Target = "CollectionButton",
 		Side = "Right",
-		Text = "Fusion: collect 3 copies of one relic, open Collection, tap it, and Fuse. Then pick a Charm. Auto-sell keeps your closest fusion target.",
+		Text = "Fusion: collect 3 copies of one relic, open Collection, tap it, and Fuse.",
+		Skip = BalanceTrials.coreLoopPresentation(),
 	},
 	{
 		Target = "SpiritSight",
 		Side = "Left",
-		Text = "Spirit Sight lets you hunt your own signals. Each bind gives a relic plus bonus discoveries.",
+		Text = "Spirit Sight lets you hunt your own signals in the wild. Each bind gives a relic plus bonus finds.",
 	},
 }
 
@@ -64,24 +131,27 @@ local ANCHORS: { [Side]: Vector2 } = {
 	Above = Vector2.new(0.5, 1),
 	Left = Vector2.new(1, 0.5),
 }
+-- Arrow glyph and where it sits on the bubble, pointing back at the target.
+local ARROWS: { [Side]: { Text: string, Anchor: Vector2, Position: UDim2 } } = {
+	Above = { Text = "▼", Anchor = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 1, 2) },
+	Below = { Text = "▲", Anchor = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 0, -2) },
+	Right = { Text = "◀", Anchor = Vector2.new(1, 0.5), Position = UDim2.new(0, -2, 0.5, 0) },
+	Left = { Text = "▶", Anchor = Vector2.new(0, 0.5), Position = UDim2.new(1, 2, 0.5, 0) },
+}
 
 function Onboarding.Start(screen: ScreenGui)
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
-	-- Core Loop: skip Fusion Collection tip (button hidden); keep seal / index / pedestals.
-	local activeSteps = STEPS
-	if BalanceTrials.coreLoopPresentation() then
-		activeSteps = {}
-		for _, step in STEPS do
-			if step.Target ~= "CollectionButton" then
-				table.insert(activeSteps, step)
-			end
+	local activeSteps = {}
+	for _, step in STEPS do
+		if not step.Skip then
+			table.insert(activeSteps, step)
 		end
 	end
 
 	local bubble = UIKit.create("Frame", {
 		Name = "HintBubble",
-		Size = UDim2.fromOffset(300, 112),
+		Size = UDim2.fromOffset(320, 104),
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.03,
 		Visible = false,
@@ -96,7 +166,7 @@ function Onboarding.Start(screen: ScreenGui)
 		infoIcon.ZIndex = 27
 	end
 	local textLabel = UIKit.label({
-		TextSize = 15,
+		TextSize = 18,
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		Size = UDim2.new(1, 0, 1, -34),
@@ -112,6 +182,26 @@ function Onboarding.Start(screen: ScreenGui)
 		ZIndex = 26,
 		Parent = bubble,
 	})
+	local arrow = UIKit.label({
+		Name = "Arrow",
+		Text = "▼",
+		TextSize = 34,
+		TextColor3 = colors.Gold,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextStrokeTransparency = 0.2,
+		Size = UDim2.fromOffset(36, 36),
+		ZIndex = 27,
+		Parent = bubble,
+	})
+
+	local lastCE = number(player, "CE")
+	player:GetAttributeChangedSignal("CE"):Connect(function()
+		local ce = number(player, "CE")
+		if ce < lastCE - 0.5 then
+			spent = true
+		end
+		lastCE = ce
+	end)
 
 	local index = 0
 	local token = 0
@@ -124,6 +214,27 @@ function Onboarding.Start(screen: ScreenGui)
 		Settings.Set("Hints", "Off")
 	end
 
+	local nextButton = UIKit.button({
+		Text = "Next",
+		TextSize = 15,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -35, 1, -14),
+		Size = UDim2.fromOffset(70, 28),
+		ZIndex = 26,
+		Parent = bubble,
+	})
+	UIKit.skinButton(nextButton, "Gold")
+	local skipButton = UIKit.button({
+		Text = "Skip",
+		TextSize = 13,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -35, 1, -14),
+		Size = UDim2.fromOffset(64, 28),
+		ZIndex = 26,
+		Parent = bubble,
+	}, finish)
+	UIKit.skinButton(skipButton, "Dark")
+
 	local showStep: (number) -> ()
 	function showStep(stepIndex: number)
 		if stepIndex > #activeSteps then
@@ -133,46 +244,37 @@ function Onboarding.Start(screen: ScreenGui)
 		index = stepIndex
 		token += 1
 		local myToken = token
-		textLabel.Text = activeSteps[stepIndex].Text
-		stepLabel.Text = `Tip {stepIndex}/{#activeSteps}`
+		local step = activeSteps[stepIndex]
+		spent = false
+		startScans = number(player, "TotalScans")
+		stepLabel.Text = `{stepIndex}/{#activeSteps}`
+		-- Action steps wait for the action (Skip leaves the tutorial); tips have Next.
+		nextButton.Visible = step.Done == nil
+		skipButton.Position = if step.Done then UDim2.new(1, -35, 1, -14) else UDim2.new(1, -112, 1, -14)
 		Motion.shine(bubble, 0.6)
-		bubble.AnchorPoint = ANCHORS[activeSteps[stepIndex].Side]
-		task.delay(STEP_SECONDS, function()
-			if running and token == myToken then
-				showStep(stepIndex + 1)
-			end
-		end)
+		if step.Done == nil then
+			task.delay(STEP_SECONDS, function()
+				if running and token == myToken then
+					showStep(stepIndex + 1)
+				end
+			end)
+		end
 	end
-
-	local nextButton = UIKit.button({
-		Text = "Next",
-		TextSize = 14,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -35, 1, -14),
-		Size = UDim2.fromOffset(70, 28),
-		ZIndex = 26,
-		Parent = bubble,
-	}, function()
+	nextButton.Activated:Connect(function()
 		showStep(index + 1)
 	end)
-	UIKit.skinButton(nextButton, "Gold")
-	local skipButton = UIKit.button({
-		Text = "Skip tips",
-		TextSize = 13,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -118, 1, -14),
-		Size = UDim2.fromOffset(80, 28),
-		ZIndex = 26,
-		Parent = bubble,
-	}, finish)
-	UIKit.skinButton(skipButton, "Dark")
 
 	local function begin()
 		if running then
 			return
 		end
 		running = true
-		showStep(1)
+		-- Returning to the tips skips action steps the player has already done.
+		local first = 1
+		while first <= #activeSteps and activeSteps[first].Done and (activeSteps[first].Done :: any)(player) do
+			first += 1
+		end
+		showStep(first)
 	end
 
 	local function shown(object: Instance): boolean
@@ -186,7 +288,17 @@ function Onboarding.Start(screen: ScreenGui)
 		return current == screen
 	end
 
-	-- Tips point at the HUD; over an open menu they only cover it.
+	local function find(path: string): GuiObject?
+		local menuName, name = string.match(path, "^(.-)/(.+)$")
+		local root: Instance? = screen
+		if menuName then
+			root = screen:FindFirstChild(menuName, true)
+		end
+		local target = root and root:FindFirstChild(name or path, true)
+		return if target and target:IsA("GuiObject") and shown(target) then target else nil
+	end
+
+	-- Plain tips point at the HUD; over an open menu they only cover it.
 	local function menuOpen(): boolean
 		for _, child in screen:GetChildren() do
 			if child:IsA("GuiObject") and child.Visible and child:GetAttribute("Modal") then
@@ -196,23 +308,54 @@ function Onboarding.Start(screen: ScreenGui)
 		return false
 	end
 
-	-- Follow the target every frame (layouts move with screen size and UI scale).
-	RunService.RenderStepped:Connect(function()
+	local checkElapsed = 0
+	RunService.RenderStepped:Connect(function(dt)
 		if not running then
 			return
 		end
 		local step = activeSteps[index]
-		local target = step and screen:FindFirstChild(step.Target, true)
-		if not target or not target:IsA("GuiObject") or not shown(target) or menuOpen() then
+		if not step then
+			return
+		end
+		checkElapsed += dt
+		if step.Done and checkElapsed >= 0.2 then
+			checkElapsed = 0
+			if step.Done(player) then
+				Motion.pop(bubble, 0, 0.3)
+				showStep(index + 1)
+				return
+			end
+		end
+		local target = find(step.Target)
+		local side, text = step.Side, step.Text
+		if not target and step.Fallback then
+			target = find(step.Fallback.Target)
+			side, text = step.Fallback.Side, step.Fallback.Text
+		end
+		local inMenu = string.find(step.Target, "/", 1, true) ~= nil and target ~= nil and find(step.Target) ~= nil
+		if not target or (menuOpen() and not inMenu and step.Done == nil) then
 			bubble.Visible = false
 			return
 		end
+		textLabel.Text = text
+		bubble.AnchorPoint = ANCHORS[side]
+		local shape = ARROWS[side]
+		arrow.Text = shape.Text
+		arrow.AnchorPoint = shape.Anchor
+		-- The arrow bobs toward the target.
+		local bob = math.sin(os.clock() * 6) * 5
+		local push = if side == "Above" then UDim2.fromOffset(0, bob)
+			elseif side == "Below" then UDim2.fromOffset(0, -bob)
+			elseif side == "Right" then UDim2.fromOffset(-bob, 0)
+			else UDim2.fromOffset(bob, 0)
+		arrow.Position = shape.Position + push
 		local position, size = target.AbsolutePosition, target.AbsoluteSize
-		local point = if step.Side == "Right"
-			then Vector2.new(position.X + size.X + GAP, position.Y + size.Y / 2)
-			elseif step.Side == "Below" then Vector2.new(position.X + size.X / 2, position.Y + size.Y + GAP)
-			elseif step.Side == "Above" then Vector2.new(position.X + size.X / 2, position.Y - GAP)
-			else Vector2.new(position.X - GAP, position.Y + size.Y / 2)
+		local gap = GAP + 22
+		local point = if side == "Right"
+			then Vector2.new(position.X + size.X + gap, position.Y + size.Y / 2)
+			elseif side == "Below" then Vector2.new(position.X + size.X / 2, position.Y + size.Y + gap)
+			elseif side == "Above" then Vector2.new(position.X + size.X / 2, position.Y - gap)
+			else Vector2.new(position.X - gap, position.Y + size.Y / 2)
 		bubble.Position = UDim2.fromOffset(point.X, point.Y)
 		bubble.Visible = true
 	end)

@@ -203,7 +203,8 @@ DataTemplate.Template = {
 	Settings = {
 		RarityFocus = "MaxLuck",
 		Frequency = "All",
-		AutoRoll = true,
+		-- New players start rolling by hand (the tutorial teaches ROLL, then Auto Roll).
+		AutoRoll = false,
 		-- Only used with the AutoEquip game pass (switched on when it is bought).
 		AutoEquip = false,
 		-- Must equal AutoSell.defaults() (checked by a Lune test).
