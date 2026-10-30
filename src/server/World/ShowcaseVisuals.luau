@@ -61,13 +61,12 @@ local VFX: { [string]: { Vfx } } = {
 		{ Template = "Aura_P142", At = { 0, 9, 6 }, Scale = 1.2, Level = 3 },
 	},
 	ForestGrove = {
-		{ Template = "Aura_P016", At = { 0, 0.5, 0 }, Scale = 1.8, Level = 1 },
+		{ Template = "Aura_P064", At = { 0, 3, 4 }, Scale = 2, Level = 1 },
 		{ Template = "Aura_P088", At = { 0, 4, 5.5 }, Scale = 2.2, Level = 3 },
 	},
-	-- One warm bronze theme: the bell glows, and at level 3 a gold ring pulses out like its toll.
+	-- One warm bronze theme: the lit bell, and a gold ring pulsing out like its toll.
 	BellWatch = {
-		{ Template = "Aura_P085", At = { 0, 6.2, 4 }, Scale = 1.3, Level = 1 },
-		{ Template = "Aura_P052", At = { 0, 6.2, 4 }, Scale = 1.6, Level = 3 },
+		{ Template = "Aura_P052", At = { 0, 6.2, 4 }, Scale = 2, Level = 1 },
 	},
 	StarCircle = {
 		{ Template = "Aura_P071", At = { 0, 4, 0 }, Scale = 1.4, Level = 1 },
