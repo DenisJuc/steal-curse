@@ -28,14 +28,28 @@ local CodexPanel = {}
 
 local KIND_ORDER = { "Essential", "Frequency", "SetComplete", "Collection", "MutatedTier" }
 local KIND_HEADINGS = {
-	Essential = "Essential milestones (Common-Legendary relics, any mutation counts)",
-	Frequency = "Signal Frequency unlocks",
-	SetComplete = "Family sets (titles)",
-	Collection = "Full collection (titles)",
-	MutatedTier = "Mutated rarities (titles)",
+	Essential = "Milestones",
+	Frequency = "Family unlocks",
+	SetComplete = "Family sets",
+	Collection = "Full collection",
+	MutatedTier = "Mutated rarities",
 }
 local REFRESH_SECONDS = 1
 local DONE_COLOR = Color3.fromRGB(120, 230, 140)
+local ROW_HEIGHT = 58
+local BAR_HEIGHT = 6
+
+-- Short reward-track titles ("28 relics", "9 Demonic") instead of full goal sentences.
+local function shortGoal(milestone: Codex.Milestone): string
+	if milestone.Kind == "Essential" or milestone.Kind == "Collection" then
+		return `{milestone.Need} relics`
+	elseif milestone.Kind == "Frequency" or milestone.Kind == "SetComplete" then
+		return `{milestone.Need} {milestone.Family}`
+	elseif milestone.Kind == "MutatedTier" then
+		return `mutated {milestone.Tier}`
+	end
+	return Codex.goalText(CodexBook, milestone)
+end
 
 function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (boolean) -> () }
 	local player = Players.LocalPlayer
@@ -67,39 +81,56 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 
 	local function milestoneRow(milestone: Codex.Milestone, have: number, claimed: boolean, ready: boolean)
 		local done = claimed or milestone.Need == 0
-		local holder = UIKit.slot(body, milestone.Id, UDim2.new(1, -10, 0, 46), nextOrder())
+		local claimable = ready and not done
+		local holder = UIKit.slot(body, milestone.Id, UDim2.new(1, -10, 0, ROW_HEIGHT), nextOrder())
 		local frame = UIKit.create("Frame", {
 			Name = "Card",
 			BackgroundColor3 = colors.Card,
 			Parent = holder,
 		}, { UIKit.corner(8) })
 		UIKit.fill(frame)
-		UIKit.skinCard(frame, if ready and not done then colors.Gold elseif done then DONE_COLOR else nil)
+		UIKit.skinCard(frame, if claimable then colors.Gold elseif done then DONE_COLOR else nil)
 		frame:SetAttribute("PopIn", true)
 		UIKit.label({
-			Text = Codex.goalText(CodexBook, milestone),
-			TextSize = 14,
+			Text = shortGoal(milestone),
+			TextSize = 18,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextColor3 = if done then DONE_COLOR else colors.Text,
 			Position = UDim2.fromOffset(10, 4),
-			Size = UDim2.new(1, -110, 0, 20),
+			Size = UDim2.new(1, -110, 0, 22),
 			Parent = frame,
 		})
 		UIKit.label({
 			Text = Codex.rewardText(milestone),
-			TextSize = 12,
+			TextSize = 15,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextColor3 = colors.Gold,
-			Position = UDim2.fromOffset(10, 24),
+			Position = UDim2.fromOffset(10, 26),
 			Size = UDim2.new(1, -110, 0, 18),
 			Parent = frame,
 		})
-		if ready and not done then
+		local fill = if milestone.Need <= 0 then 1 else math.clamp(have / milestone.Need, 0, 1)
+		local track = UIKit.create("Frame", {
+			Name = "Track",
+			Position = UDim2.fromOffset(10, ROW_HEIGHT - BAR_HEIGHT - 6),
+			Size = UDim2.new(1, -20, 0, BAR_HEIGHT),
+			BackgroundColor3 = colors.Track,
+			BorderSizePixel = 0,
+			Parent = frame,
+		}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+		UIKit.create("Frame", {
+			Name = "Fill",
+			Size = UDim2.fromScale(fill, 1),
+			BackgroundColor3 = if claimable then colors.Gold elseif done then DONE_COLOR else colors.Jade,
+			BorderSizePixel = 0,
+			Parent = track,
+		}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+		if claimable then
 			local claimButton = UIKit.button({
 				Text = "Claim",
 				TextSize = 16,
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(1, -50, 0.5, 0),
+				Position = UDim2.new(1, -50, 0.5, -2),
 				Size = UDim2.fromOffset(88, 34),
 				Parent = frame,
 			}, function()
@@ -115,8 +146,8 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			TextXAlignment = Enum.TextXAlignment.Right,
 			TextColor3 = if done then DONE_COLOR else colors.SubText,
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -10, 0, 0),
-			Size = UDim2.new(0, 90, 1, 0),
+			Position = UDim2.new(1, -10, 0, 4),
+			Size = UDim2.fromOffset(90, 40),
 			Parent = frame,
 		})
 	end
@@ -216,17 +247,14 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			end
 		end
 
-		local discovered, essential = 0, 0
+		local discovered = 0
 		for _, relicId in CodexBook.AllIds do
 			if state.Discovered[relicId] then
 				discovered += 1
-				if CodexBook.PoolSet[relicId] then
-					essential += 1
-				end
 			end
 		end
 		local luck, income = Codex.bonuses(CodexBook, claimed)
-		local summaryHolder = UIKit.slot(body, "Summary", UDim2.new(1, -10, 0, 52), nextOrder())
+		local summaryHolder = UIKit.slot(body, "Summary", UDim2.new(1, -10, 0, 56), nextOrder())
 		local summary = UIKit.create("Frame", {
 			BackgroundColor3 = colors.Card,
 			Parent = summaryHolder,
@@ -235,18 +263,18 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		UIKit.skinCard(summary, colors.Trim)
 		summary:SetAttribute("PopIn", true)
 		UIKit.label({
-			Text = `Discovered {discovered} / {#CodexBook.AllIds}   |   Essential {essential} / {#CodexBook.Pool}`,
-			TextSize = 15,
+			Text = `{discovered} / {#CodexBook.AllIds} found`,
+			TextSize = 24,
 			Position = UDim2.fromOffset(10, 4),
-			Size = UDim2.new(1, -20, 0, 22),
+			Size = UDim2.new(1, -20, 0, 28),
 			Parent = summary,
 		})
 		UIKit.label({
-			Text = `Codex bonus: +{math.round(luck * 100)}% Luck, +{math.round(income * 100)}% CE income (permanent)`,
+			Text = `+{math.round(luck * 100)}% Luck  +{math.round(income * 100)}% CE`,
 			TextSize = 13,
 			TextColor3 = colors.Gold,
-			Position = UDim2.fromOffset(10, 27),
-			Size = UDim2.new(1, -20, 0, 20),
+			Position = UDim2.fromOffset(10, 34),
+			Size = UDim2.new(1, -20, 0, 18),
 			Parent = summary,
 		})
 

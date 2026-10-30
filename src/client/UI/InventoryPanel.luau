@@ -295,6 +295,7 @@ function InventoryPanel.Start(
 		Parent = relicsPage,
 	})
 	local countLabel = UIKit.label({
+		Text = "",
 		TextSize = 15,
 		TextColor3 = colors.Gold,
 		TextTruncate = Enum.TextTruncate.AtEnd,
@@ -416,6 +417,7 @@ function InventoryPanel.Start(
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.new(1, 0, 0, ACTIONS_HEIGHT),
+		Visible = false,
 		Parent = side,
 	}, {
 		UIKit.create("UIGridLayout", {
@@ -456,6 +458,7 @@ function InventoryPanel.Start(
 	local function actionButton(order: number, onClick: (group: any) -> ()): TextButton
 		local instance = UIKit.button({
 			LayoutOrder = order,
+			Text = "",
 			TextScaled = true,
 			Parent = actions,
 		}, function()
@@ -499,9 +502,9 @@ function InventoryPanel.Start(
 
 	local function refreshDetail()
 		local inPick = pickSlot ~= nil
-		actions.Visible = not inPick
 		local group = selectedGroup()
 		if inPick then
+			actions.Visible = false
 			detailView.Visible = false
 			detailName.Text = `Pick a relic for pedestal {pickSlot}`
 			detailName.TextColor3 = colors.Gold
@@ -510,16 +513,15 @@ function InventoryPanel.Start(
 			return
 		end
 		if not group then
+			actions.Visible = false
 			detailView.Visible = false
 			detailName.Text = SELECT_HINT
 			detailName.TextColor3 = colors.SubText
-			detailInfo.Text = if statusText ~= "" then escape(statusText) else "Favorite: never auto-sold. Lock: can't be sold."
+			detailInfo.Text = if statusText ~= "" then escape(statusText) else ""
 			sideStroke.Color = colors.Gold
-			for _, button in { equipButton, floatButton, sellOneButton, sellAllButton, lockButton, favButton } do
-				styleAction(button, button.Text, false)
-			end
 			return
 		end
+		actions.Visible = true
 		local color = relicColor(group.Id, group.Mutation)
 		local sizeId = SizeConfig.normalize(group.Size)
 		if detailView:GetAttribute("RelicId") ~= group.Id or detailView:GetAttribute("Size") ~= (sizeId or "") then
@@ -552,6 +554,7 @@ function InventoryPanel.Start(
 		if relic and relic.Description then
 			table.insert(lines, `<i>{escape(relic.Description)}</i>`)
 		end
+		table.insert(lines, `<font size="11">Favorite: never auto-sold. Lock: can't be sold.</font>`)
 		if statusText ~= "" then
 			table.insert(lines, escape(statusText))
 		end
@@ -649,7 +652,7 @@ function InventoryPanel.Start(
 		UIKit.label({
 			Name = "RelicName",
 			Text = Odds.displayName(group.Id, group.Mutation, sizeId),
-			TextSize = 12,
+			TextSize = 16,
 			TextWrapped = true,
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			TextXAlignment = Enum.TextXAlignment.Center,
@@ -661,7 +664,7 @@ function InventoryPanel.Start(
 		UIKit.label({
 			Name = "Income",
 			Text = `+{Format.rate(group.IncomePerSec)}`,
-			TextSize = 11,
+			TextSize = 16,
 			TextColor3 = colors.Gold,
 			TextXAlignment = Enum.TextXAlignment.Left,
 			Position = UDim2.new(0, 5, 1, -19),
@@ -671,7 +674,7 @@ function InventoryPanel.Start(
 		UIKit.label({
 			Name = "Count",
 			Text = `x{group.Count}`,
-			TextSize = 13,
+			TextSize = 16,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			AnchorPoint = Vector2.new(1, 0),
 			Position = UDim2.new(1, -5, 1, -19),
