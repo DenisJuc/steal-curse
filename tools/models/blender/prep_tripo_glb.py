@@ -21,7 +21,10 @@ target = int(argv[3]) if len(argv) > 3 else 9000
 SIZE = 1024
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.gltf(filepath=str(src))
+if src.suffix.lower() == ".fbx":
+    bpy.ops.import_scene.fbx(filepath=str(src))
+else:
+    bpy.ops.import_scene.gltf(filepath=str(src))
 meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 bpy.ops.object.select_all(action="DESELECT")
 for o in meshes:

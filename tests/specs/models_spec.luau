@@ -59,4 +59,17 @@ return {
 			expect.equal(ModelCheck.presenceFactor({ X = 0, Y = 0, Z = 0 }), 1, "degenerate size is left alone")
 		end,
 	},
+	{
+		Name = "stand-up turns lying blades on end and flat books on edge",
+		Run = function()
+			local blade = ModelCheck.standUp({ X = 4, Y = 0.3, Z = 0.6 }) :: { number }
+			expect.equal(blade[3], 90, "x-long blade rolls upright")
+			local spear = ModelCheck.standUp({ X = 0.3, Y = 0.4, Z = 4 }) :: { number }
+			expect.equal(spear[1], 90, "z-long spear pitches upright")
+			local book = ModelCheck.standUp({ X = 2, Y = 0.4, Z = 1.6 }) :: { number }
+			expect.equal(book[1], 90, "flat book stands on edge")
+			expect.equal(ModelCheck.standUp({ X = 0.3, Y = 4, Z = 0.5 }), nil, "upright sword left alone")
+			expect.equal(ModelCheck.standUp({ X = 2, Y = 2, Z = 2 }), nil, "round fruit left alone")
+		end,
+	},
 }

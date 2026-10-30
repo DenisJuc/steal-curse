@@ -117,8 +117,10 @@ local function fromAsset(relic: RelicConfig.Relic, asset: Instance, at: CFrame, 
 	local factor = ModelCheck.presenceFactor(part.Size) * scale
 	part.Size *= factor * (if type(extra) == "number" and extra > 0 then extra else 1)
 	local rotation = asset:GetAttribute("DisplayRotation")
+	local auto = ModelCheck.standUp(template.Size)
 	local turn = if typeof(rotation) == "Vector3"
 		then CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
+		elseif auto then CFrame.Angles(math.rad(auto[1]), math.rad(auto[2]), math.rad(auto[3]))
 		else CFrame.identity
 	part.CFrame = at * turn
 	if spectral then

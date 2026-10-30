@@ -42,6 +42,27 @@ function ModelCheck.presenceFactor(size: Vector3 | { X: number, Y: number, Z: nu
 	return math.min(ModelCheck.DISPLAY_PRESENCE / presence, ModelCheck.DISPLAY_MAX_LONGEST / dims[1])
 end
 
+-- How to turn a model so it reads well on a pedestal, as Euler angles in degrees (nil = leave it):
+-- long thin things (blades, spears) stand on end, flat things (books, rings) stand on edge facing
+-- the viewer. A model's own DisplayRotation attribute takes precedence over this.
+function ModelCheck.standUp(size: Vector3 | { X: number, Y: number, Z: number }): { number }?
+	local dims = { { "X", size.X }, { "Y", size.Y }, { "Z", size.Z } }
+	table.sort(dims, function(a, b)
+		return a[2] > b[2]
+	end)
+	local long, mid, thin = dims[1], dims[2], dims[3]
+	if mid[2] <= 0 then
+		return nil
+	end
+	if long[2] / mid[2] > 2.2 and long[1] ~= "Y" then
+		return if long[1] == "X" then { 0, 0, 90 } else { 90, 0, 0 }
+	end
+	if thin[2] / mid[2] < 0.45 and thin[1] == "Y" then
+		return { 90, 0, 0 }
+	end
+	return nil
+end
+
 function ModelCheck.issues(facts: Facts): { string }
 	local issues = {}
 	if facts.Parts == 0 then
