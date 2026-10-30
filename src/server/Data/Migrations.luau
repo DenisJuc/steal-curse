@@ -18,6 +18,13 @@ Migrations.RenamedRelics = {
 	HeartOfTheLastEclipse = "RedStoneOfAia",
 }
 
+-- Relics dropped from the roster after launch prep, each replaced by a new relic of the same tier
+-- and weight. Frozen like RenamedRelics.
+Migrations.RetiredRelics = {
+	-- Only ever made sense as a pair with Inverse Spear of Heaven.
+	ChainOfThousandMiles = "OniSpineNaginata",
+}
+
 -- "<relicId>" or "<relicId>|<rest>" with the relic id renamed.
 local function renameKey(key: string): string
 	local id, rest = string.match(key, "^([^|]*)(.*)$")
@@ -216,6 +223,57 @@ Migrations.Steps = {
 					item.Size = nil
 				end
 			end
+		end
+	end,
+	-- 8 -> 9: retired relics become their replacements everywhere a relic id is stored.
+	[9] = function(data: any)
+		local map = Migrations.RetiredRelics
+		local function swap(key: any): any
+			if type(key) ~= "string" then
+				return key
+			end
+			local id, rest = string.match(key, "^([^|]*)(.*)$")
+			local renamed = map[id :: string]
+			return if renamed then renamed .. rest else key
+		end
+		local function rekey(t: any, keepOld: (any, any) -> any)
+			if type(t) ~= "table" then
+				return
+			end
+			for old, value in table.clone(t) do
+				local new = swap(old)
+				if new ~= old then
+					t[old] = nil
+					t[new] = if t[new] == nil then value else keepOld(t[new], value)
+				end
+			end
+		end
+		local function first(a: any, _b: any): any
+			return a
+		end
+		for _, list in { data.Inventory, data.RareHistory } do
+			for _, entry in if type(list) == "table" then list else {} do
+				if type(entry) == "table" and type(entry.Id) == "string" then
+					entry.Id = map[entry.Id] or entry.Id
+				end
+			end
+		end
+		rekey(data.Discovered, earliest)
+		rekey(data.CodexReady, earliest)
+		rekey(data.Favorites, function(a, b)
+			return a or b
+		end)
+		for _, nested in { data.CodexMutations, data.CodexSizes } do
+			rekey(nested, function(a, b)
+				for k, at in b do
+					a[k] = earliest(a[k], at) or at
+				end
+				return a
+			end)
+		end
+		if type(data.Collection) == "table" then
+			rekey(data.Collection.Fusion, first)
+			rekey(data.Collection.FusionPins, first)
 		end
 	end,
 } :: { [number]: (any) -> () }

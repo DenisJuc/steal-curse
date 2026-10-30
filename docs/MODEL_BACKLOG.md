@@ -46,7 +46,7 @@ Suggested batches: 1 = Common + Uncommon (seen every few scans), 2 = Rare + Epic
 | 37 | `Senbonsakura` | Senbonsakura | Epic | Special | 2 |
 | 38 | `StendDisc` | Stend Disc | Epic | Crystal | 2 |
 | 39 | `JudgementChain` | Judgement Chain | Epic | Special | 2 |
-| 40 | `ChainOfThousandMiles` | Chain of Thousand Miles | Epic | Weapon | 2 |
+| 40 | `OniSpineNaginata` | Oni-Spine Naginata | Epic | Weapon | 2 |
 | 41 | `MadorasGunbai` | Madora's Gunbai | Epic | Special | 2 |
 | 42 | `Hyorinmara` | Hyorinmara | Epic | Weapon | 2 |
 | 43 | `PotoraEarrings` | Potora Earrings | Epic | Crystal | 2 |

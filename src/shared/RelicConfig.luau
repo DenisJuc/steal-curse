@@ -84,7 +84,7 @@ RelicConfig.Relics = {
 	{ Id = "Senbonsakura", Name = "Senbonsakura", Tier = "Epic", Weight = 88, Family = "Spiritual", ObjectType = "Special", Vfx = "Bloom", Description = "Scatter, and a thousand blades fall like petals." },
 	{ Id = "StendDisc", Name = "Stend Disc", Tier = "Epic", Weight = 84, Family = "Astral", ObjectType = "Crystal", Vfx = "Starlight", Description = "Slide it in and remember a power that was not yours." },
 	{ Id = "JudgementChain", Name = "Judgement Chain", Tier = "Epic", Weight = 80, Family = "Arcane", ObjectType = "Special", Vfx = "Spirit", Description = "Break the promise and the chain closes." },
-	{ Id = "ChainOfThousandMiles", Name = "Chain of Thousand Miles", Tier = "Epic", Weight = 76, Family = "Arcane", ObjectType = "Weapon", Vfx = "Void", Description = "Nobody has ever found its other end." },
+	{ Id = "OniSpineNaginata", Name = "Oni-Spine Naginata", Tier = "Epic", Weight = 76, Family = "Arcane", ObjectType = "Weapon", Vfx = "Void", Description = "Carved from a demon's spine. It still flinches at prayers." },
 	{ Id = "MadorasGunbai", Name = "Madora's Gunbai", Tier = "Epic", Weight = 72, Family = "Astral", ObjectType = "Special", Vfx = "Storm", Description = "It once turned an army's charge back on itself." },
 	{ Id = "Hyorinmara", Name = "Hyorinmara", Tier = "Epic", Weight = 68, Family = "Astral", ObjectType = "Weapon", Vfx = "Frost", Description = "A dragon of ice uncoils from every swing." },
 	{ Id = "PotoraEarrings", Name = "Potora Earrings", Tier = "Epic", Weight = 64, Family = "Spiritual", ObjectType = "Crystal", Vfx = "Spirit", Description = "Two people wear one each, and walk away as one." },

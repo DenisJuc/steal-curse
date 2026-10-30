@@ -95,6 +95,31 @@ return {
 		end,
 	},
 	{
+		Name = "v8 data swaps retired relics for their replacements everywhere",
+		Run = function()
+			local data = {
+				DataVersion = 8,
+				Discovered = { ChainOfThousandMiles = 40, OniSpineNaginata = 60 },
+				CodexMutations = { ChainOfThousandMiles = { Golden = 45 } },
+				CodexSizes = { ChainOfThousandMiles = { Huge = 47 } },
+				Favorites = { ["ChainOfThousandMiles|Golden"] = true },
+				Inventory = { { Uid = 1, Id = "ChainOfThousandMiles", Mutation = "Golden", At = 45, Source = "Scan" } },
+				RareHistory = { { Id = "ChainOfThousandMiles", At = 40 } },
+				Collection = { Fusion = { ChainOfThousandMiles = { Rank = 1 } }, FusionPins = { ChainOfThousandMiles = true } },
+			}
+			expect.equal(Migrations.run(data, DataTemplate.Version), "Migrated", "outcome")
+			expect.equal(data.Inventory[1].Id, "OniSpineNaginata", "inventory")
+			expect.equal(data.RareHistory[1].Id, "OniSpineNaginata", "history")
+			expect.equal(data.Discovered.OniSpineNaginata, 40, "earliest discovery kept")
+			expect.equal(data.Discovered.ChainOfThousandMiles, nil, "old codex entry gone")
+			expect.equal(data.CodexMutations.OniSpineNaginata.Golden, 45, "mutations")
+			expect.equal(data.CodexSizes.OniSpineNaginata.Huge, 47, "sizes")
+			expect.equal(data.Favorites["OniSpineNaginata|Golden"], true, "favorite")
+			expect.equal(data.Collection.Fusion.OniSpineNaginata.Rank, 1, "fusion")
+			expect.equal(data.Collection.FusionPins.OniSpineNaginata, true, "pins")
+		end,
+	},
+	{
 		Name = "v1 data gains the seen-mutation Codex record from held relics",
 		Run = function()
 			local data = {

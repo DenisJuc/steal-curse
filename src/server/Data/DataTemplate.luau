@@ -4,7 +4,7 @@
 
 local DataTemplate = {}
 
-DataTemplate.Version = 8
+DataTemplate.Version = 9
 
 export type Item = {
 	Uid: number,

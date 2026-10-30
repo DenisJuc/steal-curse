@@ -267,7 +267,7 @@ return {
 	{
 		Name = "template version is current and Collection is save-safe",
 		Run = function()
-			expect.equal(DataTemplate.Version, 8, "version")
+			expect.equal(DataTemplate.Version, 9, "version")
 			expect.equal(DataTemplate.Template.Collection.Essence, 0, "template essence")
 			expect.equal(type(DataTemplate.Template.CodexSizes), "table", "codex sizes")
 			local fresh = DataTemplate.fresh()
