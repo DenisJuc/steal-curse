@@ -58,45 +58,17 @@ local function mirror(player: Player, data: any)
 	player:SetAttribute("ShowcaseLevel", level or 0)
 end
 
--- Arm poses for standing Showcases, applied as Motor6D C0 rotations in torso space (R15 and R6).
-local POSES: { [string]: { [string]: CFrame } } = {
-	Stance = {
-		Right = CFrame.Angles(0, 0, math.rad(50)),
-		Left = CFrame.Angles(0, 0, math.rad(-50)),
-	},
-	Guardian = {
-		Right = CFrame.Angles(0, 0, math.rad(160)),
-		Left = CFrame.Angles(math.rad(-25), 0, math.rad(-20)),
-	},
-}
-local SHOULDERS = {
-	Right = { "RightShoulder", "Right Shoulder" },
-	Left = { "LeftShoulder", "Left Shoulder" },
-}
-
-type Pose = { Motors: { [Motor6D]: CFrame }, Since: number, At: Vector3 }
+-- While posing, the character carries the "ShowcasePose" attribute (the Showcase id); every
+-- client bends the body into that Showcase's own pose (client ShowcasePose).
+type Pose = { Character: Model, Since: number, At: Vector3, Seated: boolean }
 local posing: { [Player]: Pose } = {}
 
 local function endPose(player: Player)
 	local pose = posing[player]
 	posing[player] = nil
-	if pose then
-		for motor, original in pose.Motors do
-			if motor.Parent then
-				motor.C0 = original
-			end
-		end
+	if pose and pose.Character.Parent then
+		pose.Character:SetAttribute("ShowcasePose", nil)
 	end
-end
-
-local function findMotor(character: Model, names: { string }): Motor6D?
-	for _, name in names do
-		local motor = character:FindFirstChild(name, true)
-		if motor and motor:IsA("Motor6D") then
-			return motor
-		end
-	end
-	return nil
 end
 
 local function pose(player: Player)
@@ -120,19 +92,14 @@ local function pose(player: Player)
 	if seat then
 		seat.Disabled = false
 		seat:Sit(humanoid)
-		return
+	else
+		-- Guardian Showcases are prayed to: face the statue behind the dais centre.
+		local facing = if showcase.Style == "Guardian" then CFrame.Angles(0, math.pi, 0) else CFrame.identity
+		local height = humanoid.HipHeight + root.Size.Y / 2
+		character:PivotTo(stand * CFrame.new(0, height, 0) * facing)
 	end
-	local height = humanoid.HipHeight + root.Size.Y / 2
-	character:PivotTo(stand * CFrame.new(0, height, 0))
-	local motors = {}
-	for side, rotation in POSES[showcase.Style] or {} do
-		local motor = findMotor(character, SHOULDERS[side])
-		if motor then
-			motors[motor] = motor.C0
-			motor.C0 = CFrame.new(motor.C0.Position) * rotation * motor.C0.Rotation
-		end
-	end
-	posing[player] = { Motors = motors, Since = os.clock(), At = root.Position }
+	character:SetAttribute("ShowcasePose", showcase.Id)
+	posing[player] = { Character = character, Since = os.clock(), At = root.Position, Seated = seat ~= nil }
 end
 
 -- Rebuilds the podium look from the player's data (only when something visible changed).
@@ -420,7 +387,7 @@ function ShowcaseService.Init()
 	end)
 	Players.PlayerRemoving:Connect(endPose)
 
-	-- Standing poses end as soon as the player moves or jumps.
+	-- Standing poses end as soon as the player moves or jumps; throne poses when they stand up.
 	RunService.Heartbeat:Connect(function()
 		for player, current in posing do
 			local character = player.Character
@@ -428,6 +395,10 @@ function ShowcaseService.Init()
 			local root = character and character:FindFirstChild("HumanoidRootPart")
 			if not humanoid or humanoid.Health <= 0 or not root or not root:IsA("BasePart") then
 				endPose(player)
+			elseif current.Seated then
+				if os.clock() - current.Since > 0.5 and not humanoid.Sit then
+					endPose(player)
+				end
 			elseif os.clock() - current.Since > 0.3 then
 				local moved = (root.Position - current.At).Magnitude > 1.5
 				if moved or humanoid.MoveDirection.Magnitude > 0.1 then

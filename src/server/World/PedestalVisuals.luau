@@ -16,7 +16,10 @@ local BuildUtil = require(script.Parent.BuildUtil)
 
 local PedestalVisuals = {}
 
-local INFO_OFFSET = 6.5
+-- Info billboard height above the pedestal top: clear of the relic's aura (more for bigger sizes).
+local INFO_OFFSET = 10
+local INFO_OFFSET_PER_SCALE = 4
+local EMPTY_INFO_OFFSET = 6.5
 local WHITE = Color3.fromRGB(245, 240, 255)
 local GREY = Color3.fromRGB(182, 170, 158)
 local GOLD = Color3.fromRGB(240, 194, 104)
@@ -43,11 +46,13 @@ export type SlotState = {
 	IsNext: boolean?,
 }
 
--- A spot on an attachment of `part`, placed at `offset` in the plot's axes and aimed at the relic.
-local function addSpot(part: BasePart, frame: CFrame, name: string, offset: Vector3, color: Color3, brightness: number)
+-- A spot on an attachment of the pedestal `top` (the relic turns and bobs on clients, so the
+-- lights stay on the stand), placed at `offset` in the plot's axes and aimed at the relic.
+local function addSpot(part: BasePart, top: BasePart, frame: CFrame, name: string, offset: Vector3, color: Color3, brightness: number)
 	local holder = Instance.new("Attachment")
 	holder.Name = name
-	holder.Parent = part
+	holder:SetAttribute("RelicLight", true)
+	holder.Parent = top
 	holder.WorldCFrame = CFrame.lookAt(frame:PointToWorldSpace(offset), part.Position)
 	local spot = Instance.new("SpotLight")
 	spot.Face = Enum.NormalId.Front
@@ -64,8 +69,8 @@ end
 local function addRimLight(part: BasePart, top: BasePart, relicId: string)
 	-- Top is a cylinder (BuildUtil.cylinder rolls it 90 degrees); unroll to get the plot's axes.
 	local frame = top.CFrame * CFrame.Angles(0, 0, math.rad(-90))
-	addSpot(part, frame, "KeyLight", KEY_OFFSET, KEY_COLOR, 4)
-	addSpot(part, frame, "RimLight", RIM_OFFSET, RIM_COLOR, 10)
+	addSpot(part, top, frame, "KeyLight", KEY_OFFSET, KEY_COLOR, 4)
+	addSpot(part, top, frame, "RimLight", RIM_OFFSET, RIM_COLOR, 10)
 
 	local relic = RelicConfig.ById[relicId]
 	local tier = relic and RarityConfig.Get(relic.Tier)
@@ -132,7 +137,7 @@ local function buildInfo(top: BasePart): BillboardGui
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Info"
 	gui.Size = UDim2.fromScale(8, 3)
-	gui.StudsOffset = Vector3.new(0, INFO_OFFSET, 0)
+	gui.StudsOffset = Vector3.new(0, EMPTY_INFO_OFFSET, 0)
 	gui.LightInfluence = 0
 	gui.MaxDistance = 70
 
@@ -233,6 +238,10 @@ local function updateInfo(top: BasePart, state: SlotState)
 	local amount = stats:FindFirstChild("Amount") :: TextLabel
 	local level = stats:FindFirstChild("Level") :: Frame
 	local tag = gui:FindFirstChild("Tag") :: TextLabel
+	local height = if state.Owned and state.Id
+		then INFO_OFFSET + (SizeConfig.scaleOf(state.Size) - 1) * INFO_OFFSET_PER_SCALE
+		else EMPTY_INFO_OFFSET
+	gui.StudsOffset = Vector3.new(0, height, 0)
 
 	if not state.Owned then
 		gui.Enabled = state.IsNext == true and state.Price ~= nil
@@ -312,6 +321,11 @@ function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 			local old = pedestal:FindFirstChild("RelicDisplay")
 			if old then
 				old:Destroy()
+			end
+			for _, light in top:GetChildren() do
+				if light:GetAttribute("RelicLight") then
+					light:Destroy()
+				end
 			end
 			if state.Owned and state.Id then
 				buildDisplay(pedestal, top, state.Id, state.Mutation, state.Size)
