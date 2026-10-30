@@ -88,7 +88,10 @@ def download(asset_id: str, key: str) -> bytes:
 
 
 MAPS = {"ColorMapContent": "basecolor", "NormalMapContent": "normal",
-        "MetalnessMapContent": "metallic", "RoughnessMapContent": "roughness"}
+        "MetalnessMapContent": "metallic", "RoughnessMapContent": "roughness",
+        "EmissiveMaskContent": "emissive"}
+# Glow for relics that ship an emissive mask (Blender-built ones).
+EMISSIVE_STRENGTH = "3"
 
 
 def upload_image(path: Path, user_id: str, key: str) -> str:
@@ -140,6 +143,8 @@ def add_surface(tree: ET.ElementTree, image_ids: dict):
         for prop, image in image_ids.items():
             content = ET.SubElement(props, "Content", {"name": prop})
             ET.SubElement(content, "uri").text = f"rbxassetid://{image}"
+        if "EmissiveMaskContent" in image_ids:
+            ET.SubElement(props, "float", {"name": "EmissiveStrength"}).text = EMISSIVE_STRENGTH
 
 
 def main():

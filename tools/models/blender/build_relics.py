@@ -22,8 +22,8 @@ CELLS = 8   # cells per row
 PALETTE = {}
 
 
-def color_index(rgb):
-    key = tuple(round(c, 3) for c in rgb)
+def color_index(rgb, glow=False):
+    key = tuple(round(c, 3) for c in rgb) + (glow,)
     if key not in PALETTE:
         PALETTE[key] = len(PALETTE)
     return PALETTE[key]
@@ -36,7 +36,9 @@ def hexc(code):
 
 # --------------------------------------------------------------------------- primitives
 def _finish(obj, color, smooth=True, bevel=0.0):
-    obj["swatch"] = color_index(hexc(color))
+    # "!" suffix = glowing accent (goes into the emissive mask)
+    glow = color.endswith("!")
+    obj["swatch"] = color_index(hexc(color.rstrip("!")), glow)
     if bevel > 0:
         mod = obj.modifiers.new("bevel", "BEVEL")
         mod.width = bevel
@@ -99,46 +101,143 @@ def blade(color, length, width, thickness, loc=(0, 0, 0), rot=(0, 0, 0)):
 
 
 # --------------------------------------------------------------------------- relic recipes
+# Style (reviewed): dark, desaturated body (charcoal, aged leather, bone) + ONE small saturated
+# glowing accent ("!" colors) on the focal feature; chunky proportions that read at icon size.
+CHAR, IRON, BONE, LEATHER, TAN, GOLD = "#2a2a31", "#7d8592", "#cbbfa4", "#4a3326", "#8f7a5c", "#b08a3a"
+
+
 def kunay():
-    steel, edge, wrap, wrap2, ring = "#5d6470", "#c9d0da", "#2b2b33", "#8a1f2a", "#7a7f88"
-    blade(steel, 1.6, 0.62, 0.12, loc=(0, 0, 0.55))
-    blade(edge, 1.45, 0.42, 0.135, loc=(0, 0, 0.62))
-    cylinder(wrap, 0.085, 0.95, loc=(0, 0, 0.08))
+    blade("#9aa3b0", 1.6, 0.66, 0.16, loc=(0, 0, 0.55))
+    blade("#ff3b4e!", 1.3, 0.16, 0.18, loc=(0, 0, 0.68))
+    cylinder(CHAR, 0.1, 0.95, loc=(0, 0, 0.08))
     for i in range(5):
-        torus(wrap2, 0.09, 0.022, loc=(0, 0, -0.3 + i * 0.18))
-    torus(ring, 0.2, 0.045, loc=(0, 0, -0.62), rot=(90, 0, 0))
-    cylinder(ring, 0.12, 0.06, loc=(0, 0, 0.55), verts=8)
+        torus("#6e1520", 0.105, 0.026, loc=(0, 0, -0.3 + i * 0.18))
+    torus(IRON, 0.26, 0.06, loc=(0, 0, -0.68), rot=(90, 0, 0))
+    cylinder(IRON, 0.13, 0.07, loc=(0, 0, 0.55), verts=8)
 
 
 def seal_scroll():
-    paper, rod, cap, seal, band = "#e9dcc0", "#5a3a22", "#c9a24a", "#7a1fbf", "#9b2335"
-    cylinder(paper, 0.42, 1.5, rot=(0, 90, 0), verts=24)
+    cylinder(TAN, 0.42, 1.5, rot=(0, 90, 0), verts=24)
     for x in (-0.86, 0.86):
-        cylinder(rod, 0.12, 0.3, loc=(x, 0, 0), rot=(0, 90, 0))
-        cylinder(cap, 0.2, 0.08, loc=(x * 1.12, 0, 0), rot=(0, 90, 0), verts=12, bevel=0.01)
+        cylinder(LEATHER, 0.13, 0.3, loc=(x, 0, 0), rot=(0, 90, 0))
+        cylinder(GOLD, 0.21, 0.09, loc=(x * 1.12, 0, 0), rot=(0, 90, 0), verts=12, bevel=0.01)
     for x in (-0.5, 0.5):
-        torus(band, 0.43, 0.03, loc=(x, 0, 0), rot=(0, 90, 0))
-    # spiral seal on the front: rings of shrinking tori
-    for i, r in enumerate((0.26, 0.18, 0.1)):
-        torus(seal, r, 0.022, loc=(0, -0.42, 0), rot=(90, 0, 0))
-    sphere(seal, 0.05, loc=(0, -0.43, 0))
-    # loose paper flap hanging down
-    box(paper, (0.9, 0.02, 0.5), loc=(0, -0.3, -0.45), rot=(-20, 0, 0), bevel=0.005)
-    box(seal, (0.5, 0.025, 0.04), loc=(0, -0.33, -0.5), rot=(-20, 0, 0), bevel=0.0)
+        torus("#5a1620", 0.43, 0.035, loc=(x, 0, 0), rot=(0, 90, 0))
+    for r in (0.27, 0.19, 0.11):
+        torus("#b24dff!", r, 0.026, loc=(0, -0.42, 0), rot=(90, 0, 0))
+    sphere("#b24dff!", 0.055, loc=(0, -0.43, 0))
 
 
 def senzo_bean():
-    bean, bean2, cloth, cord = "#5fbf3a", "#9be060", "#b48a5a", "#6b4426"
-    sphere(bean, 0.45, loc=(0, 0, 0.55), scale=(0.75, 0.6, 1.0), rot=(0, 25, 0))
-    sphere(bean2, 0.2, loc=(-0.12, -0.2, 0.75), scale=(0.6, 0.4, 0.8), rot=(0, 25, 0))
-    # pouch: squashed sphere with a gathered neck and cord
-    sphere(cloth, 0.55, loc=(0.1, 0.25, -0.15), scale=(1.0, 0.9, 0.75), seg=12)
-    cylinder(cloth, 0.22, 0.3, loc=(0.1, 0.25, 0.32), r2=0.32, verts=10)
-    torus(cord, 0.22, 0.04, loc=(0.1, 0.25, 0.25))
-    sphere(cord, 0.06, loc=(0.32, 0.12, 0.2))
+    sphere("#2fd39a!", 0.42, loc=(0, 0, 0.6), scale=(0.62, 0.55, 1.15), rot=(0, 18, 0))
+    sphere("#1f8f68", 0.43, loc=(0.03, 0.02, 0.6), scale=(0.6, 0.5, 1.1), rot=(0, 18, 0), seg=12)
+    torus("#14583f", 0.24, 0.02, loc=(0.0, -0.2, 0.6), rot=(90, 90, 0))
+    sphere(LEATHER, 0.4, loc=(0.05, 0.1, -0.25), scale=(1.0, 0.9, 0.7), seg=12)
+    cylinder(LEATHER, 0.17, 0.22, loc=(0.05, 0.1, 0.08), r2=0.25, verts=10)
+    torus(TAN, 0.17, 0.035, loc=(0.05, 0.1, 0.04))
 
 
-RECIPES = {"Kunay": kunay, "SealScroll": seal_scroll, "SenzoBean": senzo_bean}
+def paladyns_necklace():
+    for i in range(14):
+        a = math.radians(i * 360 / 16 + 22.5)
+        sphere(BONE, 0.09, loc=(math.cos(a) * 0.8, 0, math.sin(a) * 0.8 + 0.5), seg=10)
+    box("#e8f4ff!", (0.14, 0.1, 0.62), loc=(0, 0, -0.62), bevel=0.02)
+    box("#e8f4ff!", (0.42, 0.1, 0.14), loc=(0, 0, -0.5), bevel=0.02)
+    torus(IRON, 0.07, 0.02, loc=(0, 0, -0.26), rot=(90, 0, 0))
+
+
+def steal_ball():
+    sphere(IRON, 0.6, seg=20)
+    for lat in (-40, 0, 40):
+        n = 8 if lat == 0 else 6
+        for i in range(n):
+            a, b = math.radians(i * 360 / n + lat), math.radians(lat)
+            d = Vector((math.cos(b) * math.cos(a), math.cos(b) * math.sin(a), math.sin(b)))
+            sphere(CHAR, 0.09, loc=tuple(d * 0.6), seg=8)
+    torus("#3be0ff!", 0.62, 0.025, rot=(90, 0, 0), seg=32)
+
+
+def quinsy_bangle():
+    torus("#aeb6c2", 0.55, 0.06, rot=(90, 0, 0), seg=32)
+    cylinder(IRON, 0.02, 0.25, loc=(0, 0, -0.66))
+    for a in range(5):
+        r = math.radians(a * 72 + 90)
+        box("#7fe8ff!", (0.07, 0.05, 0.3), loc=(math.cos(r) * 0.13, 0, -0.95 + math.sin(r) * 0.13), rot=(0, -a * 72, 0), bevel=0.01)
+    sphere("#7fe8ff!", 0.07, loc=(0, 0, -0.95))
+
+
+def hoy_poy_capsule():
+    cylinder(BONE, 0.32, 0.9, rot=(0, 90, 0), verts=20)
+    for x in (-0.45, 0.45):
+        sphere(BONE, 0.32, loc=(x, 0, 0), seg=16)
+    torus(CHAR, 0.33, 0.03, rot=(0, 90, 0))
+    cylinder("#ffb12e!", 0.1, 0.12, loc=(0, 0, 0.33), verts=12)
+    box(CHAR, (0.3, 0.02, 0.12), loc=(-0.4, -0.31, 0.02), bevel=0.005)
+
+
+def wistaria_poison_vial():
+    cylinder("#b06cff!", 0.34, 0.75, verts=16)
+    cylinder("#3a3046", 0.36, 0.12, loc=(0, 0, -0.4), verts=16)
+    cylinder("#3a3046", 0.14, 0.35, loc=(0, 0, 0.52), r2=0.12, verts=12)
+    cylinder(LEATHER, 0.15, 0.2, loc=(0, 0, 0.78), verts=10)
+    cylinder("#3d5a2a", 0.025, 0.5, loc=(0.2, 0, 0.75), rot=(0, 25, 0))
+    for i in range(4):
+        sphere("#9a7ad1", 0.07, loc=(0.27 + i * 0.03, -0.05, 0.62 - i * 0.12), seg=8)
+
+
+def foxx_mask():
+    sphere(BONE, 0.6, loc=(0, 0, 0), scale=(0.85, 0.35, 1.0), seg=18)
+    cylinder(BONE, 0.32, 0.6, loc=(0, -0.3, -0.25), rot=(80, 0, 0), r2=0.08, verts=12)
+    for x in (-0.38, 0.38):
+        cylinder(BONE, 0.17, 0.45, loc=(x, 0.0, 0.62), rot=(0, -x * 40, 0), r2=0.02, verts=4)
+        cylinder("#e0283c", 0.1, 0.3, loc=(x * 0.98, -0.04, 0.6), rot=(0, -x * 40, 0), r2=0.01, verts=4)
+    for x in (-0.22, 0.22):
+        box("#ff2e4a!", (0.22, 0.05, 0.06), loc=(x, -0.2, 0.12), rot=(0, x * 60, 0), bevel=0.01)
+    box("#9a1f2c", (0.04, 0.05, 0.4), loc=(0.18, -0.21, -0.12), rot=(0, 25, 0), bevel=0.005)
+
+
+def huntar_license():
+    box(CHAR, (1.0, 0.06, 1.4), bevel=0.04)
+    box("#d9d2c2", (0.8, 0.07, 0.15), loc=(0, 0, -0.5), bevel=0.01)
+    torus(GOLD, 0.28, 0.035, loc=(0, -0.04, 0.2), rot=(90, 0, 0))
+    cylinder("#ff4f6d!", 0.12, 0.04, loc=(0, -0.05, 0.2), rot=(90, 0, 0), verts=6)
+    for x in (-0.18, 0.18):
+        box(GOLD, (0.05, 0.03, 0.22), loc=(x, -0.04, 0.2), rot=(0, x * 120, 0), bevel=0.0)
+
+
+def akatsuko_ring():
+    torus("#3b3540", 0.42, 0.09, rot=(90, 0, 0), seg=28)
+    cylinder("#3b3540", 0.2, 0.12, loc=(0, 0, 0.5), verts=8)
+    cylinder("#ff2e2e!", 0.15, 0.1, loc=(0, 0, 0.56), verts=8)
+    box(CHAR, (0.04, 0.04, 0.18), loc=(0, 0, 0.62), bevel=0.0)
+
+
+def black_nichiren_blade():
+    box("#141418", (0.09, 0.03, 2.6), loc=(0.0, 0, 0.95), bevel=0.01)
+    box("#5b7cff!", (0.02, 0.035, 2.4), loc=(0.04, 0, 0.92), bevel=0.0)
+    box(IRON, (0.42, 0.42, 0.06), loc=(0, 0, -0.38), bevel=0.02)
+    cylinder(CHAR, 0.075, 0.75, loc=(0, 0, -0.8), verts=8)
+    for i in range(5):
+        box("#2f3b6b", (0.17, 0.17, 0.05), loc=(0, 0, -0.5 - i * 0.13), rot=(0, 0, 45), bevel=0.0)
+
+
+def magick_stone():
+    cylinder("#58e0ff!", 0.42, 0.8, loc=(0, 0, 0.1), verts=6, r2=0.22, smooth=False)
+    cylinder("#58e0ff!", 0.42, 0.4, loc=(0, 0, -0.5), verts=6, r2=0.04, smooth=False)
+    cylinder("#2a2240", 0.3, 0.55, loc=(0.42, 0.1, -0.25), rot=(0, 30, 0), verts=5, r2=0.08, smooth=False)
+    cylinder("#2a2240", 0.25, 0.45, loc=(-0.38, -0.05, -0.3), rot=(0, -35, 0), verts=5, r2=0.06, smooth=False)
+    for i in range(3):
+        a = math.radians(i * 120 + 30)
+        box("#58e0ff!", (0.14, 0.02, 0.14), loc=(math.cos(a) * 0.7, math.sin(a) * 0.7, 0.45), rot=(0, 45, i * 120), bevel=0.0)
+
+
+RECIPES = {
+    "Kunay": kunay, "SealScroll": seal_scroll, "SenzoBean": senzo_bean,
+    "PaladynsNecklace": paladyns_necklace, "StealBall": steal_ball, "QuinsyBangle": quinsy_bangle,
+    "HoyPoyCapsule": hoy_poy_capsule, "WistariaPoisonVial": wistaria_poison_vial, "FoxxMask": foxx_mask,
+    "HuntarLicense": huntar_license, "AkatsukoRing": akatsuko_ring, "BlackNichirenBlade": black_nichiren_blade,
+    "MagickStone": magick_stone,
+}
 
 
 # --------------------------------------------------------------------------- build / export
@@ -147,16 +246,18 @@ def reset():
     PALETTE.clear()
 
 
-def palette_image(name):
+def palette_image(name, emissive=False):
     size = SWATCH * CELLS
     img = bpy.data.images.new(name, size, size)
     pixels = [0.0] * (size * size * 4)
-    for rgb, i in PALETTE.items():
+    for key, i in PALETTE.items():
+        rgb, glow = key[:3], key[3]
+        value = ([1.0, 1.0, 1.0] if glow else [0.0, 0.0, 0.0]) if emissive else list(rgb)
         cx, cy = (i % CELLS) * SWATCH, (i // CELLS) * SWATCH
         for y in range(cy, cy + SWATCH):
             for x in range(cx, cx + SWATCH):
                 o = (y * size + x) * 4
-                pixels[o:o + 4] = [*rgb, 1.0]
+                pixels[o:o + 4] = [*value, 1.0]
     img.pixels = pixels
     return img
 
@@ -187,7 +288,7 @@ def join_with_palette(name):
     return relic
 
 
-def material(relic, img):
+def material(relic, img, mask=None):
     mat = bpy.data.materials.new(relic.name)
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
@@ -197,6 +298,18 @@ def material(relic, img):
     bsdf = nodes["Principled BSDF"]
     bsdf.inputs["Roughness"].default_value = 0.6
     mat.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+    if mask is not None:
+        # preview only: glow = basecolor * mask
+        m = nodes.new("ShaderNodeTexImage")
+        m.image = mask
+        m.interpolation = "Closest"
+        mix = nodes.new("ShaderNodeMixRGB")
+        mix.blend_type = "MULTIPLY"
+        mix.inputs["Fac"].default_value = 1
+        mat.node_tree.links.new(tex.outputs["Color"], mix.inputs[1])
+        mat.node_tree.links.new(m.outputs["Color"], mix.inputs[2])
+        mat.node_tree.links.new(mix.outputs["Color"], bsdf.inputs["Emission Color"])
+        bsdf.inputs["Emission Strength"].default_value = 3.0
     relic.data.materials.append(mat)
 
 
@@ -237,7 +350,13 @@ def build(relic_id, out):
     img.filepath_raw = str(fbm / f"{relic_id}_basecolor.png")
     img.file_format = "PNG"
     img.save()
-    material(relic, img)
+    mask = None
+    if any(key[3] for key in PALETTE):
+        mask = palette_image(f"{relic_id}_emissive", emissive=True)
+        mask.filepath_raw = str(fbm / f"{relic_id}_emissive.png")
+        mask.file_format = "PNG"
+        mask.save()
+    material(relic, img, mask)
     bpy.ops.object.select_all(action="DESELECT")
     relic.select_set(True)
     bpy.ops.export_scene.fbx(filepath=str(folder / f"{relic_id}.fbx"), use_selection=True,
