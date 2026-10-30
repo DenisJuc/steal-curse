@@ -7,6 +7,7 @@ local suites = {
 	{ Name = "rollmath", Tests = require("./specs/rollmath_spec") },
 	{ Name = "format", Tests = require("./specs/format_spec") },
 	{ Name = "hunt", Tests = require("./specs/hunt_spec") },
+	{ Name = "relicvfx", Tests = require("./specs/relicvfx_spec") },
 	{ Name = "distribution", Tests = require("./specs/distribution_spec") },
 	{ Name = "data", Tests = require("./specs/data_spec") },
 	{ Name = "rarewait", Tests = require("./specs/rarewait_spec") },

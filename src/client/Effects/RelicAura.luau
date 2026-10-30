@@ -15,6 +15,12 @@ export type Options = {
 	Boost: number?,
 	-- Fewer particles (Settings.LowEffects).
 	Low: boolean?,
+	-- Pull every emitter / beam / light colour toward this colour (RelicVfx recipes).
+	Tint: Color3?,
+	-- 0..1 how far colours move toward Tint (default 0.5).
+	TintStrength: number?,
+	-- Multiplies emitter rates (still capped by MAX_RATE).
+	Density: number?,
 }
 
 export type Handle = { Destroy: (Handle) -> () }
@@ -38,12 +44,28 @@ local function scaleSequence(sequence: NumberSequence, s: number): NumberSequenc
 	return NumberSequence.new(points)
 end
 
-local function scaleEffect(item: Instance, s: number, low: boolean)
+local function tintSequence(sequence: ColorSequence, tint: Color3, k: number): ColorSequence
+	local points = {}
+	for _, point in sequence.Keypoints do
+		table.insert(points, ColorSequenceKeypoint.new(point.Time, point.Value:Lerp(tint, k)))
+	end
+	return ColorSequence.new(points)
+end
+
+local function tintEffect(item: Instance, tint: Color3, k: number)
+	if item:IsA("ParticleEmitter") or item:IsA("Beam") or item:IsA("Trail") then
+		(item :: any).Color = tintSequence((item :: any).Color, tint, k)
+	elseif item:IsA("Light") then
+		(item :: any).Color = (item :: any).Color:Lerp(tint, k)
+	end
+end
+
+local function scaleEffect(item: Instance, s: number, low: boolean, density: number)
 	if item:IsA("ParticleEmitter") then
 		item.Size = scaleSequence(item.Size, s)
 		item.Speed = NumberRange.new(item.Speed.Min * s, item.Speed.Max * s)
 		item.Acceleration *= s
-		item.Rate = math.min(item.Rate, MAX_RATE) * (if low then LOW_RATE else 1)
+		item.Rate = math.min(item.Rate * density, MAX_RATE) * (if low then LOW_RATE else 1)
 	elseif item:IsA("Beam") then
 		item.Width0 *= s
 		item.Width1 *= s
@@ -90,7 +112,10 @@ function RelicAura.attach(target: BasePart, template: Instance, options: Options
 				})
 			end
 		end
-		scaleEffect(item, s, low)
+		scaleEffect(item, s, low, opts.Density or 1)
+		if opts.Tint then
+			tintEffect(item, opts.Tint, opts.TintStrength or 0.5)
+		end
 	end
 
 	local origin = target.CFrame

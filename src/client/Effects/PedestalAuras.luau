@@ -6,6 +6,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
+local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
+local RelicVfx = require(ReplicatedStorage.Shared.RelicVfx)
 local Settings = require(script.Parent.Parent.Settings)
 local RelicAura = require(script.Parent.RelicAura)
 
@@ -30,16 +32,58 @@ local MAX_ACTIVE = 12
 local REFRESH_SECONDS = 0.5
 
 type Entry = { Part: BasePart, Handles: { RelicAura.Handle } }
+type Pick = { Template: Instance, Boost: number, Tint: Color3?, TintStrength: number?, Density: number? }
+
+-- Position of each modelled relic within its tier (roster order), so a tier walks its aura pool.
+local tierIndex: { [string]: number }? = nil
+local function indexOf(relicId: string): number?
+	if not tierIndex then
+		local built, counts = {}, {}
+		for _, relic in RelicConfig.Relics do
+			if RelicModels.has(relic.Id) then
+				counts[relic.Tier] = (counts[relic.Tier] or 0) + 1
+				built[relic.Id] = counts[relic.Tier] - 1
+			end
+		end
+		tierIndex = built
+	end
+	return (tierIndex :: any)[relicId]
+end
+
+-- Modelled relics get their own recipe (RelicVfx); placeholders keep the shared tier aura.
+local function recipeFor(relic: RelicConfig.Relic, size: string?): { Pick }?
+	if not RelicModels.has(relic.Id) then
+		return nil
+	end
+	local list = {}
+	for _, layer in RelicVfx.layers(relic :: any, size, indexOf(relic.Id)) do
+		local template = RelicAura.template(layer.Template)
+		if template then
+			table.insert(list, {
+				Template = template,
+				Boost = layer.Boost,
+				Tint = if layer.Tint then Color3.fromHex(layer.Tint) else nil,
+				TintStrength = layer.TintStrength,
+				Density = layer.Density,
+			})
+		end
+	end
+	return list
+end
 
 local displays: { [BasePart]: true } = {}
 local active: { [BasePart]: Entry } = {}
 
-local function templatesFor(part: BasePart): { { Template: Instance, Boost: number } }
+local function templatesFor(part: BasePart): { Pick }
 	local relic = RelicConfig.ById[part:GetAttribute("RelicId") :: any]
 	if not relic then
 		return {}
 	end
 	local size = part:GetAttribute("Size")
+	local recipe = recipeFor(relic, size :: any)
+	if recipe then
+		return recipe
+	end
 	local tier = relic.Tier
 	if not PedestalAuras.ByTier[tier] and (size == "Huge" or size == "Titanic") then
 		tier = SIZED_FALLBACK
@@ -65,7 +109,16 @@ local function activate(part: BasePart)
 	local handles = {}
 	local low = Settings.LowEffects()
 	for _, item in templatesFor(part) do
-		table.insert(handles, RelicAura.attach(part, item.Template, { Boost = item.Boost, Low = low }))
+		table.insert(
+			handles,
+			RelicAura.attach(part, item.Template, {
+				Boost = item.Boost,
+				Low = low,
+				Tint = item.Tint,
+				TintStrength = item.TintStrength,
+				Density = item.Density,
+			})
+		)
 	end
 	active[part] = { Part = part, Handles = handles }
 end
@@ -98,7 +151,7 @@ local function hasAura(part: BasePart): boolean
 		return false
 	end
 	local size = part:GetAttribute("Size")
-	return PedestalAuras.ByTier[relic.Tier] ~= nil or size == "Huge" or size == "Titanic"
+	return RelicModels.has(relic.Id) or PedestalAuras.ByTier[relic.Tier] ~= nil or size == "Huge" or size == "Titanic"
 end
 
 local function refresh()

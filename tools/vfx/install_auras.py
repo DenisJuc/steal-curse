@@ -21,6 +21,12 @@ CHOICES = {
     "Aura_Celestial": (27, None, 0),
     "Aura_Cosmic": (23, "#FF6BF1", 0.5),
     "Aura_TitanicExtra": (22, "#FFD46A", 0.6),
+    # Untinted bases for per-relic recipes (src/shared/RelicVfx.luau tints them at runtime).
+    "Aura_Sparkle": (6, None, 0),
+    "Aura_Rise": (20, None, 0),
+    "Aura_Wind": (31, None, 0),
+    "Aura_Ground": (19, None, 0),
+    "Aura_Rays": (15, None, 0),
 }
 
 
