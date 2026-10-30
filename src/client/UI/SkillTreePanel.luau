@@ -29,8 +29,8 @@ local SkillAction = Remotes:WaitForChild("SkillAction") :: RemoteFunction
 
 local SkillTreePanel = {}
 
-local ROW_HEIGHT = 84
-local LIST_TOP = 66
+local ROW_HEIGHT = 64
+local LIST_TOP = 40
 local STAGGER = 0.045
 local UPGRADE_WIDTH = 150
 -- Room the buttons take at the card's bottom right (Max, +10 and Upgrade).
@@ -103,14 +103,6 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			Padding = UDim.new(0, 6),
 		}),
 	})
-	local infoLabel = UIKit.label({
-		TextSize = 13,
-		TextColor3 = colors.SubText,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		Position = UDim2.fromOffset(0, 40),
-		Size = UDim2.new(1, 0, 0, 18),
-		Parent = content,
-	})
 	local list = UIKit.scrollList(content, 6)
 	list.Position = UDim2.fromOffset(0, LIST_TOP)
 	list.Size = UDim2.new(1, 0, 1, -LIST_TOP)
@@ -118,9 +110,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 
 	local render: () -> ()
 	local tabButtons: { [string]: TextButton } = {}
-	local branchBlurb: { [string]: string } = {}
 	for index, each in SkillConfig.Branches do
-		branchBlurb[each.Id] = each.Blurb
 		tabButtons[each.Id] = UIKit.button({
 			Text = each.Name,
 			TextSize = 15,
@@ -132,7 +122,6 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				return
 			end
 			branch = each.Id
-			infoLabel.Text = each.Blurb
 			popNext = true
 			render()
 		end)
@@ -173,9 +162,6 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			if ok and type(result) == "table" and type(result.State) == "table" then
 				local before = table.clone(ranks)
 				ranks = result.State.Ranks or ranks
-				if result.Message then
-					infoLabel.Text = result.Message
-				end
 				render()
 				if action == "Buy" then
 					celebrate(before)
@@ -245,39 +231,30 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			}, { UIKit.corner(2) })
 			UIKit.label({
 				Text = node.Name,
-				TextSize = 16,
-				Position = UDim2.fromOffset(12, 6),
-				Size = UDim2.new(1, -130, 0, 20),
+				TextSize = 20,
+				Position = UDim2.fromOffset(12, 5),
+				Size = UDim2.new(1, -130, 0, 24),
 				Parent = card,
 			})
 			local rankLabel = UIKit.label({
 				Name = "Rank",
 				Text = `Rank {rank}/{trialMax}`,
-				TextSize = 14,
+				TextSize = 16,
 				TextColor3 = if maxed then colors.Gold else colors.SubText,
 				TextXAlignment = Enum.TextXAlignment.Right,
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(1, -65, 0, 16),
-				Size = UDim2.fromOffset(110, 20),
-				Parent = card,
-			})
-			UIKit.label({
-				Text = node.Summary,
-				TextSize = 12,
-				TextColor3 = colors.SubText,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(12, 27),
-				Size = UDim2.new(1, -22, 0, 16),
+				Position = UDim2.new(1, -65, 0, 17),
+				Size = UDim2.fromOffset(110, 22),
 				Parent = card,
 			})
 			local now = effectText(node.Id, rank)
 			UIKit.label({
-				Text = if maxed then `Now: {now}` else `Now: {now}  \u{2192}  {effectText(node.Id, rank + 1)}`,
-				TextSize = 13,
+				Text = if maxed then now else `{now}  \u{2192}  {effectText(node.Id, rank + 1)}`,
+				TextSize = 17,
 				TextColor3 = colors.Cyan,
 				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(12, 48),
-				Size = UDim2.new(1, -(12 + BUTTONS_WIDTH), 0, 18),
+				Position = UDim2.fromOffset(12, 30),
+				Size = UDim2.new(1, -(12 + BUTTONS_WIDTH), 0, 20),
 				Parent = card,
 			})
 			local track = UIKit.create("Frame", {
@@ -347,9 +324,6 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		end
 		popNext = false
 		refreshAffordability()
-		if infoLabel.Text == "" then
-			infoLabel.Text = branchBlurb[branch] or ""
-		end
 	end
 
 	player:GetAttributeChangedSignal("CE"):Connect(refreshAffordability)
@@ -357,7 +331,6 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	return {
 		Toggle = function()
 			if UIKit.toggle(panel) then
-				infoLabel.Text = ""
 				send("Get")
 			end
 		end,
