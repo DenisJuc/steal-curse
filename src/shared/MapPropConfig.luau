@@ -66,7 +66,7 @@ MapPropConfig.Props = {
 	OfudaFear          = { Size = { 1.3, 2.6, 0.06 }, Collide = "None", Fallback = "Box" },
 	OfudaMisfortune    = { Size = { 1.3, 2.6, 0.06 }, Collide = "None", Fallback = "Box" },
 	IronChain          = { Size = { 0.6, 5.5, 0.6 }, Collide = "None", Fallback = "Pillar" },
-	SpiderLilyPatch    = { Size = { 5, 2.2, 5 },  Collide = "None", Fallback = "Bush" },
+	SpiderLilyPatch    = { Size = { 5, 3.2, 5 },  Collide = "None", Fallback = "Bush" },
 	BambooGrove        = { Size = { 10, 18, 13 }, Collide = "Box",  Collider = { 4, 18, 4 }, Fallback = "DeadTree" },
 	BambooGrove2       = { Size = { 11, 18, 14 }, Collide = "Box",  Collider = { 4, 18, 4 }, Fallback = "DeadTree" },
 	-- Shared / blend zones
