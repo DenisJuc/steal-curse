@@ -39,7 +39,8 @@ local CARD_SIZE = Vector2.new(400, 300)
 local CAMERA_ZOOM_FOV = 12
 -- From this tier up every find gets the overlay and the full-width band.
 local BAND_INDEX = RarityConfig.IndexById.Legendary or 5
-local BAND_BASE_HEIGHT = CARD_SIZE.Y + 150
+-- Room above and below the card for the rarity name and the odds.
+local BAND_MARGIN = 92
 local BAND_STEP_HEIGHT = 34
 
 local SOURCE_TEXT: { [string]: string } = {
@@ -106,7 +107,7 @@ local function build(screen: ScreenGui): Ui
 		Name = "RevealBand",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.45),
-		Size = UDim2.new(1, 0, 0, BAND_BASE_HEIGHT),
+		Size = UDim2.new(1, 0, 0, CARD_SIZE.Y + 2 * BAND_MARGIN),
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.15,
 		BorderSizePixel = 0,
@@ -281,6 +282,8 @@ local function build(screen: ScreenGui): Ui
 	local noteLabel = UIKit.label({
 		Name = "Note",
 		TextSize = 13,
+		-- Shrinks to fit beside the Skip button instead of being cut off.
+		TextScaled = true,
 		TextColor3 = colors.SubText,
 		TextXAlignment = Enum.TextXAlignment.Left,
 		AnchorPoint = Vector2.new(0, 1),
@@ -426,8 +429,12 @@ local function play(entry: Presentation.Entry, dropped: number)
 	local banded = index >= BAND_INDEX
 	local step = index - BAND_INDEX
 	ui.Band.Visible = banded
+	-- The band says the rarity in big letters; the card keeps the model, name and note.
+	ui.TierLabel.Visible = not banded
 	if banded then
-		local height = BAND_BASE_HEIGHT + step * BAND_STEP_HEIGHT
+		local cardScale = ui.Card:FindFirstChildOfClass("UIScale")
+		local scale = if cardScale then cardScale.Scale else 1
+		local height = CARD_SIZE.Y * scale + 2 * (BAND_MARGIN + step * BAND_STEP_HEIGHT / 2)
 		ui.BandTitle.Text = string.upper(if tier then tier.Name else relic.Tier)
 		ui.BandTitle.TextColor3 = accent
 		ui.BandTitle.TextSize = 60 + step * 8
