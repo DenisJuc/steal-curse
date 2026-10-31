@@ -128,7 +128,7 @@ function RebirthPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: 
 			Size = UDim2.new(1, 0, 0, 26),
 			Parent = column,
 		})
-		local mark = if color == colors.Red then "\u{2715}" else "\u{2713}"
+		local mark = if color == colors.Red then "\u{00D7}" else "\u{2713}"
 		for index, line in lines do
 			local y = 34 + (index - 1) * LINE_HEIGHT
 			UIKit.label({

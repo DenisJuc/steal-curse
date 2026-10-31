@@ -60,10 +60,13 @@ function Toasts.Show(text: string, kind: string?)
 		Text = text,
 		TextColor3 = if kind == "Error" then color else UIKit.Colors.Text,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		TextTruncate = Enum.TextTruncate.AtEnd,
+		-- Long messages shrink to fit the pill instead of being cut off.
+		TextScaled = true,
 		TextSize = TEXT_SIZE,
 		Parent = slot,
 	})
+	UIKit.create("UITextSizeConstraint", { MaxTextSize = TEXT_SIZE, MinTextSize = 13, Parent = toast })
+	UIKit.create("UIPadding", { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16), Parent = toast })
 	UIKit.fill(toast)
 	UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = toast })
 	UIKit.skinPanel(toast, color)
