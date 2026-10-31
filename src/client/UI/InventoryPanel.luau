@@ -49,16 +49,18 @@ export type Hooks = {
 	OnPickDone: () -> (),
 }
 
-local TAB_HEIGHT = 32
+local TAB_HEIGHT = 44
 local SELL_ALL_WIDTH = 250
 local CONFIRM_SECONDS = 4
-local FOOTER_HEIGHT = 36
-local SIDE_WIDTH = 230
+local FOOTER_HEIGHT = 48
+local SIDE_WIDTH = 270
 local CELL = Vector2.new(100, 126)
 local MAX_LIVE_RENDERS = 36
-local RENDER_SHARE = 0.32
-local NAME_HEIGHT = 38
-local ACTIONS_HEIGHT = 64
+local RENDER_SHARE = 0.4
+local NAME_HEIGHT = 30
+local BIG_BUTTON_HEIGHT = 56
+local TOGGLE_HEIGHT = 42
+local ACTIONS_HEIGHT = BIG_BUTTON_HEIGHT + 8 + TOGGLE_HEIGHT
 local REFRESH_SECONDS = 1
 local LAYOUT_SETTLE_SECONDS = 0.05
 local SELECT_HINT = "Tap a card to see it here."
@@ -155,8 +157,7 @@ function InventoryPanel.Start(
 		relicsPage.Visible = name == "Relics"
 		itemsPage.Visible = name == "Items"
 		for tabName, button in tabButtons do
-			UIKit.skinButton(button, if tabName == name then "Gold" else "Dark")
-			button.TextColor3 = if tabName == name then colors.Panel else colors.Text
+			UIKit.skinTab(button, tabName == name)
 		end
 		if name == "Items" then
 			items.Refresh()
@@ -176,6 +177,9 @@ function InventoryPanel.Start(
 			end
 		end)
 	end
+	for tabName, button in tabButtons do
+		UIKit.skinTab(button, tabName == currentTab)
+	end
 
 	local send: (string, ...any) -> ()
 
@@ -187,7 +191,7 @@ function InventoryPanel.Start(
 	sellAll = UIKit.button({
 		Name = "SellAll",
 		Text = "Sell all",
-		TextSize = 15,
+		TextSize = 18,
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.fromScale(1, 0),
 		Size = UDim2.fromOffset(SELL_ALL_WIDTH, TAB_HEIGHT),
@@ -215,7 +219,7 @@ function InventoryPanel.Start(
 	local autoSellLink = UIKit.button({
 		Name = "AutoSellLink",
 		Text = "",
-		TextSize = 13,
+		TextSize = 17,
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.new(1, -(SELL_ALL_WIDTH + 8), 0, 0),
@@ -249,7 +253,7 @@ function InventoryPanel.Start(
 				highest = tier.Name
 			end
 		end
-		autoSellLink.Text = if highest then `<u>Auto-sell: duplicates up to {highest}</u>` else "<u>Auto-sell: off (set up)</u>"
+		autoSellLink.Text = if highest then `<u>Auto-sell: up to {highest}</u>` else "<u>Auto-sell: off</u>"
 	end
 	autoSellLink.RichText = true
 
@@ -296,7 +300,7 @@ function InventoryPanel.Start(
 	})
 	local countLabel = UIKit.label({
 		Text = "",
-		TextSize = 15,
+		TextSize = 18,
 		TextColor3 = colors.Gold,
 		TextTruncate = Enum.TextTruncate.AtEnd,
 		Size = UDim2.new(0.4, -4, 1, 0),
@@ -312,7 +316,7 @@ function InventoryPanel.Start(
 	local equipBest = UIKit.button({
 		Name = "EquipBest",
 		Text = "Equip Best",
-		TextSize = 15,
+		TextSize = 20,
 		Position = UDim2.fromScale(0.4, 0),
 		Size = UDim2.new(0.3, -4, 1, 0),
 		Parent = footer,
@@ -322,7 +326,7 @@ function InventoryPanel.Start(
 	UIKit.skinButton(equipBest, "Gold")
 	local autoSell = UIKit.button({
 		Text = "Auto-Sell",
-		TextSize = 15,
+		TextSize = 18,
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.fromScale(1, 0),
 		Size = UDim2.new(0.3, -4, 1, 0),
@@ -362,7 +366,8 @@ function InventoryPanel.Start(
 	UIKit.skinButton(emptyPedestal, "Dark")
 	UIKit.skinButton(backButton, "Dark")
 
-	-- Detail panel.
+	-- Detail panel: big render, name in its rarity color, big income, one short stats line, then
+	-- two big actions (Place, Sell) over a row of small toggles (Lock, Favorite, Float, Sell all).
 	local side = UIKit.create("Frame", {
 		Name = "Detail",
 		AnchorPoint = Vector2.new(1, 0),
@@ -381,49 +386,58 @@ function InventoryPanel.Start(
 	})
 	detailView.Parent = side
 	local detailName = UIKit.label({
-		TextSize = 16,
+		Name = "DetailName",
+		TextSize = 18,
+		TextScaled = true,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Position = UDim2.new(0, 0, RENDER_SHARE, 2),
+		Position = UDim2.new(0, 0, RENDER_SHARE, 4),
 		Size = UDim2.new(1, 0, 0, NAME_HEIGHT),
 		Text = SELECT_HINT,
 		TextColor3 = colors.SubText,
 		Parent = side,
 	})
-	local infoScroll = UIKit.create("ScrollingFrame", {
-		BackgroundTransparency = 1,
-		BorderSizePixel = 0,
-		Position = UDim2.new(0, 0, RENDER_SHARE, NAME_HEIGHT + 4),
-		Size = UDim2.new(1, 0, 1 - RENDER_SHARE, -(NAME_HEIGHT + 4 + ACTIONS_HEIGHT + 4)),
-		CanvasSize = UDim2.new(),
-		AutomaticCanvasSize = Enum.AutomaticSize.Y,
-		ScrollingDirection = Enum.ScrollingDirection.Y,
-		ScrollBarThickness = 4,
-		Parent = side,
-	})
+	UIKit.create("UITextSizeConstraint", { MaxTextSize = 24, MinTextSize = 14, Parent = detailName })
+	local detailIncome, detailIncomeLabel = UIKit.coinValue(side, 30, 30, colors.Gold)
+	detailIncome.Name = "DetailIncome"
+	detailIncome.AnchorPoint = Vector2.new(0.5, 0)
+	detailIncome.Position = UDim2.new(0.5, 0, RENDER_SHARE, NAME_HEIGHT + 8)
+	detailIncome.Visible = false
 	local detailInfo = UIKit.label({
-		TextSize = 13,
+		Name = "DetailInfo",
+		TextSize = 17,
 		TextWrapped = true,
 		TextColor3 = colors.SubText,
+		TextXAlignment = Enum.TextXAlignment.Center,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		RichText = true,
-		AutomaticSize = Enum.AutomaticSize.Y,
-		Size = UDim2.new(1, -6, 0, 0),
+		Position = UDim2.new(0, 0, RENDER_SHARE, NAME_HEIGHT + 48),
+		Size = UDim2.new(1, 0, 1 - RENDER_SHARE, -(NAME_HEIGHT + 48 + ACTIONS_HEIGHT + 4)),
 		Text = "",
-		Parent = infoScroll,
+		Parent = side,
 	})
 	local actions = UIKit.create("Frame", {
+		Name = "Actions",
 		BackgroundTransparency = 1,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.fromScale(0, 1),
 		Size = UDim2.new(1, 0, 0, ACTIONS_HEIGHT),
 		Visible = false,
 		Parent = side,
+	})
+	local toggles = UIKit.create("Frame", {
+		Name = "Toggles",
+		BackgroundTransparency = 1,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, TOGGLE_HEIGHT),
+		Parent = actions,
 	}, {
-		UIKit.create("UIGridLayout", {
-			CellSize = UDim2.new(1 / 3, -4, 0, 30),
-			CellPadding = UDim2.fromOffset(5, 4),
+		UIKit.create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			HorizontalAlignment = Enum.HorizontalAlignment.Center,
 			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 6),
 		}),
 	})
 
@@ -455,73 +469,98 @@ function InventoryPanel.Start(
 		end)
 	end
 
-	local function actionButton(order: number, onClick: (group: any) -> ()): TextButton
-		local instance = UIKit.button({
-			LayoutOrder = order,
-			Text = "",
-			TextScaled = true,
-			Parent = actions,
-		}, function()
+	local function onSelected(onClick: (group: any) -> ()): () -> ()
+		return function()
 			local group = selectedGroup()
 			if group then
 				onClick(group)
 			end
-		end)
-		UIKit.create("UITextSizeConstraint", { MaxTextSize = 14, Parent = instance })
-		return instance
+		end
 	end
-	local equipButton = actionButton(1, function(group)
+	local equipButton = UIKit.button({
+		Name = "Place",
+		Text = "Place",
+		TextSize = 22,
+		Size = UDim2.new(0.5, -3, 0, BIG_BUTTON_HEIGHT),
+		Parent = actions,
+	}, onSelected(function(group)
 		ShrineAction:FireServer("EquipGroup", group.Id, group.Mutation, group.Size)
-	end)
-	local floatButton = actionButton(2, function(group)
-		send("Float", group.Id, group.Mutation, not group.Floating, group.Size)
-	end)
-	local sellOneButton, sellAllButton
-	sellOneButton = actionButton(3, function(group)
+	end))
+	UIKit.skinButton(equipButton, "Gold")
+	local sellOneButton: TextButton
+	sellOneButton = UIKit.button({
+		Name = "Sell",
+		Text = "Sell",
+		TextSize = 20,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.fromScale(1, 0),
+		Size = UDim2.new(0.5, -3, 0, BIG_BUTTON_HEIGHT),
+		Parent = actions,
+	}, onSelected(function(group)
 		Motion.markCoinSource(sellOneButton)
 		send("Sell", group.Id, group.Mutation, 1, group.Size)
+	end))
+	-- Small square toggles: an icon when there is one, otherwise a short word.
+	local function toggleButton(order: number, iconKey: string?, text: string, onClick: (group: any) -> ()): TextButton
+		local instance = UIKit.button({
+			Name = text,
+			LayoutOrder = order,
+			Text = "",
+			TextSize = 16,
+			Size = UDim2.fromOffset(if iconKey then TOGGLE_HEIGHT else 64, TOGGLE_HEIGHT),
+			Parent = toggles,
+		}, onSelected(onClick))
+		local icon = if iconKey then Icons.image(instance, iconKey, 28) else nil
+		if icon then
+			icon.AnchorPoint = Vector2.new(0.5, 0.5)
+			icon.Position = UDim2.fromScale(0.5, 0.5)
+		else
+			instance.Text = text
+		end
+		return instance
+	end
+	local lockButton = toggleButton(1, "Lock", "Lock", function(group)
+		send("Lock", group.Id, group.Mutation, group.Locked < group.Count, group.Size)
 	end)
-	sellAllButton = actionButton(4, function(group)
+	local favButton = toggleButton(2, "Favorite", "Fav", function(group)
+		send("Favorite", group.Id, group.Mutation, not group.Favorite, group.Size)
+	end)
+	local floatButton = toggleButton(3, nil, "Float", function(group)
+		send("Float", group.Id, group.Mutation, not group.Floating, group.Size)
+	end)
+	local sellAllButton: TextButton
+	sellAllButton = toggleButton(4, nil, "Sell all", function(group)
 		Motion.markCoinSource(sellAllButton)
 		send("Sell", group.Id, group.Mutation, "All", group.Size)
 	end)
-	local lockButton = actionButton(5, function(group)
-		send("Lock", group.Id, group.Mutation, group.Locked < group.Count, group.Size)
-	end)
-	local favButton = actionButton(6, function(group)
-		send("Favorite", group.Id, group.Mutation, not group.Favorite, group.Size)
-	end)
+	sellAllButton.Size = UDim2.fromOffset(80, TOGGLE_HEIGHT)
 
-	local function styleAction(instance: TextButton, text: string, enabled: boolean, color: Color3?)
-		instance.Text = text
-		local kind = if not enabled or color == colors.Panel then "Dark" elseif color == colors.Gold then "Gold" else "Primary"
-		UIKit.skinButton(instance, kind)
-		instance.TextColor3 = if enabled then (if color == colors.Gold then colors.Panel else colors.Text) else colors.SubText
+	-- Toggles that are on light up gold; unusable ones go dim.
+	local function styleToggle(instance: TextButton, on: boolean, usable: boolean?)
+		local enabled = usable ~= false
+		UIKit.skinButton(instance, if on then "Gold" else "Dark")
+		instance.TextColor3 = if on then colors.Panel elseif enabled then colors.Text else colors.SubText
 		Motion.setDisabled(instance, not enabled)
 	end
 
 	local function refreshDetail()
 		local inPick = pickSlot ~= nil
 		local group = selectedGroup()
-		if inPick then
+		if inPick or not group then
 			actions.Visible = false
 			detailView.Visible = false
-			detailName.Text = `Pick a relic for pedestal {pickSlot}`
-			detailName.TextColor3 = colors.Gold
-			detailInfo.Text = "Tap a card to place it. Favorites first, then best income."
-			sideStroke.Color = colors.Gold
-			return
-		end
-		if not group then
-			actions.Visible = false
-			detailView.Visible = false
-			detailName.Text = SELECT_HINT
-			detailName.TextColor3 = colors.SubText
-			detailInfo.Text = if statusText ~= "" then escape(statusText) else ""
+			detailIncome.Visible = false
+			detailName.Text = if inPick then `Pick a relic for pedestal {pickSlot}` else SELECT_HINT
+			detailName.TextColor3 = if inPick then colors.Gold else colors.SubText
+			detailInfo.Text = if inPick
+				then "Tap a card to place it."
+				elseif statusText ~= "" then escape(statusText)
+				else ""
 			sideStroke.Color = colors.Gold
 			return
 		end
 		actions.Visible = true
+		detailIncome.Visible = true
 		local color = relicColor(group.Id, group.Mutation)
 		local sizeId = SizeConfig.normalize(group.Size)
 		if detailView:GetAttribute("RelicId") ~= group.Id or detailView:GetAttribute("Size") ~= (sizeId or "") then
@@ -529,52 +568,35 @@ function InventoryPanel.Start(
 		end
 		detailView.Visible = true
 		sideStroke.Color = if sizeId == "Titanic" then colors.Gold elseif sizeId then Color3.fromRGB(160, 210, 255) else color
-		detailName.Text = `{if group.Favorite then "* " else ""}{Odds.displayName(group.Id, group.Mutation, sizeId)}`
+		detailName.Text = Odds.displayName(group.Id, group.Mutation, sizeId)
 		detailName.TextColor3 = sideStroke.Color
+		detailIncomeLabel.Text = `+{Format.rate(group.IncomePerSec)}`
 		local relic = RelicConfig.ById[group.Id]
 		local tier = relic and RarityConfig.Get(relic.Tier)
 		local yours = RollMath.comboProbability(Odds.current(), group.Id, group.Mutation)
-		local sizeLine = if sizeId
-			then `Size <b>{SizeConfig.Label[sizeId]}</b>  |  income ×{SizeConfig.incomeMult(sizeId)}  |  keep 1`
-			else "Size Normal"
-		local lines = {
-			`<b>{if tier then tier.Name else "?"}</b>{if group.Mutation then `  |  {group.Mutation}` else ""}`,
-			sizeLine,
-			`In backpack x{group.Count}{if group.Locked > 0 then `  |  {group.Locked} locked` else ""}{if group.Floating
-				then "  |  1 floating"
-				else ""}`,
-			`Income +{Format.rate(group.IncomePerSec)} CE`,
-			`Sells for {Format.number(group.SellValue)} CE{if sizeId and group.Sellable <= 0
-				then " (last copy kept)"
-				elseif sizeId
-				then " (extras only)"
-				else ""}`,
-			`Base {Format.odds(Odds.baseItem(group.Id))}  |  Yours {Format.odds(yours)}`,
-		}
-		if relic and relic.Description then
-			table.insert(lines, `<i>{escape(relic.Description)}</i>`)
+		-- One short line: rarity (size), how many, your odds.
+		local parts = { if tier then tier.Name else "?" }
+		if sizeId then
+			table.insert(parts, `{SizeConfig.Label[sizeId]} x{SizeConfig.incomeMult(sizeId)}`)
 		end
-		table.insert(lines, `<font size="11">Favorite: never auto-sold. Lock: can't be sold.</font>`)
+		table.insert(parts, `x{group.Count}`)
+		table.insert(parts, Format.odds(yours))
+		local lines = { table.concat(parts, "  ·  ") }
 		if statusText ~= "" then
-			table.insert(lines, escape(statusText))
+			table.insert(lines, `<font color="#F0C268">{escape(statusText)}</font>`)
 		end
 		detailInfo.Text = table.concat(lines, "\n")
 
-		local allLocked = group.Locked >= group.Count
 		local canSell = group.Sellable > 0
-		styleAction(equipButton, "Equip", true)
-		styleAction(
-			floatButton,
-			if group.Floating then "Stop floating" else "Float",
-			true,
-			if group.Floating then colors.Gold else colors.Panel
-		)
-		styleAction(sellOneButton, "Sell 1", canSell)
-		styleAction(sellAllButton, if sizeId then "Sell extras" else "Sell all", canSell)
-		styleAction(lockButton, if allLocked then "Unlock" else "Lock", true, if allLocked then colors.Gold else colors.Panel)
-		styleAction(favButton, if group.Favorite then "Unfavorite" else "Favorite", true, if group.Favorite
-			then colors.Gold
-			else colors.Panel)
+		sellOneButton.Text = if canSell then `Sell +{Format.number(group.SellValue)}` else "Kept"
+		UIKit.skinButton(sellOneButton, if canSell then "Primary" else "Dark")
+		sellOneButton.TextColor3 = if canSell then colors.Text else colors.SubText
+		Motion.setDisabled(sellOneButton, not canSell)
+		styleToggle(lockButton, group.Locked >= group.Count)
+		styleToggle(favButton, group.Favorite)
+		styleToggle(floatButton, group.Floating)
+		sellAllButton.Visible = group.Sellable > 1
+		styleToggle(sellAllButton, false, canSell)
 	end
 
 	local function onCardClicked(group: any)
@@ -649,18 +671,19 @@ function InventoryPanel.Start(
 			Size = UDim2.new(1, -8, 0, 70),
 			Parent = card,
 		})
-		UIKit.label({
+		local nameLabel = UIKit.label({
 			Name = "RelicName",
 			Text = Odds.displayName(group.Id, group.Mutation, sizeId),
 			TextSize = 16,
-			TextWrapped = true,
-			TextTruncate = Enum.TextTruncate.AtEnd,
+			-- One line that shrinks to fit, never cut off with "...".
+			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextColor3 = strokeColor,
-			Position = UDim2.fromOffset(3, 74),
-			Size = UDim2.new(1, -6, 0, 28),
+			Position = UDim2.fromOffset(3, 78),
+			Size = UDim2.new(1, -6, 0, 20),
 			Parent = card,
 		})
+		UIKit.create("UITextSizeConstraint", { MaxTextSize = 17, MinTextSize = 9, Parent = nameLabel })
 		UIKit.label({
 			Name = "Income",
 			Text = `+{Format.rate(group.IncomePerSec)}`,

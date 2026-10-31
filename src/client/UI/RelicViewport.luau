@@ -4,6 +4,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local UIKit = require(script.Parent.UIKit)
@@ -48,6 +49,14 @@ function RelicViewport.show(viewport: ViewportFrame, relicId: string, sizeId: st
 		end
 	end
 	local part = RelicModels.build(relicId, VIEW_ANGLE, SizeConfig.scaleOf(sizeId))
+	if part and part:GetAttribute("ModelNeeded") then
+		-- No model yet: a dark silhouette tinted with the rarity color reads as "relic", not as a
+		-- white block.
+		local relic = RelicConfig.ById[relicId]
+		local tint = if relic then UIKit.tierColor(relic.Tier) else UIKit.Colors.SubText
+		part.Color = tint:Lerp(Color3.fromRGB(20, 14, 30), 0.55)
+		part.Material = Enum.Material.SmoothPlastic
+	end
 	if part then
 		part.Parent = viewport
 		frame(viewport, part)

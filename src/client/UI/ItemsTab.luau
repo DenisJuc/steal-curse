@@ -16,7 +16,7 @@ local ItemAction = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("ItemA
 
 local ItemsTab = {}
 
-local ROW_HEIGHT = 74
+local ROW_HEIGHT = 88
 
 type Row = {
 	Item: ItemConfig.Item,
@@ -35,9 +35,9 @@ function ItemsTab.Build(page: Frame): { Refresh: () -> () }
 
 	local status = UIKit.label({
 		Name = "Status",
-		Text = "Potions drop from hunt captures, Codex rewards and your first Legendary find.",
+		Text = "Potions drop from hunts and Codex rewards.",
 		TextColor3 = colors.SubText,
-		TextSize = 14,
+		TextSize = 18,
 		TextWrapped = true,
 		Size = UDim2.new(1, 0, 0, 36),
 		Parent = page,
@@ -63,8 +63,8 @@ function ItemsTab.Build(page: Frame): { Refresh: () -> () }
 		local id = row.Item.Id
 		local count = countOf(id)
 		local left = leftOf(id)
-		row.Count.Text = `Owned: {count}`
-		row.Timer.Text = if left > 0 then `Active: {ItemConfig.formatTime(left)}` else ""
+		row.Count.Text = `x{count}`
+		row.Timer.Text = if left > 0 then ItemConfig.formatTime(left) else ""
 		local full = left >= ItemConfig.MaxBuffSeconds - 1
 		local usable = count > 0 and not full
 		row.Use.Text = if full then "Max" else "Use"
@@ -86,7 +86,7 @@ function ItemsTab.Build(page: Frame): { Refresh: () -> () }
 			Parent = list,
 		}, { UIKit.corner(10), UIKit.stroke(color, 2, 0.4) })
 		UIKit.skinCard(frame)
-		local image = Icons.image(frame, `Potion{item.Effect}`, 48)
+		local image = Icons.image(frame, `Potion{item.Effect}`, 62)
 		if image then
 			image.AnchorPoint = Vector2.new(0, 0.5)
 			image.Position = UDim2.new(0, 10, 0.5, 0)
@@ -109,44 +109,49 @@ function ItemsTab.Build(page: Frame): { Refresh: () -> () }
 		UIKit.label({
 			Name = "Title",
 			Text = item.Name,
-			TextSize = 17,
+			TextSize = 22,
 			TextColor3 = color,
-			Position = UDim2.fromOffset(68, 8),
-			Size = UDim2.new(1, -190, 0, 20),
+			Position = UDim2.fromOffset(84, 10),
+			Size = UDim2.new(1, -230, 0, 26),
 			Parent = frame,
 		})
 		UIKit.label({
 			Name = "Description",
 			Text = item.Description,
-			TextSize = 13,
-			TextColor3 = colors.SubText,
-			TextWrapped = true,
-			Position = UDim2.fromOffset(68, 28),
-			Size = UDim2.new(1, -190, 0, 18),
+			TextSize = 18,
+			TextColor3 = colors.Text,
+			TextScaled = true,
+			Position = UDim2.fromOffset(84, 40),
+			Size = UDim2.new(1, -230, 0, 22),
 			Parent = frame,
 		})
 		local count = UIKit.label({
 			Name = "Count",
-			TextSize = 13,
-			Position = UDim2.fromOffset(68, 48),
-			Size = UDim2.fromOffset(90, 18),
+			TextSize = 20,
+			TextColor3 = colors.Gold,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -146, 0, 10),
+			Size = UDim2.fromOffset(70, 26),
 			Parent = frame,
 		})
 		local timer = UIKit.label({
 			Name = "Timer",
-			TextSize = 13,
+			TextSize = 18,
 			TextColor3 = color,
-			Position = UDim2.fromOffset(160, 48),
-			Size = UDim2.fromOffset(140, 18),
+			TextXAlignment = Enum.TextXAlignment.Right,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.new(1, -146, 0, 44),
+			Size = UDim2.fromOffset(160, 22),
 			Parent = frame,
 		})
 		local useButton = UIKit.button({
 			Name = "Use",
 			Text = "Use",
-			TextSize = 16,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(1, -60, 0.5, 0),
-			Size = UDim2.fromOffset(96, 40),
+			TextSize = 22,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -12, 0.5, 0),
+			Size = UDim2.fromOffset(120, 56),
 			Parent = frame,
 		})
 		local row = { Item = item, Count = count, Timer = timer, Use = useButton }
