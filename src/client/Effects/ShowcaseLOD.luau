@@ -55,6 +55,15 @@ local function setDetail(entry: Entry, on: boolean)
 			table.insert(entry.Effects, RelicAura.attach(anchor, template, {
 				Scale = if type(scale) == "number" then scale else 1,
 			}))
+			-- Beams only: drop the pack effect's particles (its flat circles), keep its beams.
+			if anchor:GetAttribute("VfxBeamsOnly") then
+				local aura = anchor:FindFirstChild("RelicAura")
+				for _, item in if aura then aura:GetDescendants() else {} do
+					if item:IsA("ParticleEmitter") then
+						item:Destroy()
+					end
+				end
+			end
 		end
 	end
 end

@@ -1,8 +1,9 @@
 -- Server-side look of the active Showcase on a plot's podium, so visitors see it too.
 -- Every Showcase has its own set piece (binding circle, cursed throne, guardian statue, sacred
 -- tree, village bell, star orrery) and its own premade effects from the VFX pack.
---   Level 1: the set piece and its main effect.   Level 2: + segment aura ring and light.
---   Level 3: + floating seals and a second effect layer.   Level 4: + a ring of big seals.
+--   Level 1: the bare set piece.   Level 2: + segment aura ring and light (and the orrery).
+--   Level 3: + floating seals and the main premade effect.   Level 4: + big seals and a second
+--   effect layer. Effects only arrive near the top so every level up shows a clear step.
 -- Effects are only anchors here ("ShowcaseVfx" attribute = an Aura_* template); each client
 -- builds them near the podium (ShowcaseLOD). Unlocked accessories are added on top (cosmetic
 -- only). Podium local -Z faces the hub.
@@ -47,30 +48,31 @@ local POSE_TEXT = {
 
 -- Premade effects per Showcase (Aura_* templates in ReplicatedStorage.VFX.Auras): template,
 -- {x, y, z} on the dais, scale, and the level the layer appears at.
-type Vfx = { Template: string, At: { number }, Scale: number, Level: number }
+type Vfx = { Template: string, At: { number }, Scale: number, Level: number, BeamsOnly: boolean? }
 local VFX: { [string]: { Vfx } } = {
+	-- Binding Circle keeps only the pack effect's fiery beams (BeamsOnly drops its flat circles).
 	SimpleStance = {
-		{ Template = "Aura_P017", At = { 0, 1, 0 }, Scale = 1.6, Level = 1 },
+		{ Template = "Aura_P017", At = { 0, 1, 0 }, Scale = 1.6, Level = 3, BeamsOnly = true },
 	},
 	CrimsonThrone = {
-		{ Template = "Aura_P067", At = { 0, 3.5, 1.5 }, Scale = 1.5, Level = 1 },
-		{ Template = "Aura_P027", At = { 0, 0.5, 2.5 }, Scale = 1.4, Level = 3 },
+		{ Template = "Aura_P067", At = { 0, 3.5, 1.5 }, Scale = 1.5, Level = 3 },
+		{ Template = "Aura_P027", At = { 0, 0.5, 2.5 }, Scale = 1.4, Level = 4 },
 	},
 	GoldenGuardian = {
-		{ Template = "Aura_P072", At = { 0, 4, 5.4 }, Scale = 1.2, Level = 1 },
-		{ Template = "Aura_P142", At = { 0, 9, 6 }, Scale = 1.2, Level = 3 },
+		{ Template = "Aura_P072", At = { 0, 4, 5.4 }, Scale = 1.2, Level = 3 },
+		{ Template = "Aura_P142", At = { 0, 9, 6 }, Scale = 1.2, Level = 4 },
 	},
 	ForestGrove = {
-		{ Template = "Aura_P064", At = { 0, 3, 4 }, Scale = 2, Level = 1 },
-		{ Template = "Aura_P088", At = { 0, 4, 5.5 }, Scale = 2.2, Level = 3 },
+		{ Template = "Aura_P064", At = { 0, 3, 4 }, Scale = 2, Level = 3 },
+		{ Template = "Aura_P088", At = { 0, 4, 5.5 }, Scale = 2.2, Level = 4 },
 	},
-	-- One warm bronze theme: the lit bell, and a gold ring pulsing out like its toll.
+	-- One warm bronze theme: the lit bell, and at the top level a gold ring pulsing like its toll.
 	BellWatch = {
-		{ Template = "Aura_P052", At = { 0, 6.2, 4 }, Scale = 2, Level = 1 },
+		{ Template = "Aura_P052", At = { 0, 6.2, 4 }, Scale = 2, Level = 4 },
 	},
 	StarCircle = {
-		{ Template = "Aura_P071", At = { 0, 4, 0 }, Scale = 1.4, Level = 1 },
-		{ Template = "Aura_P093", At = { 0, 9, 4 }, Scale = 1.4, Level = 3 },
+		{ Template = "Aura_P071", At = { 0, 4, 0 }, Scale = 1, Level = 3 },
+		{ Template = "Aura_P093", At = { 0, 9, 4 }, Scale = 0.9, Level = 4 },
 	},
 }
 
@@ -382,12 +384,15 @@ end
 
 -- Star orrery: a rune monolith behind the dais and three tilted rings of light around the
 -- caster (the Orrery model; ShowcaseLOD turns it).
-local function buildStar(model: Model, at: At, accent: Color3)
+local function buildStar(model: Model, at: At, accent: Color3, level: number)
 	MapProps.build(model, "RuneMonolith", at(0, 0, 6), 0.9)
 	segmentRing(model, at, "StarDial", 4.6, 32, 0.3, 0.06, accent, 0.25)
 	for index = 0, 7 do
 		local angle = math.rad(index * 45)
 		neon(model, "DialStar", Vector3.new(0.5, 0.06, 0.5), at(math.cos(angle) * 3.8, 0.08, math.sin(angle) * 3.8) * CFrame.Angles(0, math.rad(45), 0), Color3.fromRGB(240, 235, 255), 0.1)
+	end
+	if level < 2 then
+		return
 	end
 	local orrery = Instance.new("Model")
 	orrery.Name = "Orrery"
@@ -538,14 +543,14 @@ function ShowcaseVisuals.Apply(plot: Model?, view: View?, ownerUserId: number?, 
 	model:SetAttribute("Style", showcase.Style)
 	model:SetAttribute("Level", view.Level)
 
-	local builders = {
+	local builders: { [string]: (Model, At, Color3, number) -> () } = {
 		Throne = buildThrone,
 		Guardian = buildGuardian,
 		Grove = buildGrove,
 		Bell = buildBell,
 		Star = buildStar,
 	}
-	;(builders[showcase.Style] or buildStance)(model, at, accent)
+	;(builders[showcase.Style] or buildStance)(model, at, accent, view.Level)
 	buildLevelEffects(model, at, view.Level, accent)
 	for index, vfx in VFX[showcase.Id] or {} do
 		if view.Level >= vfx.Level then
@@ -557,6 +562,7 @@ function ShowcaseVisuals.Apply(plot: Model?, view: View?, ownerUserId: number?, 
 			}))
 			anchor:SetAttribute("ShowcaseVfx", vfx.Template)
 			anchor:SetAttribute("VfxScale", vfx.Scale)
+			anchor:SetAttribute("VfxBeamsOnly", vfx.BeamsOnly == true)
 		end
 	end
 	for _, accessoryId in view.Accessories do
