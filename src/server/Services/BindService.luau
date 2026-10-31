@@ -15,6 +15,7 @@ local HuntStreak = require(ReplicatedStorage.Shared.HuntStreak)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
+local SpiritTypes = require(ReplicatedStorage.Shared.SpiritTypes)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local CurseService = require(script.Parent.CurseService)
 local DataService = require(script.Parent.DataService)
@@ -41,6 +42,7 @@ type Bind = {
 	SignalId: number,
 	Position: Vector3,
 	StartedClock: number,
+	SpiritType: string?,
 	Hold: number,
 }
 
@@ -58,6 +60,8 @@ export type CaptureInfo = {
 	Event: string?,
 	-- The signal was lightning-struck (rolled nothing, charged Lightning Luck instead).
 	Struck: boolean,
+	-- Spirit type of the captured signal (Config.Spirits), nil with spirit types off.
+	SpiritType: string?,
 }
 
 type Stats = {
@@ -120,9 +124,22 @@ local function skillRank(player: Player, nodeId: string): number
 	return if data then data.Skills[nodeId] or 0 else 0
 end
 
--- Hold time for a bind in `area` (zone mastery shortens it there).
-function BindService.GetHoldSeconds(player: Player, area: string?): number
+-- Spirit type settings (Config.Spirits) when spirit types are on, else nil.
+local function spiritOf(spiritType: string?): any
+	if not Config.Spirits.Enabled or spiritType == nil then
+		return nil
+	end
+	return SpiritTypes.get(spiritType, Config.Spirits :: any)
+end
+
+-- Hold time for a bind in `area` (zone mastery shortens it there) on a `spiritType` signal.
+function BindService.GetHoldSeconds(player: Player, area: string?, spiritType: string?): number
 	local base = SkillConfig.holdSeconds(skillRank(player, "BindingEfficiency"))
+	local spirit = spiritOf(spiritType)
+	if spirit then
+		-- The type sets the hold; Binding Efficiency still shortens it by the same share.
+		base *= spirit.Hold / SkillConfig.Effects.HoldBaseSeconds
+	end
 	local CollectionService = require(script.Parent.CollectionService)
 	local resonance = CollectionService.BinderHoldBonus(player)
 	local quick = CollectionService.QuickBindHoldFactor(player)
@@ -152,7 +169,7 @@ export type BonusBreakdown = {
 
 -- Formula base + Resonant Harvest (streak/zone applied in FinalizeBonus).
 -- Trial MaxBonusRolls MUST be applied to the FINAL bonus — not here — or streak/zone bypass it.
-function BindService.ComputeBonusBase(player: Player): BonusBreakdown
+function BindService.ComputeBonusBase(player: Player, spiritType: string?): BonusBreakdown
 	local trial = BalanceTrials.current()
 	local liveScan = ScanService.GetInterval(player)
 	local hunt = {
@@ -170,6 +187,11 @@ function BindService.ComputeBonusBase(player: Player): BonusBreakdown
 		huntLuck = trial.Hunt.HuntLuckFactor
 	end
 	local formulaBase = Formulas.bonusRolls(scanSeconds, Config.Signals.RegenSeconds, hunt)
+	local spirit = spiritOf(spiritType)
+	if spirit then
+		formulaBase = spirit.Bonus
+		maxBonusRolls = Config.Spirits.MaxBonusRolls
+	end
 	local harvestRank = skillRank(player, "ResonantHarvest")
 	local harvestMult = SkillConfig.harvestMultiplier(harvestRank)
 	local afterHarvest = math.ceil(formulaBase * harvestMult - 1e-9)
@@ -198,8 +220,8 @@ function BindService.BonusCount(player: Player): number
 end
 
 -- streakZoneMult = HuntStreak.combine(streak, zone, purified) already capped by MaxBonusMultiplier.
-function BindService.FinalizeBonus(player: Player, streakZoneMult: number): BonusBreakdown
-	local b = BindService.ComputeBonusBase(player)
+function BindService.FinalizeBonus(player: Player, streakZoneMult: number, spiritType: string?): BonusBreakdown
+	local b = BindService.ComputeBonusBase(player, spiritType)
 	b.StreakZoneMult = streakZoneMult
 	b.BeforeCap = math.ceil(b.AfterHarvest * streakZoneMult - 1e-9)
 	b.FinalBonus = b.BeforeCap
@@ -246,7 +268,8 @@ local function onBegin(player: Player, signalId: any)
 		SignalId = signal.Id,
 		Position = signal.Position,
 		StartedClock = os.clock(),
-		Hold = BindService.GetHoldSeconds(player, area),
+		SpiritType = signal.Type,
+		Hold = BindService.GetHoldSeconds(player, area, signal.Type),
 	}
 	binds[player] = bind
 	setBindAttributes(player, bind, workspace:GetServerTimeNow())
@@ -309,7 +332,10 @@ local function onComplete(player: Player, signalId: any)
 	local struck = struckUntil ~= nil and workspace:GetServerTimeNow() <= struckUntil
 	local info: CaptureInfo = {
 		Area = (WorldLayout.areaAt(Config.Areas, Config.World, position.X, position.Z)),
-		Band = HuntStreak.band(position.X, position.Z, Config.HuntStreak),
+		Band = if spiritOf(bind.SpiritType)
+			then spiritOf(bind.SpiritType).Band
+			else HuntStreak.band(position.X, position.Z, Config.HuntStreak),
+		SpiritType = bind.SpiritType,
 		Position = position,
 		Streak = 1,
 		Bonus = 1,
@@ -349,7 +375,7 @@ local function onComplete(player: Player, signalId: any)
 		table.insert(info.Tags, "Purified")
 	end
 	info.Bonus = HuntStreak.combine(factors, Config.Hunt.MaxBonusMultiplier)
-	local breakdown = BindService.FinalizeBonus(player, info.Bonus)
+	local breakdown = BindService.FinalizeBonus(player, info.Bonus, bind.SpiritType)
 	local bonusCount = breakdown.FinalBonus
 	local CollectionMath = require(ReplicatedStorage.Shared.CollectionMath)
 	local CollectionService = require(script.Parent.CollectionService)
@@ -484,6 +510,7 @@ local function onComplete(player: Player, signalId: any)
 		CapturedId = captured.Id,
 		CapturedMutation = captured.Mutation,
 		BonusCount = bonusCount,
+		SpiritType = bind.SpiritType,
 		BestBonusId = bestRelic(bonusIds),
 		Summary = summary,
 	})

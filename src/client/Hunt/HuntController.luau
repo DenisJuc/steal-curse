@@ -19,6 +19,7 @@ local CursedShrines = require(script.Parent.Parent.Effects.CursedShrines)
 local HuntFX = require(script.Parent.Parent.Effects.HuntFX)
 local SealBurst = require(script.Parent.Parent.Effects.SealBurst)
 local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
+local SpiritTags = require(script.Parent.SpiritTags)
 local HuntHUD = require(script.Parent.Parent.UI.HuntHUD)
 local HuntRolls = require(script.Parent.Parent.UI.HuntRolls)
 local RollReel = require(script.Parent.Parent.UI.RollReel)
@@ -54,6 +55,8 @@ local REASON_TEXT = {
 
 local player = Players.LocalPlayer
 local signals: { [number]: Vector3 } = {}
+-- Signal id -> spirit type (Config.Spirits), for the orb tags.
+local spiritTypes: { [number]: string } = {}
 local state = "Idle" -- Idle | Pending | Binding
 local activeId: number? = nil
 -- Remembered at bind start: the server removes the signal (and its orb) before the result arrives.
@@ -384,6 +387,7 @@ end
 local function step(dt: number)
 	local rootPart = getRoot()
 	SpiritSight.Update(dt, if rootPart then rootPart.Position else nil)
+	SpiritTags.Update(spiritTypes)
 
 	local count = player:GetAttribute("SignalCount") or 0
 	local max = player:GetAttribute("SignalMax") or Config.Signals.MaxCount
@@ -442,12 +446,17 @@ function HuntController.Start(screen: ScreenGui, startOptions: Options)
 			return
 		end
 		table.clear(signals)
+		table.clear(spiritTypes)
 		for _, signal in list do
 			if type(signal) == "table" and type(signal.Id) == "number" and typeof(signal.Position) == "Vector3" then
 				signals[signal.Id] = signal.Position
+				if type(signal.Type) == "string" then
+					spiritTypes[signal.Id] = signal.Type
+				end
 			end
 		end
 		SpiritSight.SetSignals(signals)
+		SpiritTags.Sync(spiritTypes)
 	end)
 	BindResult.OnClientEvent:Connect(onBindResult)
 	player:GetAttributeChangedSignal("BindSignalId"):Connect(onBindConfirmed)

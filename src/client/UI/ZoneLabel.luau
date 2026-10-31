@@ -1,4 +1,4 @@
--- Where you are in the wild: the area and its depth band (The Edge, The Deep, Heart of the Wild,
+-- Where you are in the wild: the area name (with spirit types on) or the old depth band (The Edge, The Deep, Heart of the Wild,
 -- Config.HuntStreak.Bands) with what a capture there is worth, shown at the bottom of the screen
 -- while in the wild. Going deeper also shows a banner explaining the band.
 
@@ -90,6 +90,18 @@ function ZoneLabel.Start(screen: ScreenGui)
 		local band = HuntStreak.band(position.X, position.Z, Config.HuntStreak :: any)
 		local area = WorldLayout.areaAt(Config.Areas, Config.World, position.X, position.Z)
 		holder.Visible = true
+		if Config.Spirits.Enabled then
+			-- Spirit types replaced the depth rings: just the area, and what is worth chasing.
+			if area ~= shownKey then
+				shownKey = area
+				local color = bandColor("Edge")
+				title.Text = areaNames[area] or area
+				title.TextColor3 = color
+				stroke.Color = color
+				detail.Text = "Red spirits give the most rolls. They hide far out."
+			end
+			return
+		end
 		local key = `{area}|{band}`
 		if key ~= shownKey then
 			shownKey = key

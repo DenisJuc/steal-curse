@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
+local SpiritTypes = require(ReplicatedStorage.Shared.SpiritTypes)
 local DataService = require(script.Parent.DataService)
 
 local SignalsUpdated = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("SignalsUpdated") :: RemoteEvent
@@ -22,6 +23,8 @@ export type Signal = {
 	Position: Vector3,
 	-- Lightning-struck until this server time (WildFindsService): its capture gives Lightning Luck.
 	StruckUntil: number?,
+	-- Spirit type (Config.Spirits): Wisp / Restless / Vengeful.
+	Type: string?,
 }
 
 export type SpawnPoint = { Position: Vector3, Area: string }
@@ -48,7 +51,7 @@ end
 local function push(player: Player, state: State)
 	local list = {}
 	for _, signal in state.Signals do
-		table.insert(list, { Id = signal.Id, Position = signal.Position, StruckUntil = signal.StruckUntil })
+		table.insert(list, { Id = signal.Id, Position = signal.Position, StruckUntil = signal.StruckUntil, Type = signal.Type })
 	end
 	SignalsUpdated:FireClient(player, list)
 	player:SetAttribute("SignalCount", #list)
@@ -134,8 +137,16 @@ local function pickPosition(state: State, anchor: Vector3): Vector3?
 	return pool[state.Rng:NextInteger(1, #pool)]
 end
 
+local function spiritTypeAt(state: State, position: Vector3): string?
+	if not Config.Spirits.Enabled then
+		return nil
+	end
+	local radius = math.sqrt(position.X * position.X + position.Z * position.Z)
+	return SpiritTypes.pick(radius, state.Rng:NextNumber(), Config.Spirits :: any)
+end
+
 local function addSignal(state: State, position: Vector3): Signal
-	local signal = { Id = state.NextId, Position = position }
+	local signal = { Id = state.NextId, Position = position, Type = spiritTypeAt(state, position) }
 	state.NextId += 1
 	state.Signals[signal.Id] = signal
 	return signal
@@ -162,6 +173,7 @@ local function relocate(player: Player, state: State)
 	state.Area = areaOf(anchor)
 	for _, signal in moving do
 		signal.Position = pickPosition(state, anchor) or signal.Position
+		signal.Type = spiritTypeAt(state, signal.Position)
 		signal.StruckUntil = nil
 		state.Signals[signal.Id] = signal
 	end

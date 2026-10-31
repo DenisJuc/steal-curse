@@ -431,6 +431,14 @@ end
 
 function WildDressing.build(context: Context)
 	buildBandMarkers(context)
+	if Config.Spirits.Enabled then
+		-- Spirit types replaced the depth rings: no gates or stones. Built and dropped (not skipped)
+		-- so the shared random sequence, and with it every other prop's placement, stays the same.
+		local markers = context.Folder:FindFirstChild("BandMarkers")
+		if markers then
+			markers:Destroy()
+		end
+	end
 	buildTorii(context)
 	buildLilies(context)
 	buildRopes(context)

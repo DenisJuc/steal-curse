@@ -366,6 +366,30 @@ Config.HuntStreak = {
 	},
 }
 
+-- Spirit types (SpiritTypes, SignalService, BindService). Approved 2026-10-31 to replace the
+-- Edge/Deep/Heart rings. Enabled = false restores the old ring rewards (formula bonus, ring streak).
+--   Bonus = bonus rolls per capture (before streak/zone multipliers, inside MaxBonusRolls),
+--   Hold = bind seconds before skills/mastery, Band = reward band for mastery XP and bounties.
+Config.Spirits = {
+	Enabled = true,
+	Order = { "Wisp", "Restless", "Vengeful" },
+	Types = {
+		Wisp = { Name = "Wisp", Bonus = 2, Hold = 4, Band = "Edge", Color = { 215, 230, 240 }, Scale = 0.75 },
+		Restless = { Name = "Restless Spirit", Bonus = 4, Hold = 6, Band = "Deep", Color = { 110, 160, 255 }, Scale = 1 },
+		Vengeful = { Name = "Vengeful Spirit", Bonus = 7, Hold = 8, Band = "Heart", Color = { 255, 70, 85 }, Scale = 1.45 },
+	},
+	-- By distance from the hub center (wild ring is 240..620).
+	SpawnWeights = {
+		{ UpTo = 330, Weights = { Wisp = 70, Restless = 30, Vengeful = 0 } },
+		{ UpTo = 500, Weights = { Wisp = 30, Restless = 60, Vengeful = 10 } },
+		{ Weights = { Wisp = 15, Restless = 65, Vengeful = 20 } },
+	},
+	-- Every capture adds this to the Hunt Streak, whatever the type.
+	StreakGain = 0.1,
+	-- Bonus-roll cap per capture while spirit types are on (the trial's MaxBonusRolls otherwise).
+	MaxBonusRolls = 12,
+}
+
 Config.SpiritSight = {
 	-- Signal orbs are only drawn within this distance; pulses point to all of them.
 	RevealRange = 90,
@@ -545,12 +569,12 @@ Config.Bounties = {
 		{ Id = "Village4", Difficulty = "Easy", Text = "Capture 4 spirits in the Abandoned Village", Event = "Captured", Goal = 4, Filter = { Area = "AbandonedVillage" } },
 		{ Id = "Ruins4", Difficulty = "Easy", Text = "Capture 4 spirits in the Ancient Ruins", Event = "Captured", Goal = 4, Filter = { Area = "AncientRuins" } },
 		{ Id = "Streak13", Difficulty = "Easy", Text = "Reach a x1.3 Hunt Streak", Event = "Captured", Goal = 1, Filter = { MinStreak = 1.3 } },
-		{ Id = "Deep6", Difficulty = "Medium", Text = "Capture 6 spirits Deep in the wild or in its Heart", Event = "Captured", Goal = 6, Filter = { MinBand = "Deep" } },
+		{ Id = "Deep6", Difficulty = "Medium", Text = "Capture 6 blue or red spirits", Event = "Captured", Goal = 6, Filter = { MinBand = "Deep" } },
 		{ Id = "Struck1", Difficulty = "Medium", Text = "Capture a lightning-struck spirit", Event = "Captured", Goal = 1, Filter = { Struck = true } },
 		{ Id = "Offering1", Difficulty = "Medium", Text = "Find and open a lost offering box", Event = "OfferingOpened", Goal = 1 },
 		{ Id = "Streak15", Difficulty = "Medium", Text = "Reach a x1.5 Hunt Streak", Event = "Captured", Goal = 1, Filter = { MinStreak = 1.5 } },
 		{ Id = "Capture15", Difficulty = "Medium", Text = "Capture 15 spirits", Event = "Captured", Goal = 15 },
-		{ Id = "Heart8", Difficulty = "Hard", Text = "Capture 8 spirits in the Heart of the wild", Event = "Captured", Goal = 8, Filter = { MinBand = "Heart" } },
+		{ Id = "Heart8", Difficulty = "Hard", Text = "Capture 3 red Vengeful spirits", Event = "Captured", Goal = 3, Filter = { MinBand = "Heart" } },
 		{ Id = "LostOne1", Difficulty = "Hard", Text = "Follow the Lost One to its Spirit Gift", Event = "LostOneCaught", Goal = 1 },
 		{ Id = "Shrine1", Difficulty = "Hard", Text = "Cleanse a Cursed Shrine", Event = "ShrineCleansed", Goal = 1 },
 		{ Id = "Event3", Difficulty = "Hard", Text = "Capture 3 spirits during a zone event", Event = "Captured", Goal = 3, Filter = { Event = "Any" } },

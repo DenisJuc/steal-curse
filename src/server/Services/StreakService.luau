@@ -59,7 +59,14 @@ function StreakService.Capture(player: Player, band: HuntStreak.Band, extraIdle:
 	local entry = entryFor(player)
 	entry.Idle = Config.HuntStreak.IdleSeconds + (extraIdle or 0)
 	entry.Paused = false
-	local value = HuntStreak.capture(entry.State, band, Config.HuntStreak, extraIdle)
+	local options = Config.HuntStreak
+	if Config.Spirits.Enabled then
+		-- Spirit types: every capture adds the same streak; the spirit itself carries the reward.
+		local gain = Config.Spirits.StreakGain
+		options = table.clone(Config.HuntStreak)
+		options.Gains = { Edge = gain, Deep = gain, Heart = gain }
+	end
+	local value = HuntStreak.capture(entry.State, band, options, extraIdle)
 	mirror(player, entry)
 	return value
 end
