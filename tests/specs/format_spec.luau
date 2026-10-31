@@ -18,6 +18,9 @@ return {
 			expect.equal(Format.number(1.32e15), "1.32Qd")
 			expect.equal(Format.number(999999), "1M")
 			expect.equal(Format.number(2.2222), "2.22")
+			expect.equal(Format.number(4.5e31), "45No")
+			expect.equal(Format.number(5e55), "5.0e55")
+			expect.equal(Format.number(math.huge), "∞")
 		end,
 	},
 	{

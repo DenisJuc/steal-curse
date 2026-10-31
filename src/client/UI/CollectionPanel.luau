@@ -1444,9 +1444,9 @@ function CollectionPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible:
 			tab = "Fuse"
 		end
 
-		UIKit.skinButton(fuseTabBtn, if tab == "Fuse" then "Gold" else "Dark")
-		UIKit.skinButton(boardTabBtn, if tab == "Board" then "Gold" else "Dark")
-		UIKit.skinButton(advancedTabBtn, if tab == "Advanced" then "Gold" else "Dark")
+		UIKit.skinTab(fuseTabBtn, tab == "Fuse")
+		UIKit.skinTab(boardTabBtn, tab == "Board")
+		UIKit.skinTab(advancedTabBtn, tab == "Advanced")
 		fusePage.Visible = tab == "Fuse"
 		boardPage.Visible = tab == "Board"
 		advancedPage.Visible = tab == "Advanced"

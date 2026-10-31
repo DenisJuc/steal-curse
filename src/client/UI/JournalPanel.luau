@@ -22,7 +22,7 @@ local DiscoveryResult = Remotes:WaitForChild("DiscoveryResult") :: RemoteEvent
 
 local JournalPanel = {}
 
-local TABS_HEIGHT = 40
+local TABS_HEIGHT = 52
 local MASTERY = Config.Mastery :: ZoneMastery.Options
 local player = Players.LocalPlayer
 
@@ -212,7 +212,7 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 
 	local function skinTabs()
 		for name, button in tabButtons do
-			UIKit.skinButton(button, if name == tab then "Primary" else "Dark")
+			UIKit.skinTab(button, name == tab)
 		end
 	end
 	local function setTab(id: string)

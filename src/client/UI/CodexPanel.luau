@@ -273,7 +273,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			local button = tabButtons[tab]
 			if button then
 				button.Text = `{tab} {tabFound(tab, lastState, lastSizes)}/{total}`
-				UIKit.skinButton(button, if tab == sizeTab then "Primary" else "Dark")
+				UIKit.skinTab(button, tab == sizeTab)
 			end
 		end
 	end
@@ -436,7 +436,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		local tabs = UIKit.create("Frame", {
 			LayoutOrder = nextOrder(),
 			BackgroundTransparency = 1,
-			Size = UDim2.new(1, -10, 0, 32),
+			Size = UDim2.new(1, -10, 0, UIKit.TAB_HEIGHT),
 			Parent = body,
 		}, {
 			UIKit.create("UIListLayout", {

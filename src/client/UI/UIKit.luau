@@ -524,8 +524,9 @@ end
 
 -- Centered menu window. It fills most of a small screen (phones) and stops growing at maxSize on
 -- big screens, so text never shrinks; content that doesn't fit goes in scrolling frames.
--- Header: the menu's icon in an emblem over the top-left corner (`iconKey`, an Icons key), the
--- title, and a red close button over the top-right corner.
+-- Header: the menu's icon in an emblem over the top-left corner (`iconKey`, an Icons key) and the
+-- title. There is no close button: menus close on a click outside, their HUD button, Escape or
+-- gamepad B (MenuMotion, GamepadController).
 -- Returns the window and the content area below the header.
 function UIKit.modal(
 	screen: ScreenGui,
@@ -560,7 +561,7 @@ function UIKit.modal(
 		TextColor3 = UIKit.Colors.Gold,
 		TextScaled = true,
 		Position = UDim2.fromOffset(titleX, 4),
-		Size = UDim2.new(1, -(titleX + 40), 0, 32),
+		Size = UDim2.new(1, -(titleX + 8), 0, 32),
 		Parent = window,
 	})
 	UIKit.create("UITextSizeConstraint", { MaxTextSize = 26, MinTextSize = 16, Parent = titleLabel })
@@ -581,19 +582,6 @@ function UIKit.modal(
 			}),
 		}),
 	})
-	local close = UIKit.button({
-		Name = "Close",
-		Text = "X",
-		TextSize = 24,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, 8, 0, 0),
-		Size = UDim2.fromOffset(42, 42),
-		Parent = window,
-	})
-	UIKit.skinButton(close, "Danger")
-	close.Activated:Connect(function()
-		window.Visible = false
-	end)
 	local content = UIKit.create("Frame", {
 		Name = "Content",
 		BackgroundTransparency = 1,
@@ -604,12 +592,112 @@ function UIKit.modal(
 	return window, content
 end
 
+-- Tab look shared by every tabbed menu: the selected tab is filled gold with dark text, the others
+-- are dark cards with readable light text.
+UIKit.TAB_HEIGHT = 44
+UIKit.TAB_TEXT_SIZE = 18
+
+function UIKit.skinTab(button: TextButton, selected: boolean)
+	UIKit.skinButton(button, if selected then "Gold" else "Dark")
+	button.TextColor3 = if selected then UIKit.Colors.Panel else UIKit.Colors.Text
+	button.TextTransparency = if selected then 0 else 0.15
+	button.TextSize = UIKit.TAB_TEXT_SIZE
+	button.Font = UIKit.Font
+	button:SetAttribute("Selected", selected)
+end
+
+-- A row of equal-width tab pills. `tabs` is a list of { Id, Text }; `onSelect(id)` runs on a tap.
+-- Returns the bar, the buttons by id and a `select(id)` that restyles them (it does not call
+-- onSelect).
+function UIKit.tabBar(
+	parent: Instance,
+	tabs: { { Id: string, Text: string } },
+	selected: string,
+	onSelect: (string) -> (),
+	props: Props?
+): (Frame, { [string]: TextButton }, (string) -> ())
+	local bar = UIKit.create("Frame", {
+		Name = "Tabs",
+		BackgroundTransparency = 1,
+		Size = UDim2.new(1, 0, 0, UIKit.TAB_HEIGHT),
+		Parent = parent,
+	}, {
+		UIKit.create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 8),
+		}),
+	})
+	if props then
+		for key, value in props do
+			(bar :: any)[key] = value
+		end
+	end
+	local buttons: { [string]: TextButton } = {}
+	local count = #tabs
+	local function selectTab(id: string)
+		for tabId, button in buttons do
+			UIKit.skinTab(button, tabId == id)
+		end
+	end
+	for index, tab in tabs do
+		buttons[tab.Id] = UIKit.button({
+			Name = `{tab.Id}Tab`,
+			Text = tab.Text,
+			LayoutOrder = index,
+			Size = UDim2.new(1 / count, -8 * (count - 1) / count, 1, 0),
+			Parent = bar,
+		}, function()
+			selectTab(tab.Id)
+			onSelect(tab.Id)
+		end)
+	end
+	selectTab(selected)
+	return bar, buttons, selectTab
+end
+
 -- Shows a menu window, cancelling its close animation if one is playing (see MenuMotion).
 function UIKit.show(window: GuiObject)
 	if window:GetAttribute("Closing") then
 		window:SetAttribute("Closing", nil)
 	end
 	window.Visible = true
+end
+
+-- True while any menu window on `screen` is open (closing ones don't count).
+function UIKit.anyMenuOpen(screen: Instance): boolean
+	for _, child in screen:GetChildren() do
+		if child:IsA("GuiObject") and child:GetAttribute("Modal") and child.Visible and not child:GetAttribute("Closing") then
+			return true
+		end
+	end
+	return false
+end
+
+-- Calls `callback(open)` now and whenever a menu window on `screen` opens or closes, so overlays
+-- (toasts, banners, hints) can step out of the way.
+function UIKit.watchMenus(screen: Instance, callback: (boolean) -> ())
+	local last: boolean? = nil
+	local function update()
+		local open = UIKit.anyMenuOpen(screen)
+		if open ~= last then
+			last = open
+			callback(open)
+		end
+	end
+	local function watch(child: Instance)
+		if child:IsA("GuiObject") and child:GetAttribute("Modal") then
+			child:GetPropertyChangedSignal("Visible"):Connect(update)
+			child:GetAttributeChangedSignal("Closing"):Connect(update)
+		end
+	end
+	for _, child in screen:GetChildren() do
+		watch(child)
+	end
+	screen.ChildAdded:Connect(function(child)
+		task.defer(watch, child)
+	end)
+	update()
 end
 
 -- Opens or closes a menu window; returns true when it is now open.

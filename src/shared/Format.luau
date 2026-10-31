@@ -2,7 +2,9 @@
 
 local Format = {}
 
-local SUFFIXES = { "", "K", "M", "B", "T", "Qd", "Qn", "Sx", "Sp", "Oc" }
+local SUFFIXES = { "", "K", "M", "B", "T", "Qd", "Qn", "Sx", "Sp", "Oc", "No", "Dc" }
+-- Past the last suffix numbers switch to e-notation ("5.0e55") so they never outgrow their label.
+local E_NOTATION_FROM = 1e36
 
 local function trimZeros(text: string): string
 	if string.find(text, ".", 1, true) then
@@ -27,6 +29,18 @@ function Format.number(value: number): string
 	end
 	if value < 0 then
 		return "-" .. Format.number(-value)
+	end
+	if value == math.huge then
+		return "∞"
+	end
+	if value >= E_NOTATION_FROM then
+		local exponent = math.floor(math.log10(value))
+		local mantissa = value / 10 ^ exponent
+		if mantissa >= 9.95 then
+			mantissa /= 10
+			exponent += 1
+		end
+		return string.format("%.1fe%d", mantissa, exponent)
 	end
 	local suffixIndex = 1
 	while value >= 1000 and suffixIndex < #SUFFIXES do

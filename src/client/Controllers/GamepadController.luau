@@ -34,11 +34,11 @@ local function isShown(object: GuiObject): boolean
 	return true
 end
 
--- Topmost-left visible button inside `root`, skipping the window's close button.
+-- Topmost-left visible button inside `root`.
 local function firstButton(root: Instance): GuiButton?
 	local best: GuiButton? = nil
 	for _, descendant in root:GetDescendants() do
-		if descendant:IsA("GuiButton") and descendant.Name ~= "Close" and descendant.Selectable and isShown(descendant) then
+		if descendant:IsA("GuiButton") and descendant.Selectable and isShown(descendant) then
 			if
 				not best
 				or descendant.AbsolutePosition.Y < best.AbsolutePosition.Y - 2

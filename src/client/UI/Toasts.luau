@@ -1,5 +1,6 @@
 -- Short messages at the bottom center: sent by the server through the Notify remote, or shown by
 -- the client with Toasts.Show. Pressing a cost button you can't afford shows "Need X more CE".
+-- While a menu is open the toasts drop to the bottom edge, below the menu, so they never cover it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,8 +25,11 @@ local KIND_COLORS = {
 	Milestone = UIKit.Colors.Accent,
 }
 local MAX_SHOWN = 4
-local MAX_WIDTH = 520
-local TEXT_SIZE = 16
+local MAX_WIDTH = 640
+local TEXT_SIZE = 20
+local TOAST_HEIGHT = 44
+local NORMAL_POSITION = UDim2.new(0.5, 0, 1, -270)
+local MENU_POSITION = UDim2.new(0.5, 0, 1, -10)
 
 local holder: Frame? = nil
 local order = 0
@@ -50,8 +54,8 @@ function Toasts.Show(text: string, kind: string?)
 
 	order += 1
 	local color = KIND_COLORS[kind or ""] or UIKit.Colors.Trim
-	local width = TextService:GetTextSize(text, TEXT_SIZE, UIKit.Font, Vector2.new(MAX_WIDTH, 34)).X + 36
-	local slot = UIKit.slot(list, "Toast", UDim2.fromOffset(math.min(width, MAX_WIDTH), 34), order)
+	local width = TextService:GetTextSize(text, TEXT_SIZE, UIKit.Font, Vector2.new(MAX_WIDTH, TOAST_HEIGHT)).X + 48
+	local slot = UIKit.slot(list, "Toast", UDim2.fromOffset(math.min(width, MAX_WIDTH), TOAST_HEIGHT), order)
 	local toast = UIKit.label({
 		Text = text,
 		TextColor3 = if kind == "Error" then color else UIKit.Colors.Text,
@@ -87,7 +91,7 @@ function Toasts.Start(screen: ScreenGui)
 	local list = UIKit.create("Frame", {
 		Name = "Toasts",
 		AnchorPoint = Vector2.new(0.5, 1),
-		Position = UDim2.new(0.5, 0, 1, -270),
+		Position = NORMAL_POSITION,
 		Size = UDim2.fromOffset(MAX_WIDTH, 200),
 		BackgroundTransparency = 1,
 		ZIndex = 20,
@@ -102,6 +106,9 @@ function Toasts.Start(screen: ScreenGui)
 	})
 	UIKit.scaler(list)
 	holder = list
+	UIKit.watchMenus(screen, function(open)
+		list.Position = if open then MENU_POSITION else NORMAL_POSITION
+	end)
 
 	Notify.OnClientEvent:Connect(function(text: string, kind: string?)
 		if type(text) ~= "string" then

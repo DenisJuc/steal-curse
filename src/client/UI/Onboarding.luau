@@ -63,7 +63,8 @@ local STEPS: { Step } = {
 	},
 	{
 		Target = "AutoRoll",
-		Side = "Above",
+		-- Beside the switch: above it would cover the ROLL button.
+		Side = "Right",
 		Text = "Now let it roll for you: turn on Auto Roll.",
 		Done = function(player)
 			return player:GetAttribute("AutoRoll") ~= false
@@ -298,7 +299,7 @@ function Onboarding.Start(screen: ScreenGui)
 		return if target and target:IsA("GuiObject") and shown(target) then target else nil
 	end
 
-	-- Plain tips point at the HUD; over an open menu they only cover it.
+	-- While a menu is open only hints pointing inside it show; anything else would cover it.
 	local function menuOpen(): boolean
 		for _, child in screen:GetChildren() do
 			if child:IsA("GuiObject") and child.Visible and child:GetAttribute("Modal") then
@@ -333,7 +334,7 @@ function Onboarding.Start(screen: ScreenGui)
 			side, text = step.Fallback.Side, step.Fallback.Text
 		end
 		local inMenu = string.find(step.Target, "/", 1, true) ~= nil and target ~= nil and find(step.Target) ~= nil
-		if not target or (menuOpen() and not inMenu and step.Done == nil) then
+		if not target or (menuOpen() and not inMenu) then
 			bubble.Visible = false
 			return
 		end
@@ -356,7 +357,17 @@ function Onboarding.Start(screen: ScreenGui)
 			elseif side == "Below" then Vector2.new(position.X + size.X / 2, position.Y + size.Y + gap)
 			elseif side == "Above" then Vector2.new(position.X + size.X / 2, position.Y - gap)
 			else Vector2.new(position.X - gap, position.Y + size.Y / 2)
-		bubble.Position = UDim2.fromOffset(point.X, point.Y)
+		-- Keep the whole bubble on screen (a target near an edge would push it off).
+		local bubbleSize = bubble.AbsoluteSize
+		local screenSize = screen.AbsoluteSize
+		local anchor = bubble.AnchorPoint
+		local left = point.X - anchor.X * bubbleSize.X
+		local top = point.Y - anchor.Y * bubbleSize.Y
+		local shiftX = math.clamp(left, 8, math.max(8, screenSize.X - bubbleSize.X - 8)) - left
+		local shiftY = math.clamp(top, 8, math.max(8, screenSize.Y - bubbleSize.Y - 8)) - top
+		bubble.Position = UDim2.fromOffset(point.X + shiftX, point.Y + shiftY)
+		-- The arrow stays level with the target when the bubble had to slide.
+		arrow.Position -= UDim2.fromOffset(shiftX, shiftY)
 		bubble.Visible = true
 	end)
 

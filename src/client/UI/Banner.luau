@@ -1,4 +1,5 @@
--- Big celebratory banner in the upper middle of the screen, above every menu. It never blocks
+-- Big celebratory banner in the upper middle of the screen. While a menu is open it moves up to the
+-- top edge, above the menu, so it never covers the menu's header or tabs. It never blocks
 -- clicks. Banners queue: each one plays in full (pop in, hold, shrink away) before the next starts,
 -- so zone-depth and reward banners never stack on top of each other.
 
@@ -82,13 +83,17 @@ function Banner.Start(screen: ScreenGui)
 		Name = "Banner",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.2),
-		Size = UDim2.fromOffset(460, 92),
+		Size = UDim2.fromOffset(560, 110),
 		BackgroundTransparency = 1,
 		Visible = false,
 		ZIndex = 40,
 		Parent = screen,
 	})
 	UIKit.scaler(frame)
+	UIKit.watchMenus(screen, function(open)
+		frame.AnchorPoint = if open then Vector2.new(0.5, 0) else Vector2.new(0.5, 0.5)
+		frame.Position = if open then UDim2.fromOffset(0, 2) + UDim2.fromScale(0.5, 0) else UDim2.fromScale(0.5, 0.2)
+	end)
 	local inner = UIKit.create("Frame", {
 		Name = "Card",
 		Active = false,
@@ -98,19 +103,19 @@ function Banner.Start(screen: ScreenGui)
 	UIKit.skinPanel(inner, colors.Gold)
 	titleLabel = UIKit.label({
 		FontFace = UIKit.TitleFont,
-		TextSize = 24,
+		TextSize = 28,
 		TextStrokeTransparency = 0.5,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Size = UDim2.new(1, 0, 0, 30),
+		Size = UDim2.new(1, 0, 0, 34),
 		Parent = inner,
 	})
 	textLabel = UIKit.label({
-		TextSize = 16,
+		TextSize = 20,
 		TextWrapped = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextYAlignment = Enum.TextYAlignment.Top,
-		Position = UDim2.fromOffset(0, 34),
-		Size = UDim2.new(1, 0, 1, -34),
+		Position = UDim2.fromOffset(0, 40),
+		Size = UDim2.new(1, 0, 1, -40),
 		Parent = inner,
 	})
 	holder = frame

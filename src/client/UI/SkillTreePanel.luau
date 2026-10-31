@@ -30,7 +30,7 @@ local SkillAction = Remotes:WaitForChild("SkillAction") :: RemoteFunction
 local SkillTreePanel = {}
 
 local ROW_HEIGHT = 64
-local LIST_TOP = 40
+local LIST_TOP = UIKit.TAB_HEIGHT + 10
 local STAGGER = 0.045
 local UPGRADE_WIDTH = 150
 -- Room the buttons take at the card's bottom right (Max, +10 and Upgrade).
@@ -94,7 +94,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 
 	local tabs = UIKit.create("Frame", {
 		BackgroundTransparency = 1,
-		Size = UDim2.new(1, 0, 0, 32),
+		Size = UDim2.new(1, 0, 0, UIKit.TAB_HEIGHT),
 		Parent = content,
 	}, {
 		UIKit.create("UIListLayout", {
@@ -187,7 +187,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		costButtons = {}
 		rows = {}
 		for id, tab in tabButtons do
-			UIKit.skinButton(tab, if id == branch then "Primary" else "Dark")
+			UIKit.skinTab(tab, id == branch)
 		end
 		for _, child in list:GetChildren() do
 			if child:IsA("GuiObject") then

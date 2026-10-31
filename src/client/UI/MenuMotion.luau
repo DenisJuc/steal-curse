@@ -1,11 +1,12 @@
 -- Menu windows (UIKit.modal) open with a springy pop and close with a quick shrink. While a menu
 -- is open the world behind it is blurred (not on Low effects) and dimmed, and clicking empty space
--- closes it; the HUD stays bright and clickable. Panels keep simply setting window.Visible: on a
+-- (or Escape / Backspace) closes it; the HUD stays bright and clickable. Panels keep simply setting window.Visible: on a
 -- close this module shows the window again until the shrink finishes (marked with the "Closing"
 -- attribute so controller support can ignore it; clearing it reopens the window).
 
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Motion = require(script.Parent.Motion)
 local Settings = require(script.Parent.Parent.Settings)
@@ -87,11 +88,20 @@ function MenuMotion.Start(screen: ScreenGui)
 		unblur:Play()
 	end
 
-	backdrop.Activated:Connect(function()
+	local function closeAll()
 		for window, state in states do
 			if state == "Open" then
 				window.Visible = false
 			end
+		end
+	end
+	backdrop.Activated:Connect(closeAll)
+	-- Menus have no close button: Escape (or Backspace, since Roblox may keep Escape for its own
+	-- menu) closes them too. Gamepad B is handled by GamepadController.
+	UserInputService.InputBegan:Connect(function(input, processed)
+		local escape = input.KeyCode == Enum.KeyCode.Escape
+		if escape or (input.KeyCode == Enum.KeyCode.Backspace and not processed) then
+			closeAll()
 		end
 	end)
 	screen:GetPropertyChangedSignal("Enabled"):Connect(refreshBackdrop)
