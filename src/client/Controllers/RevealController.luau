@@ -4,6 +4,9 @@
 -- dim backdrop, light rays and a camera zoom. Any click or tap skips the reveal on screen. A mutation is revealed as a
 -- second stage after the base relic. Overlays queue in arrival order (Presentation queue); extra
 -- ones are coalesced into "+N more in your Journal". Nothing here touches scanning or movement.
+-- Legendary and rarer finds always get the overlay (unless Reveals is Off), with a full-width band
+-- behind the card (rarity name, "1 in N", tap to skip) that grows with the tier, and the world
+-- dimmed for the whole reveal.
 -- Scan finds arrive through RollReel once the roll reel has landed on them. A hunt's finds arrive
 -- after the hunt papers (HuntRolls): only the new ones get a reveal then.
 
@@ -12,6 +15,7 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local Presentation = require(ReplicatedStorage.Shared.Presentation)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
@@ -33,6 +37,10 @@ local MEDIUM_INDEX = RarityConfig.IndexById[Config.Reveal.MediumTier]
 local LARGE_INDEX = RarityConfig.IndexById[Config.Reveal.LargeTier]
 local CARD_SIZE = Vector2.new(400, 300)
 local CAMERA_ZOOM_FOV = 12
+-- From this tier up every find gets the overlay and the full-width band.
+local BAND_INDEX = RarityConfig.IndexById.Legendary or 5
+local BAND_BASE_HEIGHT = CARD_SIZE.Y + 150
+local BAND_STEP_HEIGHT = 34
 
 local SOURCE_TEXT: { [string]: string } = {
 	Scan = "Found by your Spirit Resonator",
@@ -43,6 +51,9 @@ local SOURCE_TEXT: { [string]: string } = {
 
 type Ui = {
 	Dim: Frame,
+	Band: Frame,
+	BandTitle: TextLabel,
+	BandOdds: TextLabel,
 	Flash: Frame,
 	Card: Frame,
 	Stroke: UIStroke,
@@ -90,6 +101,78 @@ local function build(screen: ScreenGui): Ui
 		ZIndex = 31,
 		Parent = screen,
 	})
+	-- Full-width band behind the card for Legendary and up: rarity name above, odds below.
+	local band = UIKit.create("Frame", {
+		Name = "RevealBand",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.45),
+		Size = UDim2.new(1, 0, 0, BAND_BASE_HEIGHT),
+		BackgroundColor3 = colors.Panel,
+		BackgroundTransparency = 0.15,
+		BorderSizePixel = 0,
+		Visible = false,
+		ZIndex = 31,
+		Parent = screen,
+	}, {
+		UIKit.create("UIGradient", {
+			Name = "Fade",
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.15, 0.2),
+				NumberSequenceKeypoint.new(0.85, 0.2),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		}),
+	})
+	local function bandEdge(y: number)
+		UIKit.create("Frame", {
+			Name = "Edge",
+			AnchorPoint = Vector2.new(0, y),
+			Position = UDim2.fromScale(0, y),
+			Size = UDim2.new(1, 0, 0, 3),
+			BackgroundColor3 = colors.Gold,
+			BorderSizePixel = 0,
+			ZIndex = 31,
+			Parent = band,
+		})
+	end
+	bandEdge(0)
+	bandEdge(1)
+	local bandTitle = UIKit.label({
+		Name = "Title",
+		FontFace = UIKit.TitleFont,
+		TextSize = 60,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Position = UDim2.fromOffset(0, 6),
+		Size = UDim2.new(1, 0, 0, 66),
+		ZIndex = 31,
+		Parent = band,
+	})
+	UIKit.create("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 3, Transparency = 0.2, Parent = bandTitle })
+	local bandOdds = UIKit.label({
+		Name = "Odds",
+		TextSize = 34,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 0, 1, -30),
+		Size = UDim2.new(1, 0, 0, 40),
+		ZIndex = 31,
+		Parent = band,
+	})
+	UIKit.create("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 2, Transparency = 0.3, Parent = bandOdds })
+	UIKit.label({
+		Name = "SkipHint",
+		Text = "Tap to skip",
+		TextSize = 18,
+		TextColor3 = colors.SubText,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 0, 1, -6),
+		Size = UDim2.new(1, 0, 0, 22),
+		ZIndex = 31,
+		Parent = band,
+	})
+
 	local card = UIKit.create("Frame", {
 		Name = "RevealCard",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -168,8 +251,8 @@ local function build(screen: ScreenGui): Ui
 	local nameLabel = UIKit.label({
 		Name = "RelicName",
 		TextSize = 24,
+		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		TextTruncate = Enum.TextTruncate.AtEnd,
 		Position = UDim2.fromOffset(0, 188),
 		Size = UDim2.new(1, 0, 0, 28),
 		ZIndex = 34,
@@ -223,6 +306,9 @@ local function build(screen: ScreenGui): Ui
 
 	return {
 		Dim = dim,
+		Band = band,
+		BandTitle = bandTitle,
+		BandOdds = bandOdds,
 		Flash = flash,
 		Card = card,
 		Stroke = stroke,
@@ -335,10 +421,49 @@ local function play(entry: Presentation.Entry, dropped: number)
 		end
 	end
 
-	ui.Dim.Visible = large
+	-- Legendary and up: the full-width band, bigger and bolder per tier, and the dim.
+	local index = tierIndex(relic.Id)
+	local banded = index >= BAND_INDEX
+	local step = index - BAND_INDEX
+	ui.Band.Visible = banded
+	if banded then
+		local height = BAND_BASE_HEIGHT + step * BAND_STEP_HEIGHT
+		ui.BandTitle.Text = string.upper(if tier then tier.Name else relic.Tier)
+		ui.BandTitle.TextColor3 = accent
+		ui.BandTitle.TextSize = 60 + step * 8
+		ui.BandOdds.Text = Format.odds(Odds.item(relic.Id))
+		ui.BandOdds.TextColor3 = accent:Lerp(Color3.new(1, 1, 1), 0.35)
+		ui.Band.BackgroundColor3 = accent:Lerp(Color3.fromRGB(10, 6, 16), 0.82)
+		for _, edge in ui.Band:GetChildren() do
+			if edge.Name == "Edge" and edge:IsA("Frame") then
+				edge.BackgroundColor3 = accent
+			end
+		end
+		local rainbow = ui.BandTitle:FindFirstChild("Rainbow")
+		if rainbow then
+			rainbow:Destroy()
+		end
+		if relic.Tier == "Cosmic" and not low then
+			UIKit.create("UIGradient", {
+				Name = "Rainbow",
+				Color = ColorSequence.new({
+					ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 120, 120)),
+					ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255, 230, 120)),
+					ColorSequenceKeypoint.new(0.66, Color3.fromRGB(130, 220, 255)),
+					ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 140, 255)),
+				}),
+				Parent = ui.BandTitle,
+			})
+			ui.BandTitle.TextColor3 = Color3.new(1, 1, 1)
+		end
+		ui.Band.Size = UDim2.new(1, 0, 0, height * 0.4)
+		UIKit.tween(ui.Band, 0.28, { Size = UDim2.new(1, 0, 0, height) }, Enum.EasingStyle.Back)
+	end
+	local dimmed = large or banded
+	ui.Dim.Visible = dimmed
 	ui.Dim.BackgroundTransparency = 1
-	if large then
-		UIKit.tween(ui.Dim, 0.3, { BackgroundTransparency = 0.45 })
+	if dimmed then
+		UIKit.tween(ui.Dim, 0.3, { BackgroundTransparency = if large then 0.4 else 0.5 })
 	end
 	ui.Card.Size = UDim2.fromOffset(CARD_SIZE.X * 0.8, CARD_SIZE.Y * 0.8)
 	ui.Card.BackgroundTransparency = 0.05
@@ -388,12 +513,16 @@ local function play(entry: Presentation.Entry, dropped: number)
 	-- A skipped reveal vanishes at once; a finished one fades out.
 	if not skipRequested then
 		UIKit.tween(ui.Card, 0.18, { BackgroundTransparency = 1, Size = UDim2.fromOffset(CARD_SIZE.X * 0.9, CARD_SIZE.Y * 0.9) })
-		if large then
+		if ui.Dim.Visible then
 			UIKit.tween(ui.Dim, 0.25, { BackgroundTransparency = 1 })
+		end
+		if ui.Band.Visible then
+			UIKit.tween(ui.Band, 0.18, { Size = UDim2.fromScale(1, 0) })
 		end
 		task.wait(0.2)
 	end
 	ui.Card.Visible = false
+	ui.Band.Visible = false
 	ui.Dim.Visible = false
 	ui.Flash.Visible = false
 end
@@ -417,6 +546,7 @@ local function runQueue()
 				warn(`[RevealController] {err}`)
 				showing = false
 				ui.Card.Visible = false
+				ui.Band.Visible = false
 				ui.Dim.Visible = false
 			end
 		end
@@ -439,6 +569,10 @@ local function onResults(results: { any }, hunt: boolean)
 		local sizeId = SizeConfig.normalize(result.Size)
 		local isNew = result.First == true or result.NewVariant == true or result.NewSize == true
 		local category = Presentation.category(index, MEDIUM_INDEX, LARGE_INDEX, isNew)
+		-- Legendary and rarer always earn the overlay, repeats included.
+		if index >= BAND_INDEX and category == "Small" then
+			category = "Medium"
+		end
 		-- Size stamps always earn a centre-screen beat (Titanic matches Celestial drama).
 		if sizeId == "Titanic" then
 			category = "Large"
