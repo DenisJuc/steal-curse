@@ -1,5 +1,6 @@
 -- Skills menu (GDD 6.6): three branch tabs (Resonance, Sanctuary, Binding Arts), one row per node
--- with its rank, what it does now and at the next rank, and Buy / +10 / Max buttons (all CE).
+-- with its rank, what it does now and at the next rank, and one price button that buys 1, 10 or
+-- Max ranks (the x1 / x10 / Max toggle above the list).
 -- Costs come from SkillConfig (shared with the server); the server re-checks every purchase and
 -- answers with the fresh ranks.
 -- Feel: rows pop in one after another when the menu opens (MenuMotion "PopIn") or the tab changes; a purchase flashes
@@ -29,12 +30,15 @@ local SkillAction = Remotes:WaitForChild("SkillAction") :: RemoteFunction
 
 local SkillTreePanel = {}
 
-local ROW_HEIGHT = 64
-local LIST_TOP = UIKit.TAB_HEIGHT + 10
+local ROW_HEIGHT = 84
+local MODE_HEIGHT = 40
+local LIST_TOP = UIKit.TAB_HEIGHT + 8 + MODE_HEIGHT + 8
 local STAGGER = 0.045
-local UPGRADE_WIDTH = 150
--- Room the buttons take at the card's bottom right (Max, +10 and Upgrade).
-local BUTTONS_WIDTH = 8 + 46 + 6 + 46 + 6 + UPGRADE_WIDTH + 10
+local BUTTON_WIDTH = 168
+local BUTTON_HEIGHT = 56
+local BUY_MODES = { { Id = "One", Text = "x1" }, { Id = "Ten", Text = "x10" }, { Id = "Max", Text = "Max" } }
+-- What each mode asks the server for (SkillAction "Buy", nodeId, 1 | 10 | "Max").
+local BUY_AMOUNTS: { [string]: any } = { One = 1, Ten = 10, Max = "Max" }
 
 local function percent(value: number): string
 	return `{Format.number(value * 100)}%`
@@ -74,6 +78,8 @@ local function effectText(nodeId: string, rank: number): string
 		return `+{percent(SkillConfig.harvestMultiplier(rank) - 1)} bonus finds`
 	elseif nodeId == "SwiftStep" then
 		return `walk speed {Format.number(SkillConfig.walkSpeed(rank))}`
+	elseif nodeId == "PedestalMastery" then
+		return `+{percent(rank * SkillConfig.Effects.IncomePerMasteryRank)} pedestal income`
 	end
 	return ""
 end
@@ -85,7 +91,8 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	local colors = UIKit.Colors
 	local ranks: { [string]: number } = {}
 	local branch = SkillConfig.Branches[1].Id
-	local costButtons: { { Button: TextButton, Cost: number } } = {}
+	local costButtons: { any } = {}
+	local buyMode = "One"
 	local rows: { [string]: RowParts } = {}
 	local popNext = false
 
@@ -127,12 +134,32 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		end)
 	end
 
+	-- Prices each row's button for the buy mode: x10 and Max buy as many ranks as CE allows (up to
+	-- 10 / the cap), like the server; with none affordable the button shows the next rank's price.
 	local function refreshAffordability()
 		local ce = player:GetAttribute("CE") or 0
 		for _, entry in costButtons do
-			UIKit.setAffordable(entry.Button, ce + 1e-9 >= entry.Cost, entry.Cost)
+			local count, cost = 1, entry.OneCost
+			if buyMode ~= "One" then
+				local limit = if buyMode == "Ten" then math.min(10, entry.Remaining) else entry.Remaining
+				local bought, total = SkillConfig.affordable(entry.Node, entry.Rank, ce, limit, entry.Override)
+				if bought > 0 then
+					count, cost = bought, total
+				end
+			end
+			UIKit.setPrice(entry.Button, `+{count}`, cost)
+			UIKit.setAffordable(entry.Button, ce + 1e-9 >= cost, cost)
 		end
 	end
+	UIKit.tabBar(content, BUY_MODES, buyMode, function(id)
+		buyMode = id
+		refreshAffordability()
+	end, {
+		Name = "BuyMode",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -10, 0, UIKit.TAB_HEIGHT + 8),
+		Size = UDim2.fromOffset(204, MODE_HEIGHT),
+	})
 
 	-- Celebrates the rows whose rank went up (rows were just rebuilt by render).
 	local function celebrate(before: { [string]: number })
@@ -168,19 +195,6 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				end
 			end
 		end)
-	end
-
-	local function rowButton(card: Instance, text: string, width: number, x: number, cost: number, onClick: () -> ()): TextButton
-		local button = UIKit.button({
-			Text = text,
-			TextSize = 14,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(1, x - width / 2, 1, -23),
-			Size = UDim2.fromOffset(width, 30),
-			Parent = card,
-		}, onClick)
-		table.insert(costButtons, { Button = button, Cost = cost })
-		return button
 	end
 
 	function render()
@@ -229,38 +243,41 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				BorderSizePixel = 0,
 				Parent = card,
 			}, { UIKit.corner(2) })
+			local textWidth = UDim2.new(1, -(12 + BUTTON_WIDTH + 20), 0, 0)
 			UIKit.label({
 				Text = node.Name,
-				TextSize = 20,
-				Position = UDim2.fromOffset(12, 5),
-				Size = UDim2.new(1, -130, 0, 24),
+				TextSize = 21,
+				Position = UDim2.fromOffset(12, 8),
+				Size = textWidth + UDim2.fromOffset(-70, 26),
 				Parent = card,
 			})
 			local rankLabel = UIKit.label({
 				Name = "Rank",
-				Text = `Rank {rank}/{trialMax}`,
-				TextSize = 16,
+				Text = `{rank}/{trialMax}`,
+				TextSize = 18,
 				TextColor3 = if maxed then colors.Gold else colors.SubText,
 				TextXAlignment = Enum.TextXAlignment.Right,
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(1, -65, 0, 17),
-				Size = UDim2.fromOffset(110, 22),
+				Position = UDim2.new(1, -(BUTTON_WIDTH + 20 + 70), 0, 8),
+				Size = UDim2.fromOffset(70, 26),
 				Parent = card,
 			})
+			-- Now -> next on one line that shrinks to fit (never cut off).
 			local now = effectText(node.Id, rank)
-			UIKit.label({
+			local effect = UIKit.label({
+				Name = "Effect",
 				Text = if maxed then now else `{now}  \u{2192}  {effectText(node.Id, rank + 1)}`,
-				TextSize = 17,
+				TextSize = 18,
+				TextScaled = true,
 				TextColor3 = colors.Cyan,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(12, 30),
-				Size = UDim2.new(1, -(12 + BUTTONS_WIDTH), 0, 20),
+				Position = UDim2.fromOffset(12, 38),
+				Size = textWidth + UDim2.fromOffset(0, 22),
 				Parent = card,
 			})
+			UIKit.create("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 12, Parent = effect })
 			local track = UIKit.create("Frame", {
 				Name = "RankBar",
-				Position = UDim2.new(0, 12, 1, -13),
-				Size = UDim2.new(1, -(12 + BUTTONS_WIDTH), 0, 5),
+				Position = UDim2.new(0, 12, 1, -14),
+				Size = textWidth + UDim2.fromOffset(0, 6),
 				BackgroundColor3 = colors.Track,
 				BorderSizePixel = 0,
 				Parent = card,
@@ -287,45 +304,43 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			if maxed then
 				local tag = UIKit.label({
 					Text = "MAXED",
-					TextSize = 15,
+					TextSize = 20,
 					TextColor3 = colors.Panel,
 					TextXAlignment = Enum.TextXAlignment.Center,
 					BackgroundTransparency = 0,
 					BackgroundColor3 = colors.Gold,
-					AnchorPoint = Vector2.new(0.5, 0.5),
-					Position = UDim2.new(1, -68, 1, -23),
-					Size = UDim2.fromOffset(120, 30),
+					AnchorPoint = Vector2.new(1, 0.5),
+					Position = UDim2.new(1, -10, 0.5, 0),
+					Size = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT),
 					Parent = card,
 				})
 				UIKit.corner(8).Parent = tag
 				continue
 			end
-			local cost = SkillConfig.cost(node, rank, if nodeId == "CoreLuck" then coreLuckCostOverride() else nil) or 0
-			rowButton(card, "Max", 46, -8, cost, function()
-				send("Buy", nodeId, "Max")
-			end)
-			local nextX = -60
-			if trialMax - rank > 1 then
-				rowButton(card, "+10", 46, nextX, cost, function()
-					send("Buy", nodeId, 10)
-				end)
-				nextX -= 52
-			end
+			local costOverride = if nodeId == "CoreLuck" then coreLuckCostOverride() else nil
+			local oneCost = SkillConfig.cost(node, rank, costOverride) or 0
 			local upgrade = UIKit.priceButton({
+				Name = "Upgrade",
 				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, nextX, 1, -23),
-				Size = UDim2.fromOffset(UPGRADE_WIDTH, 30),
-				TextSize = 15,
+				Position = UDim2.new(1, -10, 0.5, 0),
+				Size = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT),
+				TextSize = 20,
 				Parent = card,
-			}, "Upgrade", cost, function()
-				send("Buy", nodeId, 1)
+			}, "+1", oneCost, function()
+				send("Buy", nodeId, BUY_AMOUNTS[buyMode])
 			end)
-			table.insert(costButtons, { Button = upgrade, Cost = cost })
+			table.insert(costButtons, {
+				Button = upgrade,
+				Node = node,
+				Rank = rank,
+				Remaining = trialMax - rank,
+				OneCost = oneCost,
+				Override = costOverride,
+			})
 		end
 		popNext = false
 		refreshAffordability()
 	end
-
 	player:GetAttributeChangedSignal("CE"):Connect(refreshAffordability)
 
 	return {

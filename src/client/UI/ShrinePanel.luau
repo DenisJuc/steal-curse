@@ -1,13 +1,14 @@
 -- Shrine menu (GDD 6.3-6.5): one card per pedestal. A card shows the relic (tap it to swap), what
 -- it earns per second and its level as a bar ("Lv 12/50"). The Upgrade side shows the next level
--- ("Lv 3 -> 4") and a small gold boost (+10%) above the main price button: "Max +N Lv"
--- (every level the current CE buys) when that is 2 or more, else "Upgrade" for one level, with a
--- small "+1 Lv" button under Max. The padlock keeps a pedestal's relic during Equip Best.
+-- ("Lv 3 -> 4") and a small gold boost (+10%) above one big price button ("+N Lv"). The padlock
+-- keeps a pedestal's relic during Equip Best.
 -- The header holds the free Equip Best button and the Auto-equip toggle, a game pass (on: Equip
 -- Best runs after every find, purchase and upgrade; without the pass it opens the purchase prompt); "Showcases" opens the Showcase menu (GDD 6.7). Selling, item locks and
 -- favorites live in the Relics menu.
 -- The client only sends intents; the server validates costs and pushes the new state back on
 -- ShrineState.
+-- Buying levels: the header's x1 / x10 / Max toggle picks what every row's single price button
+-- buys (one level, ten levels, or as many as the current CE affords).
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -30,12 +31,15 @@ local ShrineState = Remotes:WaitForChild("ShrineState") :: RemoteEvent
 local ShrinePanel = {}
 
 local PANEL_WIDTH = 580
-local LIST_TOP = 80
-local CARD_HEIGHT = 112
+local LIST_TOP = 96
+local ROW2_Y = 42
+local ROW2_HEIGHT = 44
+local BUY_MODES = { { Id = "One", Text = "x1" }, { Id = "Ten", Text = "x10" }, { Id = "Max", Text = "Max" } }
+local CARD_HEIGHT = 116
 local LOCKED_CARD_HEIGHT = 84
 local THUMB = 88
-local SIDE_WIDTH = 176
-local INFO_X = 12 + THUMB + 14
+local SIDE_WIDTH = 190
+local INFO_X = 12 + THUMB + 26
 local LEVEL_TEXT = 72
 local LEVEL_BAR = 8
 local ARROW = "\u{2192}"
@@ -128,12 +132,9 @@ function ShrinePanel.Start(
 	local snapshot: Snapshot? = nil
 	-- Buttons whose color depends on affordability: { button, cost }.
 	local costButtons: { { Button: TextButton, Cost: number } } = {}
-	-- Main upgrade buttons, re-priced whenever CE changes: "Max +N Lv" or "Upgrade" (one level),
-	-- and the small "+1 Lv" button shown with Max.
-	local upgradeButtons: {
-		{ Button: TextButton, One: TextButton, Level: number, OneCost: number, Mode: string }
-	} =
-		{}
+	-- Upgrade buttons, re-priced whenever CE or the buy mode changes.
+	local upgradeButtons: { { Button: TextButton, Level: number, OneCost: number } } = {}
+	local buyMode = "One"
 
 	local panel, content =
 		UIKit.modal(screen, "ShrineMenu", "PEDESTALS", colors.Gold, Vector2.new(PANEL_WIDTH, 620), "Pedestals")
@@ -167,9 +168,9 @@ function ShrinePanel.Start(
 	local equipBest = UIKit.button({
 		Name = "EquipBest",
 		Text = "Equip Best",
-		TextSize = 18,
-		Position = UDim2.fromOffset(0, 40),
-		Size = UDim2.fromOffset(112, 30),
+		TextSize = 19,
+		Position = UDim2.fromOffset(0, ROW2_Y),
+		Size = UDim2.fromOffset(124, ROW2_HEIGHT),
 		Parent = content,
 	}, function()
 		ShrineAction:FireServer("EquipBest")
@@ -178,9 +179,9 @@ function ShrinePanel.Start(
 	local autoEquip = UIKit.button({
 		Name = "AutoEquip",
 		Text = "",
-		TextSize = 18,
-		Position = UDim2.fromOffset(120, 40),
-		Size = UDim2.fromOffset(196, 30),
+		TextSize = 17,
+		Position = UDim2.fromOffset(132, ROW2_Y),
+		Size = UDim2.fromOffset(196, ROW2_HEIGHT),
 		Parent = content,
 	}, function()
 		local owned = snapshot ~= nil and snapshot.AutoEquipOwned == true
@@ -195,7 +196,7 @@ function ShrinePanel.Start(
 	local function refreshAutoEquip()
 		local owned = snapshot ~= nil and snapshot.AutoEquipOwned == true
 		local on = snapshot ~= nil and snapshot.AutoEquip == true
-		autoEquip.Text = if not owned then "Auto-equip (Game Pass)"
+		autoEquip.Text = if not owned then "Auto-equip (Pass)"
 			elseif on then "Auto-equip: ON"
 			else "Auto-equip: OFF"
 		UIKit.skinButton(autoEquip, if not owned then "Gold" elseif on then "Buy" else "Dark")
@@ -203,29 +204,41 @@ function ShrinePanel.Start(
 	end
 	refreshAutoEquip()
 
+	local refreshAffordability: () -> ()
+	-- x1 / x10 / Max: what each row's price button buys.
+	local modeBar = UIKit.tabBar(content, BUY_MODES, buyMode, function(id)
+		buyMode = id
+		refreshAffordability()
+	end, {
+		Name = "BuyMode",
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(1, -4, 0, ROW2_Y),
+		Size = UDim2.fromOffset(204, ROW2_HEIGHT),
+	})
+	modeBar.ZIndex = 2
+
 	local slotsFrame = UIKit.scrollList(content, 8)
 	slotsFrame.Name = "Slots"
 	slotsFrame.Position = UDim2.fromOffset(0, LIST_TOP)
 	slotsFrame.Size = UDim2.new(1, 0, 1, -LIST_TOP)
 
-	local function refreshAffordability()
+	function refreshAffordability()
 		local ce = player:GetAttribute("CE") or 0
 		for _, entry in costButtons do
 			UIKit.setAffordable(entry.Button, ce + 1e-9 >= entry.Cost, entry.Cost)
 		end
 		for _, entry in upgradeButtons do
-			local levels, cost = Economy.maxAffordableUpgrades(Config.Economy, entry.Level, ce)
-			if levels >= 2 then
-				entry.Mode = "Max"
-				UIKit.setPrice(entry.Button, `Max +{levels} Lv`, cost)
-				UIKit.setAffordable(entry.Button, true, cost)
-			else
-				entry.Mode = "One"
-				UIKit.setPrice(entry.Button, "Upgrade", entry.OneCost)
-				UIKit.setAffordable(entry.Button, ce + 1e-9 >= entry.OneCost, entry.OneCost)
+			local levels, cost = 1, entry.OneCost
+			if buyMode == "Ten" then
+				levels, cost = Economy.bulkUpgrades(Config.Economy, entry.Level, 10)
+			elseif buyMode == "Max" then
+				levels, cost = Economy.maxAffordableUpgrades(Config.Economy, entry.Level, ce)
+				if levels < 1 then
+					levels, cost = 1, entry.OneCost
+				end
 			end
-			entry.One.Visible = levels >= 2
-			UIKit.setAffordable(entry.One, ce + 1e-9 >= entry.OneCost, entry.OneCost)
+			UIKit.setPrice(entry.Button, `+{levels} Lv`, cost)
+			UIKit.setAffordable(entry.Button, ce + 1e-9 >= cost, cost)
 		end
 	end
 
@@ -314,13 +327,13 @@ function ShrinePanel.Start(
 		local hint = UIKit.label({
 			Name = "Hint",
 			Text = if slot.Id then "SWAP" else "PLACE",
-			TextSize = 14,
+			TextSize = 17,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			BackgroundTransparency = 0.3,
 			BackgroundColor3 = colors.Panel,
 			AnchorPoint = Vector2.new(0.5, 1),
 			Position = UDim2.new(0.5, 0, 1, -4),
-			Size = UDim2.new(1, -8, 0, 20),
+			Size = UDim2.new(1, -8, 0, 24),
 			ZIndex = 2,
 			Parent = thumb,
 		})
@@ -330,28 +343,29 @@ function ShrinePanel.Start(
 			Name = "Lock",
 			Text = "",
 			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0, 12 + THUMB - 4, 0.5, -THUMB / 2 + 4),
-			Size = UDim2.fromOffset(30, 30),
+			Position = UDim2.new(0, 12 + THUMB - 4, 0.5, -THUMB / 2 + 6),
+			Size = UDim2.fromOffset(40, 40),
 			ZIndex = 4,
 			Parent = frame,
 		}, function()
 			ShrineAction:FireServer("Lock", slotNumber, not slot.Locked)
 		end)
 		UIKit.skinButton(lock, if slot.Locked then "Gold" else "Dark")
-		UIKit.corner(15).Parent = lock
-		Icons.padlock(lock, 16, if slot.Locked then colors.Panel else colors.SubText, not slot.Locked)
+		UIKit.corner(20).Parent = lock
+		Icons.padlock(lock, 22, if slot.Locked then colors.Panel else colors.SubText, not slot.Locked)
 
 		local infoWidth = UDim2.new(1, -(INFO_X + SIDE_WIDTH + 20), 0, 26)
-		UIKit.label({
+		local nameLabel = UIKit.label({
 			Name = "RelicName",
 			Text = if slot.Id then Odds.displayName(slot.Id, slot.Mutation) else "Empty pedestal",
 			TextSize = 20,
+			TextScaled = true,
 			TextColor3 = if slot.Id then relicColor(slot.Id, slot.Mutation) else colors.SubText,
-			TextTruncate = Enum.TextTruncate.AtEnd,
 			Position = UDim2.fromOffset(INFO_X, 12),
 			Size = infoWidth,
 			Parent = frame,
 		})
+		UIKit.create("UITextSizeConstraint", { MaxTextSize = 21, MinTextSize = 13, Parent = nameLabel })
 		if slot.Id then
 			local income, incomeValue = UIKit.coinValue(frame, 20, 19)
 			income.Position = UDim2.fromOffset(INFO_X, 44)
@@ -403,30 +417,17 @@ function ShrinePanel.Start(
 			colors.Text
 		)
 
-		local entry
 		local upgrade = UIKit.priceButton({
 			Name = "Upgrade",
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -12, 0, 46),
-			Size = UDim2.fromOffset(SIDE_WIDTH, 34),
-			TextSize = 18,
-			Parent = frame,
-		}, "Upgrade", slot.UpgradeCost, function()
-			ShrineAction:FireServer("Upgrade", slotNumber, entry.Mode)
-		end)
-		local one = UIKit.priceButton({
-			Name = "One",
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -12, 0, 84),
-			Size = UDim2.fromOffset(SIDE_WIDTH, 24),
-			TextSize = 18,
-			Visible = false,
+			Position = UDim2.new(1, -12, 0, 44),
+			Size = UDim2.fromOffset(SIDE_WIDTH, 56),
+			TextSize = 20,
 			Parent = frame,
 		}, "+1 Lv", slot.UpgradeCost, function()
-			ShrineAction:FireServer("Upgrade", slotNumber, "One")
+			ShrineAction:FireServer("Upgrade", slotNumber, buyMode)
 		end)
-		entry = { Button = upgrade, One = one, Level = slot.Level, OneCost = slot.UpgradeCost, Mode = "One" }
-		table.insert(upgradeButtons, entry)
+		table.insert(upgradeButtons, { Button = upgrade, Level = slot.Level, OneCost = slot.UpgradeCost })
 	end
 
 	local function lockedCard(slot: any)

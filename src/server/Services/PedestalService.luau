@@ -336,7 +336,7 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 	Upgrade = function(player, data, slotArg, mode)
 		local Analytics = require(script.Parent.PlaytestAnalyticsService)
 		local slot = validSlot(data, slotArg)
-		if not slot or (mode ~= "One" and mode ~= "Max") then
+		if not slot or (mode ~= "One" and mode ~= "Ten" and mode ~= "Max") then
 			return
 		end
 		local pedestal = data.Pedestals[slot]
@@ -358,6 +358,9 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 		local levels, cost
 		if mode == "One" then
 			levels, cost = 1, Economy.upgradeCost(settings, pedestal.Level)
+		elseif mode == "Ten" then
+			-- Ten levels at their normal prices, all or nothing (TrySpend refuses if short).
+			levels, cost = Economy.bulkUpgrades(settings, pedestal.Level, 10)
 		else
 			levels, cost = Economy.maxAffordableUpgrades(settings, pedestal.Level, data.CE)
 		end

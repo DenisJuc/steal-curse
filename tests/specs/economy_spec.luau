@@ -61,6 +61,21 @@ return {
 		end,
 	},
 	{
+		Name = "x10 buy costs exactly the ten normal level prices and stops at max level",
+		Run = function()
+			local levels, cost = Economy.bulkUpgrades(settings, 3, 10)
+			expect.equal(levels, 10, "ten levels")
+			expect.equal(cost, Economy.upgradeCostRange(settings, 3, 13), "same as ten single buys")
+			local top = settings.PedestalMaxLevel
+			levels, cost = Economy.bulkUpgrades(settings, top - 4, 10)
+			expect.equal(levels, 4, "only the levels left")
+			expect.equal(cost, Economy.upgradeCostRange(settings, top - 4, top), "cost of the levels left")
+			levels, cost = Economy.bulkUpgrades(settings, top, 10)
+			expect.equal(levels, 0, "already max")
+			expect.equal(cost, 0, "nothing to pay")
+		end,
+	},
+	{
 		Name = "max-buy checks every intermediate cost",
 		Run = function()
 			local first, second = Economy.upgradeCost(settings, 1), Economy.upgradeCost(settings, 2)

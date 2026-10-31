@@ -64,6 +64,12 @@ function Economy.upgradeCostRange(settings: EconomySettings, fromLevel: number, 
 	return total
 end
 
+-- Up to `count` levels from `level` (stops at max level) and their total cost, whatever the budget.
+function Economy.bulkUpgrades(settings: EconomySettings, level: number, count: number): (number, number)
+	local levels = math.clamp(count, 0, settings.PedestalMaxLevel - level)
+	return levels, Economy.upgradeCostRange(settings, level, level + levels)
+end
+
 -- How many levels `budget` buys from `level` (each intermediate cost is checked), and the total cost.
 function Economy.maxAffordableUpgrades(settings: EconomySettings, level: number, budget: number): (number, number)
 	local levels, cost = 0, 0
