@@ -60,7 +60,7 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 		for _, option in options do
 			table.insert(tabs, { Id = tostring(option), Text = ClientSettings.display(setting.Key, option) })
 		end
-		local bar, buttons, select = UIKit.tabBar(frame, tabs, tostring(Settings.Get(setting.Key)), function(id)
+		local bar, buttons, selectOption = UIKit.tabBar(frame, tabs, tostring(Settings.Get(setting.Key)), function(id)
 			for _, option in options do
 				if tostring(option) == id then
 					Settings.Set(setting.Key, option)
@@ -77,7 +77,7 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 		end
 		player:GetAttributeChangedSignal(`Setting_{setting.Key}`):Connect(function()
 			local id = tostring(Settings.Get(setting.Key))
-			select(id)
+			selectOption(id)
 			if buttons[id] then
 				Motion.punch(buttons[id], 1.5)
 			end
