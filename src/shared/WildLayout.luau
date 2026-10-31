@@ -131,6 +131,9 @@ WildLayout.Scatter = {
 		{ Prop = "GlowMushrooms", Density = 2.2 },
 		{ Prop = "FernBush", Density = 3.1 },
 		{ Prop = "FallenLog", Density = 0.8 },
+		{ Prop = "SpiderLilyPatch", Density = 1.0 },
+		{ Prop = "BambooGrove", Density = 0.4 },
+		{ Prop = "BambooGrove2", Density = 0.4 },
 	},
 	AbandonedVillage = {
 		{ Prop = "FernBush", Density = 1.6 },
@@ -138,12 +141,15 @@ WildLayout.Scatter = {
 		{ Prop = "MossyRocks", Density = 0.5 },
 		{ Prop = "DeadTree2", Density = 0.65 },
 		{ Prop = "FallenLog", Density = 0.3 },
+		{ Prop = "SpiderLilyPatch", Density = 0.6 },
+		{ Prop = "BambooGrove", Density = 0.3 },
 	},
 	AncientRuins = {
 		{ Prop = "BrokenPillar1", Density = 1.3 },
 		{ Prop = "BrokenPillar2", Density = 1.6 },
 		{ Prop = "MossyRocks", Density = 1.6 },
 		{ Prop = "FernBush", Density = 0.8 },
+		{ Prop = "SpiderLilyPatch", Density = 0.6 },
 	},
 } :: { [string]: { ScatterRule } }
 

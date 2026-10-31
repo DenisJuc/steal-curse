@@ -155,6 +155,21 @@ local function buildShowcasePodium(parent: Instance, at: (number, number, number
 		Color = WALL_PILLAR,
 	}))
 	BuildUtil.billboard(dais, "Showcase", 8, 1.6, 3, Color3.fromRGB(255, 210, 140))
+	-- Binding chains laid on the rim at the four diagonals (clear of the set pieces at front/back).
+	if MapProps.has("IronChain") then
+		for k = 0, 3 do
+			local angle = math.rad(45 + k * 90)
+			local radius = 6.6
+			local chain = MapProps.build(model, "IronChain", at(x, FLOOR_TOP + 1.4, z))
+			if chain then
+				-- Lay it flat along the rim tangent, resting on the cap.
+				local box = chain:GetBoundingBox()
+				chain.WorldPivot = CFrame.new(box.Position)
+				local center = at(x + math.cos(angle) * radius, FLOOR_TOP + 1.65, z + math.sin(angle) * radius)
+				chain:PivotTo(center * CFrame.Angles(0, -angle, 0) * CFrame.Angles(math.rad(90), 0, 0))
+			end
+		end
+	end
 	model.Parent = parent
 end
 
@@ -302,8 +317,17 @@ local function buildWalls(parent: Instance, at: (number, number, number) -> CFra
 	end
 end
 
+-- Imported talismans, cycled along the walls.
+local OFUDA_PROPS = { "OfudaDemon", "OfudaFear", "OfudaMisfortune" }
+
 -- A paper seal (ofuda) on a wall: `cframe` is the wall face point, facing into the chamber.
-local function buildOfuda(parent: Instance, cframe: CFrame)
+local function buildOfuda(parent: Instance, cframe: CFrame, variant: number)
+	local propId = OFUDA_PROPS[(variant - 1) % #OFUDA_PROPS + 1]
+	if MapProps.has(propId) then
+		local _, height = MapPropConfig.size(propId)
+		MapProps.build(parent, propId, cframe * CFrame.new(0, -height / 2, -0.06))
+		return
+	end
 	local paper = BuildUtil.decor(BuildUtil.part(parent, {
 		Name = "Ofuda",
 		Size = Vector3.new(1, 2.6, 0.06),
@@ -327,9 +351,12 @@ local function buildWallSeals(parent: Instance, at: (number, number, number) -> 
 		{ Vector3.new(-inner, 0, -half), Vector3.new(0, 0, 1), Vector3.new(1, 0, 0) },
 		{ Vector3.new(inner, 0, -half), Vector3.new(0, 0, 1), Vector3.new(-1, 0, 0) },
 	}
+	local seals = 0
+	local lastPillar = Config.Plots.Size / spacing
 	for _, run in runs do
 		local start, along, face = run[1], run[2], run[3]
-		for i = 0, Config.Plots.Size / spacing do
+		local inward = at(face.X, 0, face.Z).Position - at(0, 0, 0).Position
+		for i = 0, lastPillar do
 			local p = start + along * (i * spacing)
 			BuildUtil.part(parent, {
 				Name = "WallPillar",
@@ -338,10 +365,17 @@ local function buildWallSeals(parent: Instance, at: (number, number, number) -> 
 				Material = Enum.Material.Basalt,
 				Color = WALL_PILLAR,
 			})
+			-- Iron chains hang down the inner face of the middle pillars (not the corners).
+			if i > 0 and i < lastPillar and MapProps.has("IronChain") then
+				local _, chainH = MapPropConfig.size("IronChain")
+				local hang = at(p.X + face.X * 2.05, FLOOR_TOP + WALL_H - chainH - 0.2, p.Z + face.Z * 2.05)
+				MapProps.build(parent, "IronChain", CFrame.lookAt(hang.Position, hang.Position + inward))
+			end
 			if i * spacing < Config.Plots.Size - 1 then
 				local mid = p + along * (spacing / 2)
 				local origin = at(mid.X, FLOOR_TOP + 5, mid.Z)
-				buildOfuda(parent, CFrame.lookAt(origin.Position, origin.Position + (at(face.X, 0, face.Z).Position - at(0, 0, 0).Position)))
+				seals += 1
+				buildOfuda(parent, CFrame.lookAt(origin.Position, origin.Position + inward), seals)
 			end
 		end
 	end

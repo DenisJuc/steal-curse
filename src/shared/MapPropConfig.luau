@@ -61,6 +61,14 @@ MapPropConfig.Props = {
 	RuinArch           = { Size = { 18, 18, 4 },  Collide = "Box",  Collider = { 18, 18, 2 }, Fallback = "Arch" },
 	GuardianStatueHead = { Size = { 18, 16, 18 }, Collide = "Box",  Sink = 2, Tilt = 70, Fallback = "StatueHead" },
 	RuneObelisk        = { Size = { 4, 16, 4 },   Collide = "Box",  Fallback = "Obelisk", Light = RUNE },
+	-- Creator Store imports (scripts stripped). Ofudas by Reverse_Polarity, see CREDITS.md.
+	OfudaDemon         = { Size = { 1.3, 2.6, 0.06 }, Collide = "None", Fallback = "Box" },
+	OfudaFear          = { Size = { 1.3, 2.6, 0.06 }, Collide = "None", Fallback = "Box" },
+	OfudaMisfortune    = { Size = { 1.3, 2.6, 0.06 }, Collide = "None", Fallback = "Box" },
+	IronChain          = { Size = { 0.6, 5.5, 0.6 }, Collide = "None", Fallback = "Pillar" },
+	SpiderLilyPatch    = { Size = { 5, 2.2, 5 },  Collide = "None", Fallback = "Bush" },
+	BambooGrove        = { Size = { 10, 18, 13 }, Collide = "Box",  Collider = { 4, 18, 4 }, Fallback = "DeadTree" },
+	BambooGrove2       = { Size = { 11, 18, 14 }, Collide = "Box",  Collider = { 4, 18, 4 }, Fallback = "DeadTree" },
 	-- Shared / blend zones
 	FernBush           = { Size = { 5, 3, 5 },    Collide = "None", Fallback = "Bush" },
 	-- The bridge collider is a flat walkway level with the banks (the bridge base sits just below).
