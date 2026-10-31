@@ -2,7 +2,7 @@
 -- are redrawn. The preview runs the same AutoSell.decide the server uses on your current
 -- inventory and Codex, so "what will happen" is exactly what will happen.
 -- Layout: a quick row ("Sell duplicates up to: Off / Common / ... / Legendary") that sets every
--- rarity at once, one compact chip per rarity (tap to cycle Keep -> Dupes -> All) for the exact
+-- rarity at once, one compact chip per rarity (tap to cycle Keep -> Sell dupes -> Sell all) for the exact
 -- rules, the two protection switches, the two extra rules, and one line on your likely next find.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,7 +11,6 @@ local AutoSell = require(ReplicatedStorage.Shared.AutoSell)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RelicIncome = require(ReplicatedStorage.Shared.RelicIncome)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
@@ -27,7 +26,12 @@ local ROW_HEIGHT = 52
 local CHIP_HEIGHT = 56
 -- Highest rarity the quick row offers; rarer finds are always worth a look.
 local QUICK_MAX_TIER = 5
-local MODE_SHORT = { Keep = "Keep", SellDuplicates = "Dupes", SellAll = "All" }
+local MODE_SHORT = { Keep = "Keep", SellDuplicates = "Sell dupes", SellAll = "Sell all" }
+local MODE_COLORS = {
+	Keep = Color3.fromRGB(120, 230, 140),
+	SellDuplicates = Color3.fromRGB(240, 194, 104),
+	SellAll = Color3.fromRGB(240, 110, 96),
+}
 local KEEP_COLOR = Color3.fromRGB(120, 230, 140)
 
 local function nextIn<T>(list: { T }, current: T): T
@@ -198,18 +202,13 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 		if not relic then
 			return "", colors.SubText
 		end
-		local bestHeld = -1
-		for _, group in state.Groups do
-			if group.Id == relic.Id and not group.Mutation then
-				bestHeld = math.max(bestHeld, group.IncomePerSec)
-			end
-		end
+		-- The line describes a plain duplicate of a relic you already found.
 		local sell, reason = AutoSell.decide(state.AutoSell, {
 			Tier = relic.Tier,
 			BaseOneIn = 1 / math.max(Odds.baseItem(relic.Id), 1e-300),
-			First = discovered[relic.Id] == nil,
+			First = false,
 			Mutated = false,
-			Duplicate = bestHeld >= RelicIncome.of(relic.Id),
+			Duplicate = true,
 			Favorite = false,
 		})
 		local verb = if sell then "SOLD" else "KEPT"
@@ -277,7 +276,13 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 					draft.Tiers[tier.Id] = nextIn(AutoSell.Modes, mode)
 				end)
 			end)
-			UIKit.skinButton(chip, if mode == "Keep" then "Dark" else "Primary")
+			UIKit.skinButton(chip, "Dark")
+			local stroke = chip:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				stroke.Color = MODE_COLORS[mode]
+				stroke.Transparency = if mode == "Keep" then 0.6 else 0
+				stroke.Thickness = if mode == "Keep" then 1.5 else 2.5
+			end
 			UIKit.label({
 				Text = tier.Name,
 				TextSize = 17,
@@ -290,8 +295,9 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 			})
 			UIKit.label({
 				Text = MODE_SHORT[mode],
-				TextSize = 19,
-				TextColor3 = if mode == "Keep" then KEEP_COLOR else colors.Text,
+				TextSize = 18,
+				TextScaled = true,
+				TextColor3 = MODE_COLORS[mode],
 				TextXAlignment = Enum.TextXAlignment.Center,
 				Position = UDim2.fromOffset(4, 27),
 				Size = UDim2.new(1, -8, 0, 22),
