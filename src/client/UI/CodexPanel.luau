@@ -2,7 +2,8 @@
 -- unlocks, set titles, prestige titles), earned titles and one card per relic with its 3D model
 -- and, once discovered, its base income per second. Unknown relics show as a black silhouette of the model with only their tier and base odds. Seen mutations appear as colored dots
 -- on the relic's card (no separate mutation Codex). Relics are tabbed Normal / Huge / Titanic
--- and grouped by rarity like an index.
+-- and grouped by rarity like an index. Two tabs: Relics (the index, first) and Rewards
+-- (milestones, titles and Claim all).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,7 +14,6 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
-local RelicIncome = require(ReplicatedStorage.Shared.RelicIncome)
 local Banner = require(script.Parent.Banner)
 local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
@@ -37,7 +37,8 @@ local KIND_HEADINGS = {
 }
 local REFRESH_SECONDS = 1
 local DONE_COLOR = Color3.fromRGB(120, 230, 140)
-local ROW_HEIGHT = 58
+local ROW_HEIGHT = 68
+local CARD_SIZE = Vector2.new(106, 104)
 local BAR_HEIGHT = 6
 local SIZE_TABS = { "Normal", "Huge", "Titanic" }
 local SIZE_COLORS = {
@@ -61,8 +62,24 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 
-	local panel, content = UIKit.modal(screen, "CodexMenu", "CODEX", colors.Accent, Vector2.new(580, 640), "Codex")
-	local body = UIKit.scrollList(content, 6)
+	local panel, content = UIKit.modal(screen, "CodexMenu", "CODEX", colors.Accent, Vector2.new(600, 640), "Codex")
+	local pageTop = UIKit.TAB_HEIGHT + 8
+	local function pageList(name: string): ScrollingFrame
+		local list = UIKit.scrollList(content, 6)
+		list.Name = name
+		list.Position = UDim2.fromOffset(0, pageTop)
+		list.Size = UDim2.new(1, 0, 1, -pageTop)
+		list.ScrollBarImageColor3 = colors.Trim
+		return list
+	end
+	-- Relics first (the index), rewards on their own tab.
+	local relicsBody = pageList("RelicsPage")
+	local body = pageList("RewardsPage")
+	body.Visible = false
+	local _, pageButtons = UIKit.tabBar(content, { { Id = "Relics", Text = "Relics" }, { Id = "Rewards", Text = "Rewards" } }, "Relics", function(id)
+		relicsBody.Visible = id == "Relics"
+		body.Visible = id == "Rewards"
+	end)
 	local order = 0
 	-- One render per relic, kept across refreshes; unknown relics tint it black.
 	local renders = RelicViewport.cache(#CodexBook.AllIds)
@@ -81,9 +98,8 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		UIKit.heading({
 			LayoutOrder = nextOrder(),
 			Text = value,
-			TextSize = 15,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			Size = UDim2.new(1, -10, 0, 24),
+			TextSize = 19,
+			Size = UDim2.new(1, -10, 0, 26),
 			Parent = body,
 		})
 	end
@@ -104,20 +120,19 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		frame:SetAttribute("PopIn", true)
 		UIKit.label({
 			Text = shortGoal(milestone),
-			TextSize = 18,
-			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextSize = 20,
 			TextColor3 = if done then DONE_COLOR else colors.Text,
-			Position = UDim2.fromOffset(10, 4),
-			Size = UDim2.new(1, -110, 0, 22),
+			Position = UDim2.fromOffset(10, 6),
+			Size = UDim2.new(1, -130, 0, 24),
 			Parent = frame,
 		})
 		UIKit.label({
 			Text = Codex.rewardText(milestone),
-			TextSize = 15,
-			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextSize = 17,
+			TextScaled = true,
 			TextColor3 = colors.Gold,
-			Position = UDim2.fromOffset(10, 26),
-			Size = UDim2.new(1, -110, 0, 18),
+			Position = UDim2.fromOffset(10, 32),
+			Size = UDim2.new(1, -130, 0, 18),
 			Parent = frame,
 		})
 		local fill = if milestone.Need <= 0 then 1 else math.clamp(have / milestone.Need, 0, 1)
@@ -139,10 +154,10 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		if claimable then
 			local claimButton = UIKit.button({
 				Text = "Claim",
-				TextSize = 16,
-				AnchorPoint = Vector2.new(0.5, 0.5),
-				Position = UDim2.new(1, -50, 0.5, -2),
-				Size = UDim2.fromOffset(88, 34),
+				TextSize = 20,
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -10, 0.5, -3),
+				Size = UDim2.fromOffset(110, 46),
 				Parent = frame,
 			}, function()
 				claim(milestone.Id)
@@ -153,12 +168,12 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		end
 		UIKit.label({
 			Text = if done then "EARNED" else `{math.min(have, milestone.Need)} / {milestone.Need}`,
-			TextSize = 15,
+			TextSize = 19,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			TextColor3 = if done then DONE_COLOR else colors.SubText,
 			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -10, 0, 4),
-			Size = UDim2.fromOffset(90, 40),
+			Position = UDim2.new(1, -10, 0, 6),
+			Size = UDim2.fromOffset(110, 40),
 			Parent = frame,
 		})
 	end
@@ -191,73 +206,63 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		UIKit.skinCard(card)
 		local render = renders.Get(relicId, relicId)
 		render.AnchorPoint = Vector2.new(0.5, 0)
-		render.Position = UDim2.new(0.5, 0, 0, 3)
-		render.Size = UDim2.fromOffset(42, 42)
+		render.Position = UDim2.new(0.5, 0, 0, 4)
+		render.Size = UDim2.fromOffset(56, 56)
 		render.ImageColor3 = if known then Color3.new(1, 1, 1) else Color3.new(0, 0, 0)
 		render.Parent = card
 		if known and sizeId then
 			UIKit.label({
 				Text = string.upper(sizeId),
-				TextSize = 10,
-				TextXAlignment = Enum.TextXAlignment.Center,
+				TextSize = 13,
+				TextXAlignment = Enum.TextXAlignment.Left,
 				TextColor3 = SIZE_COLORS[sizeId] or colors.Text,
-				Position = UDim2.fromOffset(4, 2),
-				Size = UDim2.new(1, -8, 0, 12),
+				Position = UDim2.fromOffset(6, 2),
+				Size = UDim2.new(1, -12, 0, 14),
 				Parent = card,
 			})
 		end
-		UIKit.label({
+		-- Name on one line that shrinks to fit, then "1 in N" at your current luck.
+		local name = UIKit.label({
 			Text = if known then relic.Name else "???",
-			TextSize = 12,
-			TextTruncate = Enum.TextTruncate.AtEnd,
+			TextSize = 16,
+			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextColor3 = if known then tierColor else colors.SubText,
-			Position = UDim2.fromOffset(4, 46),
-			Size = UDim2.new(1, -8, 0, 16),
+			Position = UDim2.fromOffset(4, 62),
+			Size = UDim2.new(1, -8, 0, 18),
 			Parent = card,
 		})
-		if known then
-			UIKit.label({
-				Text = `+{Format.rate(RelicIncome.of(relicId))}`,
-				TextSize = 12,
-				TextXAlignment = Enum.TextXAlignment.Center,
-				TextColor3 = colors.Gold,
-				Position = UDim2.fromOffset(4, 62),
-				Size = UDim2.new(1, -8, 0, 14),
-				Parent = card,
-			})
-		end
+		UIKit.create("UITextSizeConstraint", { MaxTextSize = 16, MinTextSize = 9, Parent = name })
 		UIKit.label({
-			-- Effective 1/p_i at current luck (SoftCap/Ladder); base rarity stays in the tier name.
-			Text = Odds.indexLine(relicId),
-			TextSize = 10,
+			Text = Format.odds(Odds.item(relicId)),
+			TextSize = 15,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			TextColor3 = tierColor,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			Position = UDim2.new(0, 4, 1, -32),
-			Size = UDim2.new(1, -8, 0, 14),
+			TextColor3 = if known then colors.Text else colors.SubText,
+			Position = UDim2.fromOffset(4, 82),
+			Size = UDim2.new(1, -8, 0, 18),
 			Parent = card,
 		})
 		local seen = state.Mutations[relicId]
 		if known and seen then
 			local dots = UIKit.create("Frame", {
 				BackgroundTransparency = 1,
-				Position = UDim2.new(0, 6, 1, -16),
-				Size = UDim2.new(1, -12, 0, 12),
+				AnchorPoint = Vector2.new(1, 0),
+				Position = UDim2.new(1, -5, 0, 5),
+				Size = UDim2.fromOffset(40, 10),
 				Parent = card,
 			}, {
 				UIKit.create("UIListLayout", {
 					FillDirection = Enum.FillDirection.Horizontal,
-					HorizontalAlignment = Enum.HorizontalAlignment.Center,
+					HorizontalAlignment = Enum.HorizontalAlignment.Right,
 					SortOrder = Enum.SortOrder.LayoutOrder,
-					Padding = UDim.new(0, 4),
+					Padding = UDim.new(0, 3),
 				}),
 			})
 			for mutationIndex, mutation in MutationConfig.Mutations do
 				if seen[mutation.Id] then
 					UIKit.create("Frame", {
 						LayoutOrder = mutationIndex,
-						Size = UDim2.fromOffset(12, 12),
+						Size = UDim2.fromOffset(10, 10),
 						BackgroundColor3 = UIKit.mutationColor(mutation.Id),
 						Parent = dots,
 					}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
@@ -313,10 +318,10 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			local tierColor = UIKit.tierColor(tier.Id)
 			UIKit.label({
 				LayoutOrder = listOrder,
-				Text = `{tier.Name} {found}/{#ids}`,
-				TextSize = 14,
+				Text = `{tier.Name}  {found}/{#ids}`,
+				TextSize = 19,
 				TextColor3 = tierColor,
-				Size = UDim2.new(1, 0, 0, 20),
+				Size = UDim2.new(1, 0, 0, 26),
 				Parent = list,
 			})
 			listOrder += 1
@@ -328,7 +333,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 				Parent = list,
 			}, {
 				UIKit.create("UIGridLayout", {
-					CellSize = UDim2.fromOffset(124, 110),
+					CellSize = UDim2.fromOffset(CARD_SIZE.X, CARD_SIZE.Y),
 					CellPadding = UDim2.fromOffset(6, 6),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}),
@@ -339,16 +344,21 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		end
 	end
 
+	local function clear(list: Instance)
+		for _, child in list:GetChildren() do
+			if child:IsA("GuiObject") then
+				child:Destroy()
+			end
+		end
+	end
+
 	local function render(snapshot: any)
 		order = 0
 		renders.DetachAll()
 		relicList = nil
 		tabButtons = {}
-		for _, child in body:GetChildren() do
-			if child:IsA("GuiObject") then
-				child:Destroy()
-			end
-		end
+		clear(body)
+		clear(relicsBody)
 		local state: Codex.State = { Discovered = snapshot.Discovered or {}, Mutations = snapshot.Mutations or {} }
 		lastState = state
 		lastSizes = snapshot.Sizes or {}
@@ -360,6 +370,8 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 				claimable += 1
 			end
 		end
+		local rewardsTab = pageButtons.Rewards
+		rewardsTab.Text = if claimable > 0 then `Rewards ({claimable})` else "Rewards"
 
 		local discovered = 0
 		for _, relicId in CodexBook.AllIds do
@@ -367,36 +379,59 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 				discovered += 1
 			end
 		end
-		local luck, income = Codex.bonuses(CodexBook, claimed)
-		local summaryHolder = UIKit.slot(body, "Summary", UDim2.new(1, -10, 0, 56), nextOrder())
-		local summary = UIKit.create("Frame", {
-			BackgroundColor3 = colors.Card,
-			Parent = summaryHolder,
-		}, { UIKit.corner(8) })
-		UIKit.fill(summary)
-		UIKit.skinCard(summary, colors.Trim)
-		summary:SetAttribute("PopIn", true)
-		UIKit.label({
-			Text = `{discovered} / {#CodexBook.AllIds} found`,
-			TextSize = 24,
-			Position = UDim2.fromOffset(10, 4),
-			Size = UDim2.new(1, -20, 0, 28),
-			Parent = summary,
-		})
-		UIKit.label({
-			Text = `+{math.round(luck * 100)}% Luck  +{math.round(income * 100)}% CE`,
-			TextSize = 13,
-			TextColor3 = colors.Gold,
-			Position = UDim2.fromOffset(10, 34),
-			Size = UDim2.new(1, -20, 0, 18),
-			Parent = summary,
-		})
 
+		-- Relics tab: found count, size tabs, then the grid grouped by rarity.
+		UIKit.label({
+			LayoutOrder = 1,
+			Text = `{discovered} / {#CodexBook.AllIds} found`,
+			FontFace = UIKit.TitleFont,
+			TextSize = 26,
+			TextColor3 = colors.Gold,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Size = UDim2.new(1, -10, 0, 32),
+			Parent = relicsBody,
+		})
+		local sizeTabs = { { Id = "Normal", Text = "Normal" }, { Id = "Huge", Text = "Huge" }, { Id = "Titanic", Text = "Titanic" } }
+		local sizeBar, sizeButtons = UIKit.tabBar(relicsBody, sizeTabs, sizeTab, function(id)
+			if sizeTab ~= id then
+				sizeTab = id
+				renderRelicList()
+			end
+		end)
+		sizeBar.LayoutOrder = 2
+		sizeBar.Size = UDim2.new(1, -10, 0, UIKit.TAB_HEIGHT)
+		tabButtons = sizeButtons
+		relicList = UIKit.create("Frame", {
+			Name = "RelicList",
+			LayoutOrder = 3,
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, -10, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Parent = relicsBody,
+		}, {
+			UIKit.create("UIListLayout", {
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+			}),
+		})
+		renderRelicList()
+
+		-- Rewards tab: bonuses, Claim all, milestones and titles.
+		local luck, income = Codex.bonuses(CodexBook, claimed)
+		UIKit.label({
+			LayoutOrder = nextOrder(),
+			Text = `Codex bonus: +{math.round(luck * 100)}% Luck  +{math.round(income * 100)}% CE`,
+			TextSize = 20,
+			TextColor3 = colors.Gold,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Size = UDim2.new(1, -10, 0, 30),
+			Parent = body,
+		})
 		if claimable > 0 then
-			local claimSlot = UIKit.slot(body, "ClaimAll", UDim2.new(1, -10, 0, 40), nextOrder())
+			local claimSlot = UIKit.slot(body, "ClaimAll", UDim2.new(1, -10, 0, 56), nextOrder())
 			local claimAll = UIKit.button({
-				Text = `Claim all rewards ({claimable})`,
-				TextSize = 17,
+				Text = `Claim all ({claimable})`,
+				TextSize = 22,
 				Parent = claimSlot,
 			}, function()
 				claim("All")
@@ -424,57 +459,14 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		local titles = Codex.titles(CodexBook, claimed)
 		UIKit.label({
 			LayoutOrder = nextOrder(),
-			Text = if #titles > 0 then table.concat(titles, ", ") else "None yet. Titles come from the milestones above.",
-			TextSize = 14,
+			Text = if #titles > 0 then table.concat(titles, ", ") else "None yet.",
+			TextSize = 18,
 			TextWrapped = true,
 			TextColor3 = if #titles > 0 then colors.Gold else colors.SubText,
-			Size = UDim2.new(1, -10, 0, 36),
+			Size = UDim2.new(1, -10, 0, 40),
 			Parent = body,
 		})
-
-		heading("Relics")
-		local tabs = UIKit.create("Frame", {
-			LayoutOrder = nextOrder(),
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1, -10, 0, UIKit.TAB_HEIGHT),
-			Parent = body,
-		}, {
-			UIKit.create("UIListLayout", {
-				FillDirection = Enum.FillDirection.Horizontal,
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 6),
-			}),
-		})
-		for index, tab in SIZE_TABS do
-			tabButtons[tab] = UIKit.button({
-				Text = tab,
-				TextSize = 15,
-				LayoutOrder = index,
-				Size = UDim2.new(1 / #SIZE_TABS, -4, 1, 0),
-				Parent = tabs,
-			}, function()
-				if sizeTab == tab then
-					return
-				end
-				sizeTab = tab
-				renderRelicList()
-			end)
-		end
-		relicList = UIKit.create("Frame", {
-			LayoutOrder = nextOrder(),
-			BackgroundTransparency = 1,
-			Size = UDim2.new(1, -10, 0, 0),
-			AutomaticSize = Enum.AutomaticSize.Y,
-			Parent = body,
-		}, {
-			UIKit.create("UIListLayout", {
-				SortOrder = Enum.SortOrder.LayoutOrder,
-				Padding = UDim.new(0, 4),
-			}),
-		})
-		renderRelicList()
 	end
-
 	local claiming = false
 	function claim(which: string)
 		if claiming then
