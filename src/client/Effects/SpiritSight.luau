@@ -18,6 +18,7 @@ local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local Ambience = require(script.Parent.Ambience)
 local HuntFX = require(script.Parent.HuntFX)
 local HuntModels = require(script.Parent.HuntModels)
+local SightTransition = require(script.Parent.SightTransition)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
 
@@ -340,7 +341,15 @@ function SpiritSight.SetEnabled(on: boolean)
 	end
 	enabled = on
 	folder.Parent = if on then workspace else nil
-	tint.Enabled = on
+	-- The spirit tint swaps in while the eyes are shut (SightTransition).
+	local function swapTint()
+		tint.Enabled = enabled
+	end
+	if on then
+		SightTransition.Enter(swapTint)
+	else
+		SightTransition.Exit(swapTint)
+	end
 	for _, signal in signals do
 		setSignalSound(signal, on)
 		if not on then
