@@ -1,5 +1,5 @@
--- Rows describing a Session summary (GDD 9.4): time, scans, discoveries, new relics, best item
--- and mutation, junk sold and shrine CE produced online. Used by the Journal.
+-- Stat tiles for a Session summary (GDD 9.4): time, scans, finds, new relics, CE produced online,
+-- relics auto-sold, and the best find. Used by the Journal.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -12,7 +12,7 @@ local UIKit = require(script.Parent.UIKit)
 
 local ReportCard = {}
 
-local ROW_HEIGHT = 24
+local TILE_HEIGHT = 72
 
 local function findText(find: { Id: string, Mutation: string? }?): (string, Color3)
 	if not find then
@@ -27,50 +27,75 @@ local function findText(find: { Id: string, Mutation: string? }?): (string, Colo
 	return `{Odds.displayName(find.Id, find.Mutation)}{if tier then ` ({tier.Name})` else ""}`, color
 end
 
--- Adds the rows to `parent` (a frame with a UIListLayout) starting at LayoutOrder `order`.
--- Returns the next free LayoutOrder.
+-- Adds a grid of big stat tiles (value on top, small label under it) to `parent` (a frame with a
+-- UIListLayout) at LayoutOrder `order`. Returns the next free LayoutOrder.
 function ReportCard.Fill(parent: Instance, summary: Session.Summary, order: number): number
 	local report = summary.Report
 	local bestText, bestColor = findText(report.Best)
-	local mutatedText, mutatedColor = findText(report.BestMutated)
-	local newText = `{report.NewUnique} new relic{if report.NewUnique == 1 then "" else "s"}`
-	if report.NewVariants > 0 then
-		newText ..= `, {report.NewVariants} new mutation{if report.NewVariants == 1 then "" else "s"}`
-	end
-	local rows: { { string | Color3 } } = {
-		{ "Time", Format.duration(summary.Seconds) },
-		{ "Scans", Format.number(summary.Scans) },
-		{ "Discoveries", `{Format.number(report.Discoveries)}  ({newText})` },
-		{ "Best find", bestText, bestColor },
-		{ "Best mutation", mutatedText, mutatedColor },
-		{ "Auto-sold", `{Format.number(report.SoldCount)} relics for {Format.ce(report.SoldCE)} CE` },
-		{ "Shrine income", `{Format.ce(summary.IncomeCE)} CE`, UIKit.Colors.Gold },
+	local tiles: { { string | Color3 } } = {
+		{ Format.duration(summary.Seconds), "Time" },
+		{ Format.number(summary.Scans), "Scans" },
+		{ Format.number(report.Discoveries), "Found" },
+		{ Format.number(report.NewUnique), "New relics" },
+		{ Format.ce(summary.IncomeCE), "CE earned", UIKit.Colors.Gold },
+		{ Format.number(report.SoldCount), "Auto-sold" },
 	}
-	for _, row in rows do
-		order += 1
-		local line = UIKit.create("Frame", {
-			LayoutOrder = order,
-			Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
-			BackgroundTransparency = 1,
-			Parent = parent,
+	order += 1
+	local grid = UIKit.create("Frame", {
+		Name = "Stats",
+		LayoutOrder = order,
+		BackgroundTransparency = 1,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, -10, 0, 0),
+		Parent = parent,
+	}, {
+		UIKit.create("UIGridLayout", {
+			CellSize = UDim2.new(1 / 3, -6, 0, TILE_HEIGHT),
+			CellPadding = UDim2.fromOffset(8, 8),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+	})
+	for index, tile in tiles do
+		local frame = UIKit.create("Frame", {
+			LayoutOrder = index,
+			BackgroundColor3 = UIKit.Colors.Card,
+			Parent = grid,
+		}, { UIKit.corner(10) })
+		UIKit.skinCard(frame)
+		local value = UIKit.label({
+			Text = tile[1] :: string,
+			TextSize = 30,
+			TextScaled = true,
+			TextColor3 = (tile[3] :: Color3?) or UIKit.Colors.Text,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Position = UDim2.fromOffset(6, 8),
+			Size = UDim2.new(1, -12, 0, 34),
+			Parent = frame,
 		})
+		UIKit.create("UITextSizeConstraint", { MaxTextSize = 32, MinTextSize = 14, Parent = value })
 		UIKit.label({
-			Text = row[1] :: string,
-			TextSize = 14,
+			Text = tile[2] :: string,
+			TextSize = 17,
 			TextColor3 = UIKit.Colors.SubText,
-			Size = UDim2.fromScale(0.32, 1),
-			Parent = line,
-		})
-		UIKit.label({
-			Text = row[2] :: string,
-			TextSize = 15,
-			TextColor3 = (row[3] :: Color3?) or UIKit.Colors.Text,
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			Position = UDim2.fromScale(0.32, 0),
-			Size = UDim2.fromScale(0.68, 1),
-			Parent = line,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Position = UDim2.fromOffset(4, 44),
+			Size = UDim2.new(1, -8, 0, 20),
+			Parent = frame,
 		})
 	end
+	-- Best find gets its own wide line in its rarity color.
+	order += 1
+	local best = UIKit.label({
+		LayoutOrder = order,
+		Text = `Best: {bestText}`,
+		TextSize = 20,
+		TextScaled = true,
+		TextColor3 = bestColor,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Size = UDim2.new(1, -10, 0, 28),
+		Parent = parent,
+	})
+	UIKit.create("UITextSizeConstraint", { MaxTextSize = 21, MinTextSize = 13, Parent = best })
 	return order
 end
 

@@ -48,8 +48,8 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 		UIKit.heading({
 			LayoutOrder = order,
 			Text = text,
-			TextSize = 16,
-			Size = UDim2.new(1, -10, 0, 26),
+			TextSize = 20,
+			Size = UDim2.new(1, -10, 0, 28),
 			Parent = list,
 		})
 	end
@@ -63,13 +63,13 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 		heading("This session", 1)
 		local order = ReportCard.Fill(list, Session.Summarize(Session.Total), 1)
 		order += 1
-		heading(`Rare finds ({Config.Save.RareHistoryTier} or rarer, last {Config.Save.RareHistoryMax})`, order)
+		heading(`Rare finds ({Config.Save.RareHistoryTier}+)`, order)
 		if #history == 0 then
 			order += 1
 			UIKit.label({
 				LayoutOrder = order,
 				Text = "Nothing rare yet. Keep scanning!",
-				TextSize = 14,
+				TextSize = 18,
 				TextColor3 = colors.SubText,
 				Size = UDim2.new(1, -10, 0, 24),
 				Parent = list,
@@ -86,7 +86,7 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 			local color = if find.Mutation then UIKit.mutationColor(find.Mutation) else UIKit.tierColor(relic.Tier)
 			local row = UIKit.create("Frame", {
 				LayoutOrder = order,
-				Size = UDim2.new(1, -10, 0, 44),
+				Size = UDim2.new(1, -10, 0, 54),
 				BackgroundColor3 = colors.Card,
 				Parent = list,
 			}, { UIKit.corner(8), UIKit.stroke(color, 1, 0.5) })
@@ -100,20 +100,21 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 			}, { UIKit.corner(3) })
 			UIKit.label({
 				Text = Odds.displayName(find.Id, find.Mutation),
-				TextSize = 15,
+				TextSize = 19,
+				TextScaled = true,
 				TextColor3 = color,
-				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(18, 4),
-				Size = UDim2.new(1, -24, 0, 18),
+				Position = UDim2.fromOffset(18, 5),
+				Size = UDim2.new(1, -24, 0, 22),
 				Parent = row,
 			})
 			local ago = math.max(0, now - (tonumber(find.At) or now))
 			UIKit.label({
 				Text = `{Odds.describe(find.Id, nil)}  |  {SOURCE_TEXT[find.Source] or "found"} {Format.duration(ago)} ago`,
-				TextSize = 13,
+				TextSize = 16,
+				TextScaled = true,
 				TextColor3 = colors.SubText,
-				Position = UDim2.fromOffset(18, 23),
-				Size = UDim2.new(1, -24, 0, 16),
+				Position = UDim2.fromOffset(18, 30),
+				Size = UDim2.new(1, -24, 0, 18),
 				Parent = row,
 			})
 		end
@@ -137,7 +138,18 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 				cleansed[id] = true
 			end
 		end
-		local order = 0
+		local order = 1
+		-- Said once here instead of on every zone card.
+		UIKit.label({
+			LayoutOrder = order,
+			Text = "Cleanse shrines to lift a zone's curse. Hunting there levels its mastery.",
+			TextSize = 17,
+			TextWrapped = true,
+			TextColor3 = colors.SubText,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Size = UDim2.new(1, -10, 0, 44),
+			Parent = list,
+		})
 		for _, area in Config.Areas do
 			local done, total = Curse.progress(cleansed, WildLayout.CursedShrines, area.Id)
 			local xp = player:GetAttribute(`Mastery_{area.Id}`)
@@ -149,31 +161,30 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 			order += 1
 			local card = UIKit.create("Frame", {
 				LayoutOrder = order,
-				Size = UDim2.new(1, -10, 0, 86),
+				Size = UDim2.new(1, -10, 0, 92),
 				BackgroundColor3 = colors.Card,
 				Parent = list,
-			}, { UIKit.corner(8), UIKit.padding(8) })
+			}, { UIKit.corner(8), UIKit.padding(10) })
 			UIKit.skinCard(card)
 			UIKit.label({
-				Text = if done == total
-					then `Curse lifted {done}/{total} - purified!`
-					else `Curse lifted {done}/{total} - cleanse its shrines to thin the fog`,
-				TextSize = 14,
+				Text = if done == total then `Shrines {done}/{total}  Purified!` else `Shrines {done}/{total}`,
+				TextSize = 19,
 				TextColor3 = if done == total then colors.Gold else colors.Text,
-				Size = UDim2.new(1, 0, 0, 18),
+				Size = UDim2.new(0.5, 0, 0, 22),
 				Parent = card,
 			})
 			UIKit.label({
-				Text = if size > 0 then `Mastery level {level} - {into}/{size} XP` else `Mastery level {level} (max)`,
-				TextSize = 14,
-				Position = UDim2.fromOffset(0, 22),
-				Size = UDim2.new(1, 0, 0, 18),
+				Text = if size > 0 then `Mastery Lv {level}` else `Mastery Lv {level} (max)`,
+				TextSize = 19,
+				TextXAlignment = Enum.TextXAlignment.Right,
+				Position = UDim2.fromScale(0.5, 0),
+				Size = UDim2.new(0.5, 0, 0, 22),
 				Parent = card,
 			})
 			local track = UIKit.create("Frame", {
 				BackgroundColor3 = colors.Track,
-				Position = UDim2.fromOffset(0, 44),
-				Size = UDim2.new(1, 0, 0, 8),
+				Position = UDim2.fromOffset(0, 30),
+				Size = UDim2.new(1, 0, 0, 10),
 				Parent = card,
 			}, { UIKit.corner(4) })
 			UIKit.create("Frame", {
@@ -182,13 +193,12 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 				Parent = track,
 			}, { UIKit.corner(4) })
 			UIKit.label({
-				Text = if nextPerk
-					then `Next perk at level {nextPerk.Level}: {ZoneMastery.perkText(nextPerk)} (in this zone)`
-					else "Every perk unlocked in this zone.",
-				TextSize = 12,
-				TextColor3 = colors.SubText,
-				Position = UDim2.fromOffset(0, 56),
-				Size = UDim2.new(1, 0, 0, 16),
+				Text = if nextPerk then `Lv {nextPerk.Level}: {ZoneMastery.perkText(nextPerk)}` else "All perks unlocked",
+				TextSize = 17,
+				TextScaled = true,
+				TextColor3 = colors.Cyan,
+				Position = UDim2.fromOffset(0, 48),
+				Size = UDim2.new(1, 0, 0, 20),
 				Parent = card,
 			})
 			for _, shrine in WildLayout.CursedShrines do
@@ -200,7 +210,7 @@ function JournalPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> 
 				UIKit.label({
 					LayoutOrder = order,
 					Text = `"{lore}"`,
-					TextSize = 13,
+					TextSize = 16,
 					TextWrapped = true,
 					TextColor3 = colors.SubText,
 					Size = UDim2.new(1, -10, 0, 34),
