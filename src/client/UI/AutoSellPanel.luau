@@ -1,15 +1,18 @@
 -- Auto-sell rules menu (GDD 9.2). Every change is sent at once and the server's cleaned-up rules
 -- are redrawn. The preview runs the same AutoSell.decide the server uses on your current
 -- inventory and Codex, so "what will happen" is exactly what will happen.
+-- Layout: a quick row ("Sell duplicates up to: Off / Common / ... / Legendary") that sets every
+-- rarity at once, one compact chip per rarity (tap to cycle Keep -> Dupes -> All) for the exact
+-- rules, the two protection switches, the two extra rules, and one line on your likely next find.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AutoSell = require(ReplicatedStorage.Shared.AutoSell)
 local Format = require(ReplicatedStorage.Shared.Format)
-local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RelicIncome = require(ReplicatedStorage.Shared.RelicIncome)
+local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local Odds = require(script.Parent.Odds)
 local UIKit = require(script.Parent.UIKit)
 
@@ -20,9 +23,12 @@ local GetCodex = Remotes:WaitForChild("GetCodex") :: RemoteFunction
 
 local AutoSellPanel = {}
 
-local ROW_HEIGHT = 40
--- The preview shows a mutated copy as the most common mutation.
-local PREVIEW_MUTATION = MutationConfig.Mutations[1]
+local ROW_HEIGHT = 52
+local CHIP_HEIGHT = 56
+-- Highest rarity the quick row offers; rarer finds are always worth a look.
+local QUICK_MAX_TIER = 5
+local MODE_SHORT = { Keep = "Keep", SellDuplicates = "Dupes", SellAll = "All" }
+local KEEP_COLOR = Color3.fromRGB(120, 230, 140)
 
 local function nextIn<T>(list: { T }, current: T): T
 	local index = table.find(list, current) or 0
@@ -33,15 +39,41 @@ local function thresholdLabel(value: number): string
 	return if value <= 0 then "Off" else `1 in {Format.number(value)}`
 end
 
+-- The quick-row choice the rules match exactly ("Off", a tier id), or nil for a custom mix.
+local function quickChoice(rules: AutoSell.Rules): string?
+	local highest: string? = nil
+	local sawKeep = false
+	for _, tier in RarityConfig.Tiers do
+		local mode = rules.Tiers[tier.Id] or "Keep"
+		if mode == "SellDuplicates" then
+			if sawKeep then
+				return nil
+			end
+			highest = tier.Id
+		elseif mode == "Keep" then
+			sawKeep = true
+		else
+			return nil
+		end
+	end
+	return highest or "Off"
+end
+
 function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (boolean) -> () }
 	local colors = UIKit.Colors
 	local state: any = nil
 	local discovered: { [string]: number } = {}
 
 	local panel, content =
-		UIKit.modal(screen, "AutoSellMenu", "AUTO-SELL RULES", colors.Accent, Vector2.new(540, 640), "Backpack")
-	local body = UIKit.scrollList(content, 6)
+		UIKit.modal(screen, "AutoSellMenu", "AUTO-SELL", colors.Accent, Vector2.new(600, 640), "Backpack")
+	local body = UIKit.scrollList(content, 8)
+	body.ScrollBarImageColor3 = colors.Trim
 	local order = 0
+
+	local function nextOrder(): number
+		order += 1
+		return order
+	end
 
 	local function clear()
 		order = 0
@@ -52,41 +84,44 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 		end
 	end
 
-	local function row(height: number?): Frame
-		order += 1
-		local frame = UIKit.create("Frame", {
-			LayoutOrder = order,
-			Size = UDim2.new(1, -10, 0, height or ROW_HEIGHT),
-			BackgroundColor3 = colors.Card,
-			Parent = body,
-		}, { UIKit.corner(8) })
-		UIKit.skinCard(frame)
-		return frame
-	end
-
-	local function text(parent: Instance, value: string, props: { [string]: any }?)
-		local label = UIKit.label({
-			Text = value,
-			TextSize = 14,
-			TextWrapped = true,
-			Position = UDim2.fromOffset(10, 0),
-			Size = UDim2.new(1, -20, 1, 0),
-			Parent = parent,
-		})
-		for key, prop in props or {} do
-			(label :: any)[key] = prop
-		end
-		return label
-	end
-
 	local function heading(value: string)
-		order += 1
 		UIKit.heading({
-			LayoutOrder = order,
+			LayoutOrder = nextOrder(),
 			Text = value,
-			TextSize = 15,
+			TextSize = 19,
 			Size = UDim2.new(1, -10, 0, 24),
 			Parent = body,
+		})
+	end
+
+	local function line(value: string, color: Color3?, size: number?): TextLabel
+		return UIKit.label({
+			LayoutOrder = nextOrder(),
+			Text = value,
+			TextSize = size or 18,
+			TextColor3 = color or colors.SubText,
+			TextWrapped = true,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.new(1, -10, 0, 0),
+			Parent = body,
+		})
+	end
+
+	local function grid(name: string, columns: number): Frame
+		return UIKit.create("Frame", {
+			Name = name,
+			LayoutOrder = nextOrder(),
+			BackgroundTransparency = 1,
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Size = UDim2.new(1, -10, 0, 0),
+			Parent = body,
+		}, {
+			UIKit.create("UIGridLayout", {
+				CellSize = UDim2.new(1 / columns, -6, 0, CHIP_HEIGHT),
+				CellPadding = UDim2.fromOffset(8, 8),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
 		})
 	end
 
@@ -112,82 +147,74 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 		end)
 	end
 
-	local function control(parent: Frame, label: string, width: number, color: Color3, onClick: () -> ())
-		local button = UIKit.button({
+	-- A row with a label on the left and an ON/OFF (or value) button on the right.
+	local function switchRow(label: string, value: string, on: boolean, onClick: () -> ())
+		local frame = UIKit.create("Frame", {
+			LayoutOrder = nextOrder(),
+			Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
+			BackgroundColor3 = colors.Card,
+			Parent = body,
+		}, { UIKit.corner(8) })
+		UIKit.skinCard(frame)
+		UIKit.label({
 			Text = label,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(1, -6 - width / 2, 0.5, 0),
-			Size = UDim2.fromOffset(width, 32),
-			Parent = parent,
+			TextSize = 19,
+			Position = UDim2.fromOffset(12, 0),
+			Size = UDim2.new(1, -150, 1, 0),
+			Parent = frame,
+		})
+		local button = UIKit.button({
+			Text = value,
+			TextSize = 19,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -6, 0.5, 0),
+			Size = UDim2.fromOffset(124, ROW_HEIGHT - 10),
+			Parent = frame,
 		}, onClick)
-		UIKit.skinButton(button, if color == colors.Accent then "Primary" else "Dark")
+		UIKit.skinTab(button, on)
 	end
 
-	local function toggleRow(label: string, key: string)
-		local on = state.AutoSell[key] == true
-		local frame = row()
-		text(frame, label, { Size = UDim2.new(1, -110, 1, 0) })
-		control(frame, if on then "ON" else "OFF", 80, if on then colors.Accent else colors.Panel, function()
-			save(function(draft)
-				draft[key] = not on
-			end)
-		end)
-	end
-
-	local function previewRow(relic: RelicConfig.Relic)
-		local rules = state.AutoSell
-		local plainIncome = RelicIncome.of(relic.Id)
-		local mutatedIncome = RelicIncome.of(relic.Id, PREVIEW_MUTATION.Id)
-		local bestHeld = -1
-		local favorites = {}
-		for _, group in state.Groups do
-			if group.Id == relic.Id then
-				bestHeld = math.max(bestHeld, group.IncomePerSec)
-				if group.Favorite then
-					favorites[AutoSell.favoriteKey(group.Id, group.Mutation)] = true
+	-- What your most likely next find (most common rarity at your luck, a relic you own) would do.
+	local function nextFindLine(): (string, Color3)
+		local ctx = Odds.current()
+		local masses = RollMath.tierMasses(ctx.Tiers, ctx.Luck)
+		local bestIndex = 1
+		for index, mass in masses do
+			if mass > masses[bestIndex] then
+				bestIndex = index
+			end
+		end
+		local tierId = ctx.Tiers[bestIndex].Id
+		local tier = RarityConfig.Get(tierId)
+		local relic: RelicConfig.Relic? = nil
+		for _, candidate in RelicConfig.Relics do
+			if candidate.Tier == tierId and (relic == nil or discovered[candidate.Id] ~= nil) then
+				relic = candidate
+				if discovered[candidate.Id] then
+					break
 				end
 			end
 		end
-		local base = {
+		if not relic then
+			return "", colors.SubText
+		end
+		local bestHeld = -1
+		for _, group in state.Groups do
+			if group.Id == relic.Id and not group.Mutation then
+				bestHeld = math.max(bestHeld, group.IncomePerSec)
+			end
+		end
+		local sell, reason = AutoSell.decide(state.AutoSell, {
 			Tier = relic.Tier,
 			BaseOneIn = 1 / math.max(Odds.baseItem(relic.Id), 1e-300),
 			First = discovered[relic.Id] == nil,
-		}
-		local function outcome(mutated: boolean, income: number, key: string): (string, Color3)
-			local sell, reason = AutoSell.decide(rules, {
-				Tier = base.Tier,
-				BaseOneIn = base.BaseOneIn,
-				First = base.First,
-				Mutated = mutated,
-				Duplicate = bestHeld >= income,
-				Favorite = favorites[key] == true,
-			})
-			local word = if sell then "SELL" else "KEEP"
-			return `{word} ({AutoSell.ReasonText[reason]})`, if sell then colors.Red else Color3.fromRGB(120, 230, 140)
-		end
-		local plainText, plainColor = outcome(false, plainIncome, relic.Id)
-		local mutatedText = outcome(true, mutatedIncome, AutoSell.favoriteKey(relic.Id, PREVIEW_MUTATION.Id))
-
-		local frame = row(46)
-		local name = if discovered[relic.Id] then relic.Name else `??? (new {relic.Tier})`
-		text(frame, name, {
-			TextColor3 = UIKit.tierColor(relic.Tier),
-			TextTruncate = Enum.TextTruncate.AtEnd,
-			TextWrapped = false,
-			Size = UDim2.new(0.45, -10, 1, 0),
+			Mutated = false,
+			Duplicate = bestHeld >= RelicIncome.of(relic.Id),
+			Favorite = false,
 		})
-		text(frame, `Next copy: {plainText}`, {
-			TextSize = 12,
-			TextColor3 = plainColor,
-			Position = UDim2.new(0.45, 0, 0, 4),
-			Size = UDim2.new(0.55, -10, 0, 18),
-		})
-		text(frame, `{PREVIEW_MUTATION.Name} copy: {mutatedText}`, {
-			TextSize = 12,
-			TextColor3 = colors.SubText,
-			Position = UDim2.new(0.45, 0, 0, 23),
-			Size = UDim2.new(0.55, -10, 0, 18),
-		})
+		local verb = if sell then "SOLD" else "KEPT"
+		return `Next {if tier then tier.Name else tierId} duplicate: {verb} ({AutoSell.ReasonText[reason]})`,
+			if sell then colors.Red else KEEP_COLOR
 	end
 
 	function render()
@@ -197,66 +224,108 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 		end
 		local rules = state.AutoSell
 
-		text(
-			row(64),
-			"Applies to new finds only. Pedestal, locked and favorite relics are never auto-sold, and every first find is recorded in the Codex even if it is sold.",
-			{ TextSize = 13, TextColor3 = colors.SubText, Position = UDim2.fromOffset(10, 4), Size = UDim2.new(1, -20, 1, -8) }
-		)
+		line("New finds only. Favorite, locked and placed relics are safe.")
+		if state.Count >= state.Capacity then
+			line(`Backpack full ({state.Count}/{state.Capacity}): sell relics to keep scanning.`, colors.Red)
+		end
 
-		heading("By rarity")
-		for _, tier in RarityConfig.Tiers do
+		heading("Sell duplicates up to")
+		local quick = quickChoice(rules)
+		local quickGrid = grid("Quick", 3)
+		local quickOptions = { { Id = "Off", Text = "Off" } }
+		for index, tier in RarityConfig.Tiers do
+			if index > QUICK_MAX_TIER then
+				break
+			end
+			table.insert(quickOptions, { Id = tier.Id, Text = tier.Name })
+		end
+		for index, option in quickOptions do
+			local chip = UIKit.button({
+				Name = option.Id,
+				LayoutOrder = index,
+				Text = option.Text,
+				TextSize = 19,
+				Parent = quickGrid,
+			}, function()
+				save(function(draft)
+					local on = option.Id ~= "Off"
+					for _, tier in RarityConfig.Tiers do
+						draft.Tiers[tier.Id] = if on then "SellDuplicates" else "Keep"
+						if tier.Id == option.Id then
+							on = false
+						end
+					end
+				end)
+			end)
+			UIKit.skinTab(chip, quick == option.Id)
+			if option.Id ~= "Off" then
+				chip.TextColor3 = if quick == option.Id then colors.Panel else UIKit.tierColor(option.Id)
+			end
+		end
+
+		heading(if quick then "Each rarity" else "Each rarity (custom)")
+		local tierGrid = grid("Tiers", 4)
+		for index, tier in RarityConfig.Tiers do
 			local mode = rules.Tiers[tier.Id] or "Keep"
-			local frame = row()
-			text(frame, tier.Name, { TextColor3 = UIKit.tierColor(tier.Id), Size = UDim2.new(1, -180, 1, 0) })
-			control(frame, AutoSell.ModeLabels[mode], 160, if mode == "Keep" then colors.Panel else colors.Accent, function()
+			local chip = UIKit.button({
+				Name = tier.Id,
+				LayoutOrder = index,
+				Text = "",
+				Parent = tierGrid,
+			}, function()
 				save(function(draft)
 					draft.Tiers[tier.Id] = nextIn(AutoSell.Modes, mode)
 				end)
 			end)
+			UIKit.skinButton(chip, if mode == "Keep" then "Dark" else "Primary")
+			UIKit.label({
+				Text = tier.Name,
+				TextSize = 17,
+				TextScaled = true,
+				TextColor3 = UIKit.tierColor(tier.Id),
+				TextXAlignment = Enum.TextXAlignment.Center,
+				Position = UDim2.fromOffset(4, 5),
+				Size = UDim2.new(1, -8, 0, 20),
+				Parent = chip,
+			})
+			UIKit.label({
+				Text = MODE_SHORT[mode],
+				TextSize = 19,
+				TextColor3 = if mode == "Keep" then KEEP_COLOR else colors.Text,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				Position = UDim2.fromOffset(4, 27),
+				Size = UDim2.new(1, -8, 0, 22),
+				Parent = chip,
+			})
 		end
 
-		heading("Extra rules")
-		toggleRow("Sell duplicates of every rarity", "SellAllDuplicates")
-		local thresholdFrame = row(58)
-		text(thresholdFrame, "Also sell anything MORE COMMON than:", {
-			Position = UDim2.fromOffset(10, 4),
-			Size = UDim2.new(1, -150, 0, 22),
-		})
-		text(
-			thresholdFrame,
-			if rules.SellEasierThan > 0
-				then `e.g. a 1 in {Format.number(rules.SellEasierThan / 2)} relic is sold, a 1 in {Format.number(
-					rules.SellEasierThan * 5
-				)} relic is kept.`
-				else "Off: base odds never sell anything by themselves.",
-			{
-				TextSize = 12,
-				TextColor3 = colors.SubText,
-				Position = UDim2.fromOffset(10, 28),
-				Size = UDim2.new(1, -150, 0, 24),
-			}
-		)
-		control(thresholdFrame, thresholdLabel(rules.SellEasierThan), 120, if rules.SellEasierThan > 0
-			then colors.Accent
-			else colors.Panel, function()
+		heading("Protect")
+		switchRow("First finds", if rules.ProtectFirst then "ON" else "OFF", rules.ProtectFirst, function()
+			save(function(draft)
+				draft.ProtectFirst = not rules.ProtectFirst
+			end)
+		end)
+		switchRow("Mutated relics", if rules.ProtectMutated then "ON" else "OFF", rules.ProtectMutated, function()
+			save(function(draft)
+				draft.ProtectMutated = not rules.ProtectMutated
+			end)
+		end)
+
+		heading("More")
+		switchRow("Duplicates of any rarity", if rules.SellAllDuplicates then "ON" else "OFF", rules.SellAllDuplicates, function()
+			save(function(draft)
+				draft.SellAllDuplicates = not rules.SellAllDuplicates
+			end)
+		end)
+		switchRow("Anything more common than", thresholdLabel(rules.SellEasierThan), rules.SellEasierThan > 0, function()
 			save(function(draft)
 				draft.SellEasierThan = nextIn(AutoSell.ThresholdPresets, rules.SellEasierThan)
 			end)
 		end)
 
-		heading("Protection (wins over the rules above)")
-		toggleRow("Protect first discoveries", "ProtectFirst")
-		toggleRow("Protect mutated relics", "ProtectMutated")
-
-		heading("What happens to your next find")
-		if state.Count >= state.Capacity then
-			text(row(44), `[INVENTORY FULL] {state.Count}/{state.Capacity}: scanning is paused until you sell relics.`, {
-				TextSize = 13,
-				TextColor3 = colors.Red,
-			})
-		end
-		for _, relic in RelicConfig.Relics do
-			previewRow(relic)
+		local text, color = nextFindLine()
+		if text ~= "" then
+			line(text, color, 19)
 		end
 	end
 
