@@ -1,7 +1,7 @@
 -- Settings menu (GDD 12.1): effects quality, reveals, camera effects, sound volume, interface size,
--- Welcome Back summary and beginner hints (ClientSettings, saved by the server). Option settings
--- are buttons that cycle to the next option; range settings (sound volume) are sliders that can be
--- dragged, or moved with the -/+ buttons (gamepad).
+-- Welcome Back summary and beginner hints (ClientSettings, saved by the server). One short label
+-- per row; option settings show every option as pills (On/Off reads as a switch); range settings
+-- (sound volume) are sliders that can be dragged, or moved with the -/+ buttons (gamepad).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,17 +17,26 @@ local player = Players.LocalPlayer
 
 local SettingsPanel = {}
 
-local ROW_HEIGHT = 58
-local CYCLE_WIDTH = 118
-local SLIDER_WIDTH = 250
+local ROW_HEIGHT = 60
+local OPTION_WIDTH = 96
+local SLIDER_WIDTH = 270
+-- Shorter names for the menu rows (ClientSettings keeps the full ones).
+local SHORT_LABELS = {
+	["Visual effects"] = "Effects",
+	["Camera effects"] = "Camera shake",
+	["Sound volume"] = "Sound",
+	["Interface size"] = "Menu size",
+	["Welcome Back summary"] = "Welcome Back",
+	["Beginner hints"] = "Tutorial",
+}
 
 function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (boolean) -> () }
 	local colors = UIKit.Colors
 	local panel, content =
-		UIKit.modal(screen, "SettingsMenu", "SETTINGS", colors.Accent, Vector2.new(520, 600), "Settings")
+		UIKit.modal(screen, "SettingsMenu", "SETTINGS", colors.Accent, Vector2.new(560, 620), "Settings")
 	local list = UIKit.scrollList(content, 6)
 
-	local function row(order: number, label: string, help: string, controlWidth: number): Frame
+	local function row(order: number, label: string, controlWidth: number): Frame
 		local frame = UIKit.create("Frame", {
 			LayoutOrder = order,
 			Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
@@ -36,48 +45,44 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 		}, { UIKit.corner(10), UIKit.padding(8) })
 		UIKit.skinCard(frame)
 		UIKit.label({
-			Text = label,
-			TextSize = 16,
-			Size = UDim2.new(1, -controlWidth - 12, 0, 20),
-			Parent = frame,
-		})
-		UIKit.label({
-			Text = help,
-			TextSize = 12,
-			TextColor3 = colors.SubText,
-			TextWrapped = true,
-			TextYAlignment = Enum.TextYAlignment.Top,
-			Position = UDim2.fromOffset(0, 21),
-			Size = UDim2.new(1, -controlWidth - 12, 1, -21),
+			Text = SHORT_LABELS[label] or label,
+			TextSize = 20,
+			Size = UDim2.new(1, -controlWidth - 12, 1, 0),
 			Parent = frame,
 		})
 		return frame
 	end
 
-	local function cycleControl(frame: Frame, setting: ClientSettings.Setting)
-		local button = UIKit.button({
-			TextSize = 16,
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(1, -CYCLE_WIDTH / 2, 0.5, 0),
-			Size = UDim2.fromOffset(CYCLE_WIDTH, 38),
-			Parent = frame,
-		}, function()
-			local nextValue = ClientSettings.nextOption(setting.Key, Settings.Get(setting.Key))
-			if nextValue ~= nil then
-				Settings.Set(setting.Key, nextValue)
+	-- Every option visible at once as pills; the chosen one is filled gold (On/Off is a switch).
+	local function optionsControl(frame: Frame, setting: ClientSettings.Setting)
+		local options = setting.Options :: { ClientSettings.Value }
+		local tabs = {}
+		for _, option in options do
+			table.insert(tabs, { Id = tostring(option), Text = ClientSettings.display(setting.Key, option) })
+		end
+		local bar, buttons, select = UIKit.tabBar(frame, tabs, tostring(Settings.Get(setting.Key)), function(id)
+			for _, option in options do
+				if tostring(option) == id then
+					Settings.Set(setting.Key, option)
+				end
+			end
+		end, {
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.fromScale(1, 0.5),
+			Size = UDim2.fromOffset(#options * OPTION_WIDTH, ROW_HEIGHT - 16),
+		})
+		bar.Name = setting.Key
+		for _, button in buttons do
+			button.TextSize = 18
+		end
+		player:GetAttributeChangedSignal(`Setting_{setting.Key}`):Connect(function()
+			local id = tostring(Settings.Get(setting.Key))
+			select(id)
+			if buttons[id] then
+				Motion.punch(buttons[id], 1.5)
 			end
 		end)
-		local function show(value: ClientSettings.Value)
-			button.Text = ClientSettings.display(setting.Key, value)
-			UIKit.skinButton(button, if value == setting.Default then "Primary" else "Dark")
-		end
-		show(Settings.Get(setting.Key))
-		player:GetAttributeChangedSignal(`Setting_{setting.Key}`):Connect(function()
-			show(Settings.Get(setting.Key))
-			Motion.punch(button, 1.5)
-		end)
 	end
-
 	local function sliderControl(frame: Frame, setting: ClientSettings.Setting)
 		local range = setting.Range :: ClientSettings.Range
 		local holder = UIKit.create("Frame", {
@@ -106,11 +111,11 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 		nudgeButton("-", 0, -1)
 		nudgeButton("+", SLIDER_WIDTH - 82, 1)
 		local valueLabel = UIKit.label({
-			TextSize = 15,
+			TextSize = 18,
 			TextXAlignment = Enum.TextXAlignment.Right,
 			AnchorPoint = Vector2.new(1, 0.5),
 			Position = UDim2.fromScale(1, 0.5),
-			Size = UDim2.fromOffset(46, 20),
+			Size = UDim2.fromOffset(52, 22),
 			Parent = holder,
 		})
 
@@ -195,9 +200,10 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 
 	for order, setting in ClientSettings.Schema do
 		if setting.Range then
-			sliderControl(row(order, setting.Label, setting.Help, SLIDER_WIDTH), setting)
+			sliderControl(row(order, setting.Label, SLIDER_WIDTH), setting)
 		else
-			cycleControl(row(order, setting.Label, setting.Help, CYCLE_WIDTH), setting)
+			local count = #(setting.Options :: { any })
+			optionsControl(row(order, setting.Label, count * OPTION_WIDTH), setting)
 		end
 	end
 
