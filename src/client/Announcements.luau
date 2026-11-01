@@ -12,6 +12,7 @@ local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local Banner = require(script.Parent.UI.Banner)
 local Odds = require(script.Parent.UI.Odds)
 local UIKit = require(script.Parent.UI.UIKit)
+local Sounds = require(script.Parent.Sounds)
 
 local Announce = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Announce") :: RemoteEvent
 local ServerLuckBought = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("ServerLuckBought") :: RemoteEvent
@@ -54,6 +55,10 @@ function Announcements.Start()
 				`{payload.Name} sealed {Odds.displayName(relic.Id, mutation, size)}  ·  {Format.odds(Odds.baseItem(relic.Id))}`,
 				color
 			)
+			-- A Cosmic find is heard by the whole server.
+			if relic.Tier == "Cosmic" then
+				Sounds.Play("RevealLarge")
+			end
 		end
 	end)
 end

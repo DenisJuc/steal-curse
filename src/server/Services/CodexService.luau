@@ -16,6 +16,10 @@ local RollService = require(script.Parent.RollService)
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local GetCodex = Remotes:WaitForChild("GetCodex") :: RemoteFunction
 local ClaimCodex = Remotes:WaitForChild("ClaimCodex") :: RemoteFunction
+local Notify = Remotes:WaitForChild("Notify") :: RemoteEvent
+
+-- "Almost there" toast when a milestone is this close after a new Codex entry.
+local CLOSE_TO_MILESTONE = 3
 
 local CodexService = {}
 
@@ -74,6 +78,31 @@ local function mirror(player: Player, data: any)
 end
 
 -- Marks newly reached milestones as ready to claim. Call after anything that adds Codex entries.
+-- After a new Codex entry: the closest unreached milestone, if only a few relics away.
+function CodexService.NudgeClosest(player: Player)
+	local data = DataService.Get(player)
+	if not data then
+		return
+	end
+	local state = stateOf(data)
+	local best, bestLeft = nil, math.huge
+	for _, milestone in CodexBook.Milestones do
+		if milestone.Need > 0 and data.CodexMilestones[milestone.Id] == nil and data.CodexReady[milestone.Id] == nil then
+			local left = milestone.Need - Codex.progress(milestone, state)
+			if left > 0 and left < bestLeft then
+				best, bestLeft = milestone, left
+			end
+		end
+	end
+	if best and bestLeft <= CLOSE_TO_MILESTONE then
+		Notify:FireClient(
+			player,
+			`Codex: {bestLeft} more relic{if bestLeft == 1 then "" else "s"} \u{2192} {Codex.rewardText(best)}`,
+			"Item"
+		)
+	end
+end
+
 function CodexService.Evaluate(player: Player)
 	local data = DataService.Get(player)
 	if not data then
