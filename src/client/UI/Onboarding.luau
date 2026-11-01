@@ -173,6 +173,10 @@ function Onboarding.Start(screen: ScreenGui)
 	}, { UIKit.corner(12), UIKit.padding(10), UIKit.stroke(colors.Gold, 2, 0) })
 	UIKit.skinPanel(bubble, colors.Gold)
 	UIKit.scaler(bubble)
+	-- One guidance voice: the HUD's NEXT card steps aside while a tutorial bubble shows.
+	bubble:GetPropertyChangedSignal("Visible"):Connect(function()
+		Players.LocalPlayer:SetAttribute("TutorialShowing", bubble.Visible)
+	end)
 	local infoIcon = Icons.image(bubble, "Info", 30)
 	if infoIcon then
 		infoIcon.Position = UDim2.fromOffset(-24, -24)

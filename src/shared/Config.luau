@@ -944,7 +944,7 @@ Config.Plots = {
 	},
 	ResonatorOffset = { 0, 28 },
 	ShowcaseOffset = { 30, 24 },
-	SpawnOffset = { 0, -34 },
+	SpawnOffset = { 0, -28 },
 }
 
 Config.Hub = {

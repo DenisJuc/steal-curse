@@ -125,7 +125,8 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local function refreshObjective()
 		local text = player:GetAttribute("NextObjectiveText")
 		local hasCollection = type(player:GetAttribute("Essence")) == "number"
-		if not hasCollection or type(text) ~= "string" or text == "" then
+		-- Hidden while a tutorial bubble talks (Onboarding), so there's one instruction at a time.
+		if not hasCollection or type(text) ~= "string" or text == "" or player:GetAttribute("TutorialShowing") == true then
 			objectiveCard.Visible = false
 			return
 		end
@@ -138,6 +139,7 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		objectiveBody.Text = text
 	end
 	player:GetAttributeChangedSignal("NextObjectiveText"):Connect(refreshObjective)
+	player:GetAttributeChangedSignal("TutorialShowing"):Connect(refreshObjective)
 	player:GetAttributeChangedSignal("NextObjectiveDetail"):Connect(refreshObjective)
 	player:GetAttributeChangedSignal("BoardIncomeMult"):Connect(refreshObjective)
 	player:GetAttributeChangedSignal("Essence"):Connect(refreshObjective)
