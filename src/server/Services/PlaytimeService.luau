@@ -78,12 +78,12 @@ local function claim(player: Player, index: unknown): string
 		table.insert(parts, `{Format.ce(amount)} CE`)
 	end
 	if gift.Potions then
-		-- ItemService names the potions in its own toast.
-		ItemService.Grant(player, gift.Potions, "gift")
+		ItemService.Grant(player, gift.Potions, "gift", true)
+		table.insert(parts, 1, ItemService.Describe(gift.Potions))
 	end
 	DataService.RequestSave(player)
 	mirror(player)
-	return if #parts > 0 then `Gift: {table.concat(parts, " + ")}!` else "Gift claimed!"
+	return `Gift: {table.concat(parts, " + ")}!`
 end
 
 function PlaytimeService.Init()

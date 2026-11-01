@@ -126,8 +126,8 @@ local function payGift(player: Player, state: State, reason: string): (string, s
 	end
 	local tier = Offerings.tierOf(options, tierId)
 	if next(reward.Potions) then
-		ItemService.Grant(player, reward.Potions, if tier then tier.Name else reason)
-		table.insert(lines, "potions")
+		ItemService.Grant(player, reward.Potions, if tier then tier.Name else reason, true)
+		table.insert(lines, ItemService.Describe(reward.Potions))
 	end
 	if reward.Lantern then
 		LanternService.Grant(player, reward.Lantern, if tier then tier.Name else reason)

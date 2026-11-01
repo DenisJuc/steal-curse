@@ -24,21 +24,32 @@ local KIND_COLORS = {
 	Jade = UIKit.Colors.Jade,
 	Milestone = UIKit.Colors.Accent,
 }
-local MAX_SHOWN = 4
-local MAX_WIDTH = 640
-local TEXT_SIZE = 20
-local TOAST_HEIGHT = 44
-local NORMAL_POSITION = UDim2.new(0.5, 0, 1, -270)
+-- Few, big and slow enough to read: at most 3 at once, rewards stay 5.5 s, the same text twice in
+-- a row is shown once.
+local MAX_SHOWN = 3
+local MAX_WIDTH = 720
+local TEXT_SIZE = 24
+local MIN_TEXT_SIZE = 17
+local TOAST_HEIGHT = 54
+local SECONDS = { Offline = 8, Item = 5.5, Milestone = 5.5, Error = 4 }
+local DEFAULT_SECONDS = 4.5
+local NORMAL_POSITION = UDim2.new(0.5, 0, 1, -330)
 local MENU_POSITION = UDim2.new(0.5, 0, 1, -10)
 
 local holder: Frame? = nil
 local order = 0
+local lastText: string? = nil
+local lastAt = 0
 
 function Toasts.Show(text: string, kind: string?)
 	local list = holder
 	if not list then
 		return
 	end
+	if text == lastText and os.clock() - lastAt < 3 then
+		return
+	end
+	lastText, lastAt = text, os.clock()
 	local shown = {}
 	for _, child in list:GetChildren() do
 		if child:IsA("GuiObject") then
@@ -65,7 +76,7 @@ function Toasts.Show(text: string, kind: string?)
 		TextSize = TEXT_SIZE,
 		Parent = slot,
 	})
-	UIKit.create("UITextSizeConstraint", { MaxTextSize = TEXT_SIZE, MinTextSize = 13, Parent = toast })
+	UIKit.create("UITextSizeConstraint", { MaxTextSize = TEXT_SIZE, MinTextSize = MIN_TEXT_SIZE, Parent = toast })
 	UIKit.create("UIPadding", { PaddingLeft = UDim.new(0, 16), PaddingRight = UDim.new(0, 16), Parent = toast })
 	UIKit.fill(toast)
 	UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = toast })
@@ -74,7 +85,7 @@ function Toasts.Show(text: string, kind: string?)
 	if kind == "Error" then
 		Motion.shake(toast, 90)
 	end
-	task.delay(if kind == "Offline" then 8 else 3, function()
+	task.delay(SECONDS[kind or ""] or DEFAULT_SECONDS, function()
 		if not toast.Parent then
 			return
 		end
@@ -95,7 +106,7 @@ function Toasts.Start(screen: ScreenGui)
 		Name = "Toasts",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = NORMAL_POSITION,
-		Size = UDim2.fromOffset(MAX_WIDTH, 200),
+		Size = UDim2.fromOffset(MAX_WIDTH, (TOAST_HEIGHT + 6) * MAX_SHOWN),
 		BackgroundTransparency = 1,
 		ZIndex = 20,
 		Parent = screen,

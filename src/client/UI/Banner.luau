@@ -11,9 +11,10 @@ local UIKit = require(script.Parent.UIKit)
 
 local Banner = {}
 
-local SHOW_SECONDS = 3.2
+-- Big and slow enough to read; only 2 wait in line (older ones are dropped, the newest matter).
+local SHOW_SECONDS = 4.5
 local HIDE_SECONDS = 0.25
-local MAX_QUEUE = 4
+local MAX_QUEUE = 2
 
 type Entry = { Title: string, Text: string, Color: Color3 }
 
@@ -83,7 +84,7 @@ function Banner.Start(screen: ScreenGui)
 		Name = "Banner",
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.2),
-		Size = UDim2.fromOffset(560, 110),
+		Size = UDim2.fromOffset(680, 132),
 		BackgroundTransparency = 1,
 		Visible = false,
 		ZIndex = 40,
@@ -103,21 +104,23 @@ function Banner.Start(screen: ScreenGui)
 	UIKit.skinPanel(inner, colors.Gold)
 	titleLabel = UIKit.label({
 		FontFace = UIKit.TitleFont,
-		TextSize = 28,
+		TextSize = 38,
 		TextStrokeTransparency = 0.5,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Size = UDim2.new(1, 0, 0, 34),
+		Size = UDim2.new(1, 0, 0, 44),
 		Parent = inner,
 	})
 	textLabel = UIKit.label({
-		TextSize = 20,
+		TextSize = 25,
 		TextWrapped = true,
+		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
 		TextYAlignment = Enum.TextYAlignment.Top,
-		Position = UDim2.fromOffset(0, 40),
-		Size = UDim2.new(1, 0, 1, -40),
+		Position = UDim2.fromOffset(0, 50),
+		Size = UDim2.new(1, 0, 1, -50),
 		Parent = inner,
 	})
+	UIKit.create("UITextSizeConstraint", { MaxTextSize = 25, MinTextSize = 18, Parent = textLabel })
 	holder = frame
 	card = inner
 end

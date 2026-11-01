@@ -63,8 +63,14 @@ local function describe(rewards: { [string]: number }): string
 	return table.concat(parts, ", ")
 end
 
--- Adds potions (capped at ItemConfig.MaxStack each) and tells the player why.
-function ItemService.Grant(player: Player, rewards: { [string]: number }, reason: string?)
+-- "2x Luck Potion, Haste Potion" for a reward table (callers that write their own message).
+function ItemService.Describe(rewards: { [string]: number }): string
+	return describe(rewards)
+end
+
+-- Adds potions (capped at ItemConfig.MaxStack each) and tells the player why, unless `silent`
+-- (the caller already names them in its own single message).
+function ItemService.Grant(player: Player, rewards: { [string]: number }, reason: string?, silent: boolean?)
 	local data = DataService.Get(player)
 	if not data then
 		return
@@ -84,7 +90,9 @@ function ItemService.Grant(player: Player, rewards: { [string]: number }, reason
 	end
 	mirror(player)
 	DataService.RequestSave(player)
-	Notify:FireClient(player, `+ {text}{if reason then ` ({reason})` else ""}`, "Item")
+	if not silent then
+		Notify:FireClient(player, `+ {text}{if reason then ` ({reason})` else ""}`, "Item")
+	end
 end
 
 local function use(player: Player, itemId: string): { Ok: boolean, Message: string }
