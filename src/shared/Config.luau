@@ -293,15 +293,18 @@ Config.DevProducts = {
 -- Upgrades menu: the v0.1 skill tree (SkillTreePanel); false = the old list (SkillListPanel).
 Config.SkillTreeUI = true
 
--- Playtime gifts (PlaytimeService): one chest per step of this session's play time (AFK counts),
--- claimed from the gift button. Restarts every session. CEMinutes = minutes of current income.
+-- Playtime gifts (PlaytimeService): one gift per step of today's play time (AFK counts, saved, so
+-- rejoining doesn't restart it), claimed from the gift button. Resets each UTC day.
+-- CEMinutes = minutes of current income.
 Config.PlaytimeGifts = {
 	{ Minutes = 5, Potions = { LuckPotion = 1 } },
 	{ Minutes = 10, CEMinutes = 5 },
-	{ Minutes = 20, Potions = { HastePotion = 1 } },
-	{ Minutes = 30, CEMinutes = 10, Potions = { FortunePotion = 1 } },
-	{ Minutes = 45, Potions = { LuckPotion = 2 } },
-	{ Minutes = 60, CEMinutes = 20, Potions = { LuckPotion = 1, HastePotion = 1, FortunePotion = 1 } },
+	{ Minutes = 15, Potions = { HastePotion = 1 } },
+	{ Minutes = 25, CEMinutes = 10 },
+	{ Minutes = 40, Potions = { FortunePotion = 1 } },
+	{ Minutes = 60, CEMinutes = 20, Potions = { LuckPotion = 1, HastePotion = 1 } },
+	{ Minutes = 90, CEMinutes = 30 },
+	{ Minutes = 120, Potions = { LuckPotion = 1, FortunePotion = 1 } },
 }
 
 -- Friend bonus (FriendService): extra Luck for each Roblox friend in the same server, capped.
@@ -641,9 +644,9 @@ Config.Bounties = {
 		{ Id = "Seal400", Difficulty = "Medium", Text = "Seal 400 relics", Event = "Sealed", Goal = 400 },
 		{ Id = "SealEpic1", Difficulty = "Medium", Text = "Seal an Epic or rarer relic", Event = "Sealed", Goal = 1, Filter = { MinTier = "Epic" } },
 		{ Id = "SealHuge1", Difficulty = "Hard", Text = "Seal a Huge relic", Event = "Sealed", Goal = 1, Filter = { MinSize = "Huge" } },
-		{ Id = "SealEpic5", Difficulty = "Hard", Text = "Seal 5 Epic or rarer relics", Event = "Sealed", Goal = 5, Filter = { MinTier = "Epic" } },
-		{ Id = "Seal3000", Difficulty = "Weekly", Text = "Seal 3,000 relics", Event = "Sealed", Goal = 3000 },
-		{ Id = "SealHuge3", Difficulty = "Weekly", Text = "Seal 3 Huge relics", Event = "Sealed", Goal = 3, Filter = { MinSize = "Huge" } },
+		{ Id = "SealEpic3", Difficulty = "Hard", Text = "Seal 3 Epic or rarer relics", Event = "Sealed", Goal = 3, Filter = { MinTier = "Epic" } },
+		{ Id = "Seal10000", Difficulty = "Weekly", Text = "Seal 10,000 relics", Event = "Sealed", Goal = 10000 },
+		{ Id = "SealHuge5", Difficulty = "Weekly", Text = "Seal 5 Huge relics", Event = "Sealed", Goal = 5, Filter = { MinSize = "Huge" } },
 		{ Id = "Forest4", Difficulty = "Easy", Text = "Capture 4 spirits in the Haunted Forest", Event = "Captured", Goal = 4, Filter = { Area = "HauntedForest" } },
 		{ Id = "Village4", Difficulty = "Easy", Text = "Capture 4 spirits in the Abandoned Village", Event = "Captured", Goal = 4, Filter = { Area = "AbandonedVillage" } },
 		{ Id = "Ruins4", Difficulty = "Easy", Text = "Capture 4 spirits in the Ancient Ruins", Event = "Captured", Goal = 4, Filter = { Area = "AncientRuins" } },

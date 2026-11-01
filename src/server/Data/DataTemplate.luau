@@ -117,6 +117,8 @@ export type Data = {
 	ItemRewards: { [string]: number },
 	-- Last developer-product PurchaseIds granted (ShopService), so a receipt is never paid twice.
 	PurchaseIdCache: { string },
+	-- Playtime gifts (PlaytimeService): play time today (UTC day) and the gifts claimed today.
+	Playtime: { Day: number, Seconds: number, Claimed: { [string]: boolean } },
 	-- Offering boxes opened in a row below the second reward tier (Offerings pity).
 	OfferingPity: number,
 	-- Title shown over the player's head: an earned title, "Auto" (best earned) or "Off".
@@ -271,6 +273,7 @@ DataTemplate.Template = {
 	Buffs = {},
 	ItemRewards = {},
 	PurchaseIdCache = {},
+	Playtime = { Day = 0, Seconds = 0, Claimed = {} },
 	OfferingPity = 0,
 	TitleChoice = "Auto",
 	Lanterns = {

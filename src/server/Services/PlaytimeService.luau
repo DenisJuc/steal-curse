@@ -1,6 +1,7 @@
--- Playtime gifts (Config.PlaytimeGifts): each step of this session's play time unlocks one gift,
--- claimed with ClaimPlaytimeGift(index). Session-only (nothing saved): the clock starts when the
--- profile loads and AFK time counts. Mirrors PlaytimeStart (server time) and PlaytimeClaimed
+-- Playtime gifts (Config.PlaytimeGifts): each step of today's play time unlocks one gift, claimed
+-- with ClaimPlaytimeGift(index). Saved in data.Playtime (UTC day, seconds played, claimed steps), so
+-- rejoining keeps the clock and the claims; a new UTC day starts over. AFK time counts.
+-- Mirrors PlaytimeStart (server time the day's play "started", now - seconds) and PlaytimeClaimed
 -- ("1,3" = claimed indices) for the HUD button.
 
 local Players = game:GetService("Players")
@@ -17,34 +18,58 @@ local ClaimPlaytimeGift = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild
 
 local PlaytimeService = {}
 
-type Session = { Start: number, Claimed: { [number]: boolean } }
-local sessions: { [Player]: Session } = {}
+local TICK_SECONDS = 1
+local MIRROR_SECONDS = 15
+local SECONDS_PER_DAY = 86400
 
-local function mirror(player: Player, session: Session)
+local function today(): number
+	return os.time() // SECONDS_PER_DAY
+end
+
+-- Today's playtime record (reset on a new day).
+local function record(player: Player): any?
+	local data = DataService.Get(player)
+	if not data then
+		return nil
+	end
+	local playtime = data.Playtime
+	if playtime.Day ~= today() then
+		playtime.Day = today()
+		playtime.Seconds = 0
+		playtime.Claimed = {}
+	end
+	return playtime
+end
+
+local function mirror(player: Player)
+	local playtime = record(player)
+	if not playtime then
+		return
+	end
 	local list = {}
-	for index in session.Claimed do
-		table.insert(list, tostring(index))
+	for index in playtime.Claimed do
+		table.insert(list, index)
 	end
 	table.sort(list)
-	player:SetAttribute("PlaytimeStart", session.Start)
+	player:SetAttribute("PlaytimeStart", workspace:GetServerTimeNow() - playtime.Seconds)
 	player:SetAttribute("PlaytimeClaimed", table.concat(list, ","))
 end
 
 local function claim(player: Player, index: unknown): string
-	local session = sessions[player]
+	local playtime = record(player)
 	local gift = type(index) == "number" and Config.PlaytimeGifts[index]
-	if not session or not gift then
+	if not playtime or not gift then
 		return "Try again in a moment."
 	end
-	local i = index :: number
-	if session.Claimed[i] then
-		return "Already claimed."
+	local key = tostring(index)
+	if playtime.Claimed[key] then
+		return "Already claimed today."
 	end
-	local left = session.Start + gift.Minutes * 60 - workspace:GetServerTimeNow()
+	local left = gift.Minutes * 60 - playtime.Seconds
 	if left > 0 then
 		return `Ready in {Format.duration(math.ceil(left))}.`
 	end
-	session.Claimed[i] = true
+	playtime.Claimed[key] = true
 	local parts = {}
 	if gift.CEMinutes then
 		local amount =
@@ -53,35 +78,45 @@ local function claim(player: Player, index: unknown): string
 		table.insert(parts, `{Format.ce(amount)} CE`)
 	end
 	if gift.Potions then
+		-- ItemService names the potions in its own toast.
 		ItemService.Grant(player, gift.Potions, "gift")
-		table.insert(parts, "potions")
 	end
 	DataService.RequestSave(player)
-	mirror(player, session)
-	return `Gift: {table.concat(parts, " + ")}!`
+	mirror(player)
+	return if #parts > 0 then `Gift: {table.concat(parts, " + ")}!` else "Gift claimed!"
 end
 
 function PlaytimeService.Init()
 	RemoteGuard.Function(ClaimPlaytimeGift, claim, "Settings")
-	DataService.OnPlayerLoaded(function(player: Player)
-		if sessions[player] then
-			return
+	DataService.OnPlayerLoaded(mirror)
+	task.spawn(function()
+		local sinceMirror = 0
+		while true do
+			task.wait(TICK_SECONDS)
+			sinceMirror += TICK_SECONDS
+			for _, player in Players:GetPlayers() do
+				local playtime = record(player)
+				if playtime then
+					local day = playtime.Day
+					playtime.Seconds += TICK_SECONDS
+					if sinceMirror >= MIRROR_SECONDS or day ~= today() then
+						mirror(player)
+					end
+				end
+			end
+			if sinceMirror >= MIRROR_SECONDS then
+				sinceMirror = 0
+			end
 		end
-		local session = { Start = workspace:GetServerTimeNow(), Claimed = {} }
-		sessions[player] = session
-		mirror(player, session)
-	end)
-	Players.PlayerRemoving:Connect(function(player: Player)
-		sessions[player] = nil
 	end)
 end
 
--- Studio /gifts command: move the session clock back `minutes`.
+-- Studio /gifts command: add `minutes` of play time today.
 function PlaytimeService.Skip(player: Player, minutes: number)
-	local session = sessions[player]
-	if session then
-		session.Start -= minutes * 60
-		mirror(player, session)
+	local playtime = record(player)
+	if playtime then
+		playtime.Seconds += minutes * 60
+		mirror(player)
 	end
 end
 
