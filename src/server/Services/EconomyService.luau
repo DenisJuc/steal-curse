@@ -19,6 +19,7 @@ local Economy = require(ReplicatedStorage.Shared.Economy)
 local Rebirth = require(ReplicatedStorage.Shared.Rebirth)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local DataService = require(script.Parent.DataService)
+local GameEvents = require(script.Parent.GameEvents)
 local MultiplierService = require(script.Parent.MultiplierService)
 
 local EconomyService = {}
@@ -89,6 +90,9 @@ function EconomyService.TrySpend(player: Player, amount: number): boolean
 	end
 	data.CE = math.max(0, data.CE - amount)
 	EconomyService.Mirror(player)
+	if amount > 0 then
+		GameEvents.Fire("Spent", player, amount)
+	end
 	return true
 end
 
