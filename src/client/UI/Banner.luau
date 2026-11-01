@@ -16,7 +16,7 @@ local SHOW_SECONDS = 4.5
 local HIDE_SECONDS = 0.25
 local MAX_QUEUE = 2
 
-type Entry = { Title: string, Text: string, Color: Color3 }
+type Entry = { Title: string, Text: string, Color: Color3, Priority: number }
 
 local holder: Frame? = nil
 local card: Frame? = nil
@@ -125,7 +125,8 @@ function Banner.Start(screen: ScreenGui)
 	card = inner
 end
 
-function Banner.Show(title: string, text: string, color: Color3)
+-- priority: 1 = normal, 2 = important (rare finds, rebirth, events); low ones are dropped first.
+function Banner.Show(title: string, text: string, color: Color3, priority: number?)
 	-- Skip a duplicate of what's already playing or last in the queue.
 	local last = queue[#queue]
 	if last and last.Title == title and last.Text == text then
@@ -134,9 +135,15 @@ function Banner.Show(title: string, text: string, color: Color3)
 	if playing and titleLabel and titleLabel.Text == title and textLabel and textLabel.Text == text then
 		return
 	end
-	table.insert(queue, { Title = title, Text = text, Color = color })
+	table.insert(queue, { Title = title, Text = text, Color = color, Priority = priority or 1 })
 	while #queue > MAX_QUEUE do
-		table.remove(queue, 1)
+		local drop = 1
+		for index, entry in queue do
+			if entry.Priority < queue[drop].Priority then
+				drop = index
+			end
+		end
+		table.remove(queue, drop)
 	end
 	task.spawn(playNext)
 end

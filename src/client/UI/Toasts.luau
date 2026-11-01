@@ -108,7 +108,7 @@ function Toasts.Start(screen: ScreenGui)
 		Position = NORMAL_POSITION,
 		Size = UDim2.fromOffset(MAX_WIDTH, (TOAST_HEIGHT + 6) * MAX_SHOWN),
 		BackgroundTransparency = 1,
-		ZIndex = 20,
+		ZIndex = 30,
 		Parent = screen,
 	}, {
 		UIKit.create("UIListLayout", {
@@ -138,7 +138,7 @@ function Toasts.Start(screen: ScreenGui)
 			elseif string.find(text, "unlocked", 1, true) or string.find(text, "complete", 1, true) then
 				title = "GOAL"
 			end
-			Banner.Show(title, text, KIND_COLORS.Milestone)
+			Banner.Show(title, text, KIND_COLORS.Milestone, if title == "REBIRTH" then 2 else 1)
 		end
 		Toasts.Show(text, kind)
 	end)

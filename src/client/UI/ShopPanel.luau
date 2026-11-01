@@ -19,7 +19,7 @@ local player = Players.LocalPlayer
 local ShopPanel = {}
 
 local CARD_HEIGHT = 128
-local EVENT_HEIGHT = 168
+local EVENT_HEIGHT = 184
 local FEATURED_HEIGHT = 150
 
 type Entry = {
@@ -130,7 +130,7 @@ function ShopPanel.Start(screen: ScreenGui, onOpen: () -> ()): { Toggle: () -> (
 				TextXAlignment = if event then Enum.TextXAlignment.Center else Enum.TextXAlignment.Left,
 				TextYAlignment = Enum.TextYAlignment.Top,
 				Position = UDim2.fromOffset(textLeft, titleTop + (if event then 24 else 34)),
-				Size = UDim2.new(1, -textLeft - 8, 0, if event then 18 else 36),
+				Size = UDim2.new(1, -textLeft - 8, 0, if event then 32 else 36),
 				Parent = frame,
 			})
 		end
@@ -223,10 +223,16 @@ function ShopPanel.Start(screen: ScreenGui, onOpen: () -> ()): { Toggle: () -> (
 				zone = each
 			end
 		end
+		local where = nil
+		for _, area in Config.Areas do
+			if zone and area.Id == zone.Area then
+				where = area.Name
+			end
+		end
 		card(events, index, {
 			Name = entry.Name,
 			Title = if zone then zone.Name else entry.Event,
-			Text = if zone then zone.Effect else nil,
+			Text = if zone then `{zone.Effect} in the {where or zone.Area}` else nil,
 			Icon = entry.Icon,
 			Color = if zone then zone.Color else nil,
 		}, false, "Event")

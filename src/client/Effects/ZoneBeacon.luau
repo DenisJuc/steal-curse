@@ -135,7 +135,7 @@ function ZoneBeacon.Start()
 		local area = areaOf(event.Area)
 		local where = if area then area.Name else event.Area
 		local color = rgb(event.Color)
-		Banner.Show(string.upper(event.Name), `{where}: {event.Effect} for {Format.duration(Config.ZoneEvents.Duration)}`, color)
+		Banner.Show(string.upper(event.Name), `{where}: {event.Effect} for {Format.duration(Config.ZoneEvents.Duration)}`, color, 2)
 		chat(`{event.Name} over the {where}! {event.Effect} on captures there.`, color)
 		Sounds.Play("EventStart")
 	end

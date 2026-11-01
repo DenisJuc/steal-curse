@@ -56,6 +56,22 @@ function ZoneEventService.Force(id: string): boolean
 	return true
 end
 
+-- Bought events (ShopService): start now, or right after the running event ends so nobody's
+-- paid event is cut short. Returns "Started" or "Queued".
+local queued: { string } = {}
+function ZoneEventService.Summon(id: string): string?
+	if not ZoneEvents.byId(options, id) then
+		return nil
+	end
+	if state.Phase == "Active" then
+		table.insert(queued, id)
+		workspace:SetAttribute("ZoneEventQueued", #queued)
+		return "Queued"
+	end
+	ZoneEventService.Force(id)
+	return "Started"
+end
+
 function ZoneEventService.Init()
 	state = ZoneEvents.new(workspace:GetServerTimeNow(), options)
 	publish()
@@ -68,6 +84,10 @@ function ZoneEventService.Init()
 			end
 			if changed then
 				publish()
+			end
+			if state.Phase ~= "Active" and #queued > 0 then
+				ZoneEventService.Force(table.remove(queued, 1) :: string)
+				workspace:SetAttribute("ZoneEventQueued", if #queued > 0 then #queued else nil)
 			end
 		end
 	end)

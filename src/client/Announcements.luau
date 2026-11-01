@@ -26,14 +26,15 @@ end
 
 function Announcements.Start()
 	-- A bought event: one chat line (the event's own banner and beam come from ZoneBeacon).
-	EventSummoned.OnClientEvent:Connect(function(name: unknown, eventId: unknown)
+	EventSummoned.OnClientEvent:Connect(function(name: unknown, eventId: unknown, queued: unknown)
 		if type(name) ~= "string" or type(eventId) ~= "string" then
 			return
 		end
+		local suffix = if queued == true then " It starts when the current event ends." else ""
 		local channels = TextChatService:FindFirstChild("TextChannels")
 		local general = channels and channels:FindFirstChild("RBXGeneral")
 		if general and general:IsA("TextChannel") then
-			general:DisplaySystemMessage(`<font color="#FFC24A"><b>{escape(name)} summoned an event for everyone!</b></font>`)
+			general:DisplaySystemMessage(`<font color="#FFC24A"><b>{escape(name)} summoned an event for everyone!{suffix}</b></font>`)
 		end
 	end)
 	ServerLuckBought.OnClientEvent:Connect(function(name: unknown, seconds: unknown)
@@ -65,7 +66,8 @@ function Announcements.Start()
 			Banner.Show(
 				`{string.upper(if tier then tier.Name else relic.Tier)} FIND!`,
 				`{payload.Name} sealed {Odds.displayName(relic.Id, mutation, size)}  ·  {Format.odds(Odds.baseItem(relic.Id))}`,
-				color
+				color,
+				2
 			)
 			-- A Cosmic find is heard by the whole server.
 			if relic.Tier == "Cosmic" then

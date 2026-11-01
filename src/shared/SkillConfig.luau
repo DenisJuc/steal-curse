@@ -41,7 +41,7 @@ SkillConfig.Nodes = {
 		-- Costs grow faster than luck (x10 luck costs about x100 CE), so luck can't run away.
 		CostBase = 100,
 		CostGrowth = 1.6,
-		Summary = "Multiplies your luck: x10 every 10 ranks (rank 100 = 10 billion x).",
+		Summary = "Multiplies your luck: x10 for every 10 ranks.",
 	},
 	{
 		Id = "ScanSpeed",

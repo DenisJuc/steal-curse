@@ -63,10 +63,11 @@ local grants: { [string]: (Player) -> () } = {
 for _, entry in SHOP.Events do
 	grants[entry.Name] = function(player)
 		local ZoneEventService = require(script.Parent.ZoneEventService)
-		if not ZoneEventService.Force(entry.Event) then
+		local result = ZoneEventService.Summon(entry.Event)
+		if not result then
 			error(`unknown zone event {entry.Event}`)
 		end
-		EventSummoned:FireAllClients(player.DisplayName, entry.Event)
+		EventSummoned:FireAllClients(player.DisplayName, entry.Event, result == "Queued")
 	end
 end
 
