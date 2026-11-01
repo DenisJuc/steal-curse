@@ -1,12 +1,12 @@
 -- Screen-space crossing into (and out of) the spirit world when Spirit Sight toggles. Nothing
--- here touches the character or the camera: it is a ScreenGui plus two Lighting effects.
+-- here touches the character or the camera: it is two ScreenGuis plus two Lighting effects.
 --
--- Entering (about half a second): the eyes shut fast (two lids with a violet glowing rim meet in
--- the middle while the view blurs), the world turns over behind them (the caller's `onCovered`
--- switches the spirit tint on there), then the lids tear open on a violet flash with a ripple
--- ring rushing outward and the blur clearing. A dark violet veil stays on the screen edges,
--- slowly breathing, for as long as Spirit Sight is on.
--- Leaving is a shorter half-blink that drops the veil and lets the colour flood back.
+-- Entering (about 0.6s): vision softly dims in from the edges (the feathered edge veil deepens
+-- while a dark violet wash fades over the whole screen and the view blurs), the world turns over
+-- at the darkest moment (the caller's `onCovered` switches the spirit tint on there), then it
+-- clears on a soft violet flash with a faint ripple ring and the blur lifting. A dark violet veil
+-- stays on the screen edges, slowly breathing, for as long as Spirit Sight is on.
+-- Leaving is a shorter, lighter dim that drops the veil and lets the colour flood back.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -16,89 +16,60 @@ local Settings = require(script.Parent.Parent.Settings)
 
 local SightTransition = {}
 
-local RIM_COLOR = Color3.fromRGB(190, 140, 255)
-local LID_COLOR = Color3.fromRGB(6, 2, 14)
+local DIM_COLOR = Color3.fromRGB(20, 6, 40)
 local VEIL_COLOR = Color3.fromRGB(28, 6, 52)
+local RING_COLOR = Color3.fromRGB(190, 140, 255)
 local FLASH_TINT = Color3.fromRGB(200, 170, 255)
 
 -- Seconds for each phase of entering.
-local CLOSE_SECONDS = 0.09
+local DIM_SECONDS = 0.2
 local HOLD_SECONDS = 0.05
-local OPEN_SECONDS = 0.32
--- Leaving: the lids only close part way.
-local EXIT_CLOSE_SECONDS = 0.07
-local EXIT_OPEN_SECONDS = 0.2
-local EXIT_CLOSE_AMOUNT = 0.8
-local BLUR_SIZE = 22
--- Fraction of the screen each edge of the veil covers.
+local OPEN_SECONDS = 0.35
+-- Leaving: a lighter dim, then clear.
+local EXIT_DIM_SECONDS = 0.12
+local EXIT_OPEN_SECONDS = 0.23
+local EXIT_DIM_AMOUNT = 0.4
+local BLUR_SIZE = 18
+-- Fraction of the screen each edge of the veil covers at rest, and at the darkest moment.
 local VEIL_DEPTH = 0.22
+local DIM_DEPTH = 0.6
+-- The full-screen wash never goes fully black.
+local WASH_OPACITY = 0.85
 
 local gui: ScreenGui? = nil
--- The veil lives in its own ScreenGui under the HUD so it never darkens buttons.
+-- The veil lives in its own ScreenGui under the HUD so it never darkens buttons at rest.
 local veilGui: ScreenGui
-local topLid: Frame
-local bottomLid: Frame
+local wash: Frame
 local ripple: Frame
 local rippleStroke: UIStroke
 local veilEdges: { Frame } = {}
 local blur: BlurEffect
 local flash: ColorCorrectionEffect
 local veilOn = false
+-- veilAmount: the resting edge veil (0..1). dimAmount: how far vision has dimmed in (0..1).
 local veilAmount = 0
-local lidAmount = 0
+local dimAmount = 0
+local swell = 1
 -- Bumped on every toggle so a quick re-press cuts the running transition short.
 local token = 0
 
+local function easeInOut(t: number): number
+	return 0.5 - math.cos(math.pi * t) * 0.5
+end
+
 local function easeOut(t: number): number
-	return 1 - (1 - t) ^ 3
-end
-
-local function easeIn(t: number): number
-	return t * t
-end
-
--- A lid covers half the screen plus a little overlap; its rim glows along the inner edge.
-local function makeLid(name: string, top: boolean, parent: Instance): Frame
-	local lid = Instance.new("Frame")
-	lid.Name = name
-	lid.AnchorPoint = Vector2.new(0, if top then 1 else 0)
-	lid.Size = UDim2.fromScale(1, 0.56)
-	lid.BackgroundColor3 = LID_COLOR
-	lid.BorderSizePixel = 0
-	lid.ZIndex = 3
-	lid.Parent = parent
-
-	local rim = Instance.new("Frame")
-	rim.Name = "Rim"
-	rim.AnchorPoint = Vector2.new(0, if top then 0 else 1)
-	rim.Position = UDim2.fromScale(0, if top then 1 else 0)
-	rim.Size = UDim2.new(1, 0, 0, 36)
-	rim.BackgroundColor3 = RIM_COLOR
-	rim.BorderSizePixel = 0
-	rim.ZIndex = 4
-	rim.Parent = lid
-	local fade = Instance.new("UIGradient")
-	fade.Rotation = if top then 90 else -90
-	-- Bright at the lid's edge, fading out into the open screen.
-	fade.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.05),
-		NumberSequenceKeypoint.new(0.25, 0.45),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	fade.Parent = rim
-	return lid
+	return math.sin(t * math.pi * 0.5)
 end
 
 -- One edge of the veil: solid at the screen edge, fading toward the middle.
-local function makeEdge(name: string, rotation: number, anchor: Vector2, position: UDim2, size: UDim2, parent: Instance): Frame
+local function makeEdge(name: string, rotation: number, anchor: Vector2, parent: Instance): Frame
 	local edge = Instance.new("Frame")
 	edge.Name = name
 	edge.AnchorPoint = anchor
-	edge.Position = position
-	edge.Size = size
+	edge.Position = UDim2.fromScale(anchor.X, anchor.Y)
 	edge.BackgroundColor3 = VEIL_COLOR
 	edge.BorderSizePixel = 0
-	edge.BackgroundTransparency = 0
+	edge.Visible = false
 	edge.ZIndex = 1
 	edge.Parent = parent
 	local gradient = Instance.new("UIGradient")
@@ -113,17 +84,25 @@ local function makeEdge(name: string, rotation: number, anchor: Vector2, positio
 end
 
 local function build(): ScreenGui
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 	local screen = Instance.new("ScreenGui")
 	screen.Name = "SpiritSightTransition"
 	screen.IgnoreGuiInset = true
 	screen.ResetOnSpawn = false
-	-- Above the HUD so the blink covers everything, below nothing the player must click.
+	-- Above the HUD so the dim covers everything, below nothing the player must click.
 	screen.DisplayOrder = 90
 	screen.Enabled = false
-	screen.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	screen.Parent = playerGui
 
-	topLid = makeLid("TopLid", true, screen)
-	bottomLid = makeLid("BottomLid", false, screen)
+	wash = Instance.new("Frame")
+	wash.Name = "Wash"
+	wash.Size = UDim2.fromScale(1, 1)
+	wash.BackgroundColor3 = DIM_COLOR
+	wash.BackgroundTransparency = 1
+	wash.BorderSizePixel = 0
+	wash.Visible = false
+	wash.ZIndex = 1
+	wash.Parent = screen
 
 	ripple = Instance.new("Frame")
 	ripple.Name = "Ripple"
@@ -138,8 +117,8 @@ local function build(): ScreenGui
 	round.CornerRadius = UDim.new(0.5, 0)
 	round.Parent = ripple
 	rippleStroke = Instance.new("UIStroke")
-	rippleStroke.Color = RIM_COLOR
-	rippleStroke.Thickness = 10
+	rippleStroke.Color = RING_COLOR
+	rippleStroke.Thickness = 3
 	rippleStroke.Parent = ripple
 
 	veilGui = Instance.new("ScreenGui")
@@ -147,17 +126,14 @@ local function build(): ScreenGui
 	veilGui.IgnoreGuiInset = true
 	veilGui.ResetOnSpawn = false
 	veilGui.DisplayOrder = -1
-	veilGui.Parent = screen.Parent
+	veilGui.Parent = playerGui
 	-- Gradient rotation points from transparent (0) to solid (1): toward each screen edge.
 	veilEdges = {
-		makeEdge("VeilTop", -90, Vector2.new(0, 0), UDim2.fromScale(0, 0), UDim2.fromScale(1, VEIL_DEPTH), veilGui),
-		makeEdge("VeilBottom", 90, Vector2.new(0, 1), UDim2.fromScale(0, 1), UDim2.fromScale(1, VEIL_DEPTH), veilGui),
-		makeEdge("VeilLeft", 180, Vector2.new(0, 0), UDim2.fromScale(0, 0), UDim2.fromScale(VEIL_DEPTH * 0.7, 1), veilGui),
-		makeEdge("VeilRight", 0, Vector2.new(1, 0), UDim2.fromScale(1, 0), UDim2.fromScale(VEIL_DEPTH * 0.7, 1), veilGui),
+		makeEdge("VeilTop", -90, Vector2.new(0, 0), veilGui),
+		makeEdge("VeilBottom", 90, Vector2.new(0, 1), veilGui),
+		makeEdge("VeilLeft", 180, Vector2.new(0, 0), veilGui),
+		makeEdge("VeilRight", 0, Vector2.new(1, 0), veilGui),
 	}
-	for _, edge in veilEdges do
-		edge.Visible = false
-	end
 
 	blur = Instance.new("BlurEffect")
 	blur.Name = "SpiritSightBlur"
@@ -179,27 +155,30 @@ local function ensure(): ScreenGui
 	return gui :: ScreenGui
 end
 
--- closed 0 = lids fully open (off screen), 1 = shut.
-local function setLids(closed: number)
-	lidAmount = closed
-	topLid.Position = UDim2.fromScale(0, closed * 0.56)
-	bottomLid.Position = UDim2.fromScale(0, 1 - closed * 0.56)
-	topLid.Visible = closed > 0.001
-	bottomLid.Visible = closed > 0.001
+-- Draws the veil and wash from veilAmount, dimAmount and the breathing swell.
+local function render()
+	local depth = VEIL_DEPTH + (DIM_DEPTH - VEIL_DEPTH) * dimAmount
+	local opacity = math.max(veilAmount * swell, dimAmount)
+	for index, edge in veilEdges do
+		local side = index > 2
+		edge.Size = if side then UDim2.fromScale(depth * 0.7, 1) else UDim2.fromScale(1, depth)
+		edge.BackgroundTransparency = 1 - opacity
+		edge.Visible = opacity > 0.01
+	end
+	wash.BackgroundTransparency = 1 - WASH_OPACITY * dimAmount
+	wash.Visible = dimAmount > 0.001
 end
 
-local function setVeil(amount: number)
-	veilAmount = amount
-	for _, edge in veilEdges do
-		edge.BackgroundTransparency = 1 - amount
-		edge.Visible = amount > 0.01
-	end
+local function setDim(amount: number, blurOn: boolean)
+	dimAmount = amount
+	blur.Size = if blurOn then BLUR_SIZE * amount else 0
+	render()
 end
 
 local function setFlash(amount: number, tint: Color3)
 	flash.Enabled = amount > 0.001
-	flash.Brightness = 0.35 * amount
-	flash.Contrast = 0.25 * amount
+	flash.Brightness = 0.25 * amount
+	flash.Contrast = 0.15 * amount
 	flash.Saturation = 0.2 * amount
 	flash.TintColor = Color3.new(1, 1, 1):Lerp(tint, amount)
 end
@@ -231,21 +210,19 @@ local function startBreathing()
 			return
 		end
 		-- The veil swells slowly, like the world breathing around you.
-		local swell = 0.88 + math.sin((os.clock() - start) * 1.6) * 0.12
-		for _, edge in veilEdges do
-			edge.BackgroundTransparency = 1 - veilAmount * swell
-		end
+		swell = 0.88 + math.sin((os.clock() - start) * 1.6) * 0.12
+		render()
 	end)
 end
 
--- Plays the crossing into the spirit world. `onCovered` runs once the eyes are shut (or at once
--- if the transition is skipped), which is where the caller swaps the world's look.
+-- Plays the crossing into the spirit world. `onCovered` runs at the darkest moment, which is
+-- where the caller swaps the world's look.
 function SightTransition.Enter(onCovered: () -> ())
 	token += 1
 	local mine = token
 	local screen = ensure()
 	screen.Enabled = true
-	local low = Settings.LowEffects()
+	local blurOn = not Settings.LowEffects()
 	local covered = false
 	local function cover()
 		if not covered then
@@ -255,38 +232,38 @@ function SightTransition.Enter(onCovered: () -> ())
 	end
 	veilOn = true
 	startBreathing()
+	-- A press mid-exit starts from wherever the dim and veil already are.
 	local fromVeil = veilAmount
+	local fromDim = dimAmount
+	blur.Enabled = blurOn
 
-	local total = CLOSE_SECONDS + HOLD_SECONDS + OPEN_SECONDS
-	blur.Enabled = not low
+	local total = DIM_SECONDS + HOLD_SECONDS + OPEN_SECONDS
 	animate(mine, function(t)
-		if t < CLOSE_SECONDS then
-			local k = easeIn(t / CLOSE_SECONDS)
-			setLids(k)
-			blur.Size = BLUR_SIZE * k
+		if t < DIM_SECONDS then
+			setDim(fromDim + (1 - fromDim) * easeInOut(t / DIM_SECONDS), blurOn)
 			return false
 		end
 		cover()
-		if t < CLOSE_SECONDS + HOLD_SECONDS then
-			setLids(1)
-			blur.Size = BLUR_SIZE
-			setFlash(1, FLASH_TINT)
+		if t < DIM_SECONDS + HOLD_SECONDS then
+			setDim(1, blurOn)
+			setFlash(easeInOut((t - DIM_SECONDS) / HOLD_SECONDS) * 0.6, FLASH_TINT)
 			return false
 		end
-		local k = math.min(1, (t - CLOSE_SECONDS - HOLD_SECONDS) / OPEN_SECONDS)
-		local open = easeOut(k)
-		setLids(1 - open)
-		blur.Size = BLUR_SIZE * (1 - open)
-		setFlash(1 - open, FLASH_TINT)
-		setVeil(fromVeil + (1 - fromVeil) * open)
-		if not low then
+		local k = math.min(1, (t - DIM_SECONDS - HOLD_SECONDS) / OPEN_SECONDS)
+		local open = easeInOut(k)
+		veilAmount = fromVeil + (1 - fromVeil) * open
+		setDim(1 - open, blurOn)
+		-- The flash peaks just as vision clears, then settles.
+		setFlash(math.sin(math.min(1, k * 1.6 + 0.3) * math.pi) * 0.6 + (1 - k) * 0.2, FLASH_TINT)
+		if blurOn then
 			ripple.Visible = k < 1
-			ripple.Size = UDim2.fromScale(0.15 + open * 1.5, 0.15 + open * 1.5)
-			rippleStroke.Thickness = 12 * (1 - k) + 1
-			rippleStroke.Transparency = k
+			ripple.Size = UDim2.fromScale(0.2 + easeOut(k) * 1.3, 0.2 + easeOut(k) * 1.3)
+			rippleStroke.Thickness = 3 * (1 - k) + 1
+			rippleStroke.Transparency = 0.45 + 0.55 * k
 		end
 		if t >= total then
-			setLids(0)
+			veilAmount = 1
+			setDim(0, false)
 			ripple.Visible = false
 			blur.Enabled = false
 			flash.Enabled = false
@@ -296,7 +273,7 @@ function SightTransition.Enter(onCovered: () -> ())
 	end)
 end
 
--- Plays the way back out. `onCovered` runs at the bottom of the half-blink.
+-- Plays the way back out. `onCovered` runs at the bottom of the dim.
 function SightTransition.Exit(onCovered: () -> ())
 	token += 1
 	local mine = token
@@ -312,35 +289,33 @@ function SightTransition.Exit(onCovered: () -> ())
 		end
 	end
 	veilOn = false
+	swell = 1
 	ripple.Visible = false
+	-- A press mid-enter starts from wherever the dim, veil and blur already are.
 	local fromVeil = veilAmount
-	-- A press mid-enter starts from wherever the lids and blur already are.
-	local fromLids = lidAmount
-	local peak = math.max(fromLids, EXIT_CLOSE_AMOUNT)
-	local fromBlur = if blur.Enabled then blur.Size else 0
-	local total = EXIT_CLOSE_SECONDS + EXIT_OPEN_SECONDS
+	local fromDim = dimAmount
+	local peak = math.max(fromDim, EXIT_DIM_AMOUNT)
+	local blurOn = blur.Enabled
+	local total = EXIT_DIM_SECONDS + EXIT_OPEN_SECONDS
 	animate(mine, function(t)
-		if t < EXIT_CLOSE_SECONDS then
-			local k = t / EXIT_CLOSE_SECONDS
-			setLids(fromLids + (peak - fromLids) * easeIn(k))
-			blur.Size = fromBlur * (1 - k)
+		if t < EXIT_DIM_SECONDS then
+			setDim(fromDim + (peak - fromDim) * easeInOut(t / EXIT_DIM_SECONDS), blurOn)
 			return false
 		end
 		cover()
-		local k = math.min(1, (t - EXIT_CLOSE_SECONDS) / EXIT_OPEN_SECONDS)
-		local open = easeOut(k)
-		setLids(peak * (1 - open))
-		setVeil(fromVeil * (1 - open))
-		blur.Enabled = false
-		-- Colour floods back: a brief warm, saturated lift that settles to normal.
+		local k = math.min(1, (t - EXIT_DIM_SECONDS) / EXIT_OPEN_SECONDS)
+		local open = easeInOut(k)
+		veilAmount = fromVeil * (1 - open)
+		setDim(peak * (1 - open), blurOn)
+		-- Colour floods back: a brief saturated lift that settles to normal.
 		flash.Enabled = k < 1
-		flash.Saturation = 0.35 * (1 - open)
-		flash.Brightness = 0.08 * (1 - open)
+		flash.Saturation = 0.3 * (1 - open)
+		flash.Brightness = 0.06 * (1 - open)
 		flash.Contrast = 0
 		flash.TintColor = Color3.new(1, 1, 1)
 		if t >= total then
-			setLids(0)
-			setVeil(0)
+			veilAmount = 0
+			setDim(0, false)
 			flash.Enabled = false
 			blur.Enabled = false
 			if gui then
