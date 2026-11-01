@@ -170,7 +170,7 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 	local equipped = PedestalService.AutoEquip(player) > 1e-9
 	-- Without the pass, empty pedestals still fill themselves (never a swap).
 	if not equipped then
-		equipped = PedestalService.FillEmpty(player) > 1e-9
+		equipped = PedestalService.FillEmpty(player, items) > 1e-9
 	end
 	if equipped then
 		for _, item in items do

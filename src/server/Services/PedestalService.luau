@@ -183,7 +183,14 @@ function PedestalService.Refresh(player: Player)
 end
 
 -- Placing the floating copy on a pedestal ends its float.
+-- Pedestals the player emptied on purpose this session (Clear, Grab): FillEmpty leaves them alone
+-- until something is placed there again.
+local keptEmpty: { [Player]: { [number]: boolean } } = {}
+
 local function setDisplay(player: Player, slot: number, item: any?)
+	if item and keptEmpty[player] then
+		keptEmpty[player][slot] = nil
+	end
 	local data = DataService.Get(player) :: any
 	data.Pedestals[slot].Uid = if item then item.Uid else nil
 	displayed[player][slot] = item
@@ -230,10 +237,11 @@ function PedestalService.EquipBest(player: Player): number
 	return EconomyService.GetIncomePerSec(player) - before
 end
 
--- Free for everyone: an EMPTY unlocked pedestal takes the best relic not shown yet, so income starts
--- with the first finds. It never swaps a displayed relic (that stays with Auto Equip / Equip Best).
--- Returns the CE/sec gained.
-function PedestalService.FillEmpty(player: Player): number
+-- Free for everyone: an EMPTY unlocked pedestal takes the best of this batch's NEW finds, so income
+-- starts with the first rolls. Only new finds, so a pedestal the player emptied on purpose isn't
+-- refilled with the relic they just took off, and backpack relics never move by themselves. It
+-- never swaps a displayed relic (that stays with Auto Equip / Equip Best). Returns the CE/sec gained.
+function PedestalService.FillEmpty(player: Player, newItems: { any }): number
 	local data = DataService.Get(player)
 	local cache = displayed[player]
 	if not data or not cache then
@@ -241,16 +249,24 @@ function PedestalService.FillEmpty(player: Player): number
 	end
 	local empty = {}
 	for slot, pedestal in data.Pedestals do
-		if not pedestal.Locked and not cache[slot] then
+		if not pedestal.Locked and not cache[slot] and not (keptEmpty[player] and keptEmpty[player][slot]) then
 			table.insert(empty, slot)
 		end
 	end
 	if #empty == 0 then
 		return 0
 	end
-	local candidates = {}
+	local inInventory = {}
 	for _, item in data.Inventory do
-		if not PedestalService.IsDisplayed(player, item.Uid) and not CosmeticEquipService.IsFloating(player, item.Uid) then
+		inInventory[item.Uid] = true
+	end
+	local candidates = {}
+	for _, item in newItems do
+		if
+			inInventory[item.Uid]
+			and not PedestalService.IsDisplayed(player, item.Uid)
+			and not CosmeticEquipService.IsFloating(player, item.Uid)
+		then
 			table.insert(candidates, { Item = item, Income = relicIncome(item) })
 		end
 	end
@@ -499,6 +515,10 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 		if current then
 			CosmeticEquipService.Float(player, current.Uid)
 		end
+		if current and not floating then
+			keptEmpty[player] = keptEmpty[player] or {}
+			keptEmpty[player][slot] = true
+		end
 		local after = if floating then relicIncome(floating) * multiplier(pedestal) else 0
 		local change = after - before
 		local rate = `{if change >= 0 then "+" else "-"}{Format.number(math.abs(change))} CE/sec`
@@ -518,6 +538,8 @@ local ACTIONS: { [string]: (Player, any, ...any) -> () } = {
 		local slot = validSlot(data, slotArg)
 		if slot then
 			setDisplay(player, slot, nil)
+			keptEmpty[player] = keptEmpty[player] or {}
+			keptEmpty[player][slot] = true
 		end
 	end,
 
@@ -599,6 +621,7 @@ function PedestalService.Init()
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		displayed[player] = nil
+		keptEmpty[player] = nil
 	end)
 end
 
