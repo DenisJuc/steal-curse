@@ -2384,8 +2384,12 @@ function CollectionService.Init()
 		CollectionService.OnRebirth(player)
 		mirror(player)
 	end)
-	GameEvents.On("Discovery", function(player: Player)
+	GameEvents.On("Discovery", function(player: Player, _item: any, first: boolean?)
 		CollectionService.TryClaimMutationGoals(player)
+		-- A new Codex entry changes the HUD's "Index n/92" objective.
+		if first then
+			mirror(player)
+		end
 	end)
 	GameEvents.On("CollectionChanged", function(player: Player)
 		mirror(player)
