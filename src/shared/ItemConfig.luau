@@ -33,7 +33,7 @@ ItemConfig.Items = {
 	{
 		Id = "HastePotion",
 		Name = "Haste Potion",
-		Description = "Rolls charge in 75% of the time for 10 minutes.",
+		Description = "You roll faster: 1 extra roll for every 3 (33% more rolls) for 10 minutes.",
 		Effect = "Haste",
 		Value = 0.75,
 		DurationSeconds = 600,

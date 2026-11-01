@@ -27,7 +27,7 @@ local WARN_SECONDS = 10
 
 local SHORT_NAMES = {
 	Luck = "Luck x2",
-	Haste = "Haste -25%",
+	Haste = "Faster rolls",
 	Fortune = "Fortune +50%",
 }
 
