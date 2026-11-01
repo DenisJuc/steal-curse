@@ -178,7 +178,7 @@ function BountyService.Record(player: Player, event: string, payload: { [string]
 		return
 	end
 	for _, def in completed do
-		Notify:FireClient(player, `Bounty complete: {def.Text} - claim it at the Bounty Board in town`, "Item")
+		Notify:FireClient(player, `Bounty complete: {def.Text} - claim it from Gifts or the Bounty Board`, "Item")
 	end
 	if #completed > 0 or Bounties.claimable(data.Bounties, OPTIONS) ~= before then
 		DataService.RequestSave(player)

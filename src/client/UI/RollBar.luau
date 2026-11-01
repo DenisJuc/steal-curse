@@ -5,13 +5,17 @@
 -- (OmikujiBox) that fills with gold, rocks with "ROLL!" when charged and waits for a press (click,
 -- R key, L1 on a gamepad); pressing rattles it and rolls. Clicking the pill toggles.
 -- The server decides everything; this only shows the charge and sends RollNow / SetAutoRoll.
+-- Upgrades carries a "!" badge while a skill tree node you can open is affordable (after a look at
+-- the tree, only again once CE has doubled).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Format = require(ReplicatedStorage.Shared.Format)
+local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local OmikujiBox = require(script.Parent.OmikujiBox)
@@ -165,6 +169,62 @@ function RollBar.Start(screen: ScreenGui, callbacks: Callbacks): { Frame: Frame,
 	local upgrades, upgradesSlot = sideButton(bar, "UpgradesButton", "Upgrades", 3)
 	sideIcon(upgrades, "Upgrades")
 	upgrades.Activated:Connect(callbacks.OnUpgrades)
+	local upgradeBadge = UIKit.label({
+		Name = "AffordBadge",
+		Text = "!",
+		TextSize = 18,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = colors.Red,
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(1, -4, 0, 4),
+		Size = UDim2.fromOffset(24, 24),
+		ZIndex = 10,
+		Visible = false,
+		Parent = upgrades,
+	})
+	UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = upgradeBadge })
+	UIKit.stroke(colors.Text, 2, 0).Parent = upgradeBadge
+	Motion.badge(upgradeBadge)
+	-- After a look at the tree the badge waits until CE has doubled, so it never just stays on.
+	local seenAtCE = 0
+	local function refreshUpgradeBadge()
+		local ce = player:GetAttribute("CE") or 0
+		if seenAtCE > 0 and ce < seenAtCE * 2 then
+			upgradeBadge.Visible = false
+			return
+		end
+		local ranks = {}
+		for _, node in SkillConfig.Nodes do
+			ranks[node.Id] = player:GetAttribute(`Skill_{node.Id}`) or 0
+		end
+		local rebirths = player:GetAttribute("Rebirths") or 0
+		local any = false
+		for _, node in SkillConfig.Nodes do
+			if
+				BalanceTrials.skillNodeEnabled(node.Id)
+				and SkillConfig.unlocked(node.Id, ranks)
+				and ranks[node.Id] < BalanceTrials.skillMaxRank(node.Id, rebirths)
+			then
+				local override = if node.Id == "CoreLuck" then BalanceTrials.coreLuckCostOverride() else nil
+				local cost = SkillConfig.cost(node, ranks[node.Id], override)
+				if cost and cost <= ce + 1e-9 then
+					any = true
+					break
+				end
+			end
+		end
+		upgradeBadge.Visible = any
+	end
+	upgrades.Activated:Connect(function()
+		seenAtCE = math.max(1, player:GetAttribute("CE") or 0)
+		upgradeBadge.Visible = false
+	end)
+	player:GetAttributeChangedSignal("CE"):Connect(refreshUpgradeBadge)
+	for _, node in SkillConfig.Nodes do
+		player:GetAttributeChangedSignal(`Skill_{node.Id}`):Connect(refreshUpgradeBadge)
+	end
+	refreshUpgradeBadge()
 
 	local function isAuto(): boolean
 		return player:GetAttribute("AutoRoll") ~= false

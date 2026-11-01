@@ -1,5 +1,6 @@
 -- Playtime gifts (PlaytimeService): a GIFTS button under SHOP counts down to the next gift and
--- shows a red dot when one is ready; the menu lists every step with its reward and a Claim button.
+-- shows a red dot when one is ready (or a bounty can be claimed); the menu lists every step with its
+-- reward and a Claim button, plus a Bounties button so bounties can be claimed from anywhere.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -54,10 +55,21 @@ local function secondsLeft(index: number): number?
 	return start + Config.PlaytimeGifts[index].Minutes * 60 - workspace:GetServerTimeNow()
 end
 
-function GiftPanel.Start(screen: ScreenGui, onOpen: () -> ()): { Toggle: () -> (), SetVisible: (boolean) -> () }
+function GiftPanel.Start(
+	screen: ScreenGui,
+	onOpen: () -> (),
+	onBounties: () -> ()
+): { Toggle: () -> (), SetVisible: (boolean) -> () }
 	local colors = UIKit.Colors
 	local panel, content = UIKit.modal(screen, "GiftsMenu", "GIFTS", colors.Gold, Vector2.new(480, 520))
 	local list = UIKit.scrollList(content, 8)
+	local bounties = UIKit.button({
+		Text = "Daily bounties",
+		TextSize = 18,
+		LayoutOrder = 0,
+		Size = UDim2.new(1, -10, 0, 44),
+		Parent = list,
+	}, onBounties)
 	local rows: { { Button: TextButton, Index: number } } = {}
 	-- skinButton "Gold" darkens the text and "Dark" doesn't undo it; only restyle on a change.
 	local function skin(button: TextButton, kind: string)
@@ -160,12 +172,15 @@ function GiftPanel.Start(screen: ScreenGui, onOpen: () -> ()): { Toggle: () -> (
 				end
 			end
 		end
-		dot.Visible = ready > 0
+		local bountyReady = (player:GetAttribute("BountiesReady") or 0) > 0
+		dot.Visible = ready > 0 or bountyReady
 		open.Text = if ready > 0
 			then "GIFT READY!"
+			elseif bountyReady then "BOUNTY READY!"
 			elseif nextLeft < math.huge then `GIFT {Format.duration(math.ceil(nextLeft))}`
 			else "GIFTS"
-		skin(open, if ready > 0 then "Gold" else "Dark")
+		skin(open, if ready > 0 or bountyReady then "Gold" else "Dark")
+		skin(bounties, if bountyReady then "Gold" else "Dark")
 		if not panel.Visible then
 			return
 		end
