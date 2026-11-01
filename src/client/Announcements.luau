@@ -16,6 +16,7 @@ local Sounds = require(script.Parent.Sounds)
 
 local Announce = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Announce") :: RemoteEvent
 local ServerLuckBought = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("ServerLuckBought") :: RemoteEvent
+local EventSummoned = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("EventSummoned") :: RemoteEvent
 
 local Announcements = {}
 
@@ -24,6 +25,17 @@ local function escape(text: string): string
 end
 
 function Announcements.Start()
+	-- A bought event: one chat line (the event's own banner and beam come from ZoneBeacon).
+	EventSummoned.OnClientEvent:Connect(function(name: unknown, eventId: unknown)
+		if type(name) ~= "string" or type(eventId) ~= "string" then
+			return
+		end
+		local channels = TextChatService:FindFirstChild("TextChannels")
+		local general = channels and channels:FindFirstChild("RBXGeneral")
+		if general and general:IsA("TextChannel") then
+			general:DisplaySystemMessage(`<font color="#FFC24A"><b>{escape(name)} summoned an event for everyone!</b></font>`)
+		end
+	end)
 	ServerLuckBought.OnClientEvent:Connect(function(name: unknown, seconds: unknown)
 		if type(name) ~= "string" or type(seconds) ~= "number" then
 			return

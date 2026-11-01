@@ -288,6 +288,10 @@ Config.DevProducts = {
 	LuckPotion = 0,
 	PotionBundle = 0,
 	ServerLuck = 0,
+	-- Start a zone event for the whole server right now (Config.ZoneEvents ids).
+	EventBloodMoon = 0,
+	EventSpiritStorm = 0,
+	EventStarFall = 0,
 }
 
 -- Upgrades menu: the v0.1 skill tree (SkillTreePanel); false = the old list (SkillListPanel).
@@ -321,17 +325,23 @@ Config.Shop = {
 	-- Server Luck: x2 luck for everyone in the server; buying again while active adds time.
 	ServerLuckFactor = 2,
 	ServerLuckSeconds = 900,
-	-- Menu order and text. Price comes from Roblox (GetProductInfo).
+	-- Menu order, text, icon (IconAssets key), card colour and an optional ribbon. Price comes
+	-- from Roblox (GetProductInfo). Event = the zone event a product starts.
+	Featured = { Name = "ServerLuck", Title = "SERVER LUCK x2", Text = "Everyone in the server, 15 minutes", Icon = "Luck", Color = { 255, 196, 70 }, Tag = "SERVER-WIDE" },
+	Events = {
+		{ Name = "EventBloodMoon", Event = "BloodMoon", Icon = "Shrine" },
+		{ Name = "EventSpiritStorm", Event = "SpiritStorm", Icon = "Lightning" },
+		{ Name = "EventStarFall", Event = "StarFall", Icon = "SpiritSight" },
+	},
 	Passes = {
-		{ Name = "DoubleLuck", Title = "2x Luck", Text = "Double luck on every seal" },
-		{ Name = "FasterSeal", Title = "Faster Seal", Text = "Seal 25% faster" },
-		{ Name = "MoreIncome", Title = "+50% Income", Text = "More CE from every pedestal" },
-		{ Name = "AutoEquip", Title = "Auto Equip", Text = "Best relics placed for you" },
+		{ Name = "DoubleLuck", Title = "2x Luck", Text = "Double luck on every roll, forever", Icon = "Luck", Color = { 120, 235, 140 }, Tag = "BEST VALUE" },
+		{ Name = "FasterSeal", Title = "Faster Rolls", Text = "33% more rolls, forever", Icon = "PotionHaste", Color = { 120, 200, 255 } },
+		{ Name = "MoreIncome", Title = "+50% Income", Text = "More CE from every pedestal", Icon = "CursedEnergy", Color = { 200, 120, 255 } },
+		{ Name = "AutoEquip", Title = "Auto Equip", Text = "Your best relics placed for you", Icon = "Pedestals", Color = { 255, 170, 90 } },
 	},
 	Products = {
-		{ Name = "ServerLuck", Title = "Server Luck", Text = "x2 luck for everyone, 15 min" },
-		{ Name = "PotionBundle", Title = "Potion Bundle", Text = "Luck, Haste and Fortune" },
-		{ Name = "LuckPotion", Title = "Luck Potion", Text = "One Luck potion" },
+		{ Name = "PotionBundle", Title = "Potion Bundle", Text = "Luck + Haste + Fortune", Icon = "PotionFortune", Color = { 255, 196, 80 }, Tag = "3 IN 1" },
+		{ Name = "LuckPotion", Title = "Luck Potion", Text = "x2 Luck for 10 minutes", Icon = "PotionLuck", Color = { 120, 235, 140 } },
 	},
 }
 

@@ -565,7 +565,7 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 					return
 				end
 			end
-			reply(player, "Usage: /buy <luckpotion|potionbundle|serverluck>")
+			reply(player, "Usage: /buy <luckpotion|potionbundle|serverluck|eventbloodmoon|eventspiritstorm|eventstarfall>")
 		end,
 
 		give = function(player, args)

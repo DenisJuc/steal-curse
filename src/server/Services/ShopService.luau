@@ -5,6 +5,7 @@
 --   data.PurchaseIdCache and the receipt is only confirmed once that id is in the SAVED data
 --   (ProfileStore's dev-product pattern), so a purchase is never lost or paid twice.
 --   Server Luck: workspace attribute ServerLuckEndsAt (server time); everyone's Luck x2 until then.
+--   Event products (Config.Shop.Events): start that zone event for everyone now.
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
@@ -25,6 +26,7 @@ local SHOP = Config.Shop
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local ServerLuckBought = Remotes:WaitForChild("ServerLuckBought") :: RemoteEvent
+local EventSummoned = Remotes:WaitForChild("EventSummoned") :: RemoteEvent
 
 local function serverLuckActive(): boolean
 	local ends = workspace:GetAttribute("ServerLuckEndsAt")
@@ -56,6 +58,17 @@ local grants: { [string]: (Player) -> () } = {
 		task.delay(from + SHOP.ServerLuckSeconds - now + 0.5, refreshAll)
 	end,
 }
+
+-- Event products: start that zone event for the whole server now (a running event is replaced).
+for _, entry in SHOP.Events do
+	grants[entry.Name] = function(player)
+		local ZoneEventService = require(script.Parent.ZoneEventService)
+		if not ZoneEventService.Force(entry.Event) then
+			error(`unknown zone event {entry.Event}`)
+		end
+		EventSummoned:FireAllClients(player.DisplayName, entry.Event)
+	end
+end
 
 local function productName(productId: number): string?
 	for name, id in Config.DevProducts do
