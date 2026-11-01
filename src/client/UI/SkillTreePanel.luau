@@ -1,8 +1,9 @@
 -- Skills menu as a tree (GDD 6.6, v0.1): one tree per branch tab (Resonance, Sanctuary, Binding
 -- Arts). Each node is a round icon with its rank under it, placed by SkillConfig Pos and joined to
 -- the node it Requires by a line that lights up once the path is open. Tapping a node opens the
--- sheet at the bottom: name, rank, what it does now -> next, and one price button (x1 / x10 / Max
--- toggle). Locked nodes say which node opens them; nodes you can afford breathe gold.
+-- sheet at the bottom: name, rank, what it does now -> next, and one price button (one rank per
+-- tap). Locked nodes say which node opens them; nodes you can upgrade now wear a red "i" badge and
+-- breathe gold.
 -- Feel: a purchase bounces the node, bursts sparks from it, runs light down its child lines and
 -- plays the upgrade sound (plus a shine when it maxes). The server re-checks every purchase
 -- (SkillService) and answers with the fresh ranks. Effect texts come from SkillListPanel, the
@@ -37,8 +38,6 @@ local LABEL_HEIGHT = 34
 local MODE_HEIGHT = 40
 local TREE_TOP = UIKit.TAB_HEIGHT + 8 + MODE_HEIGHT + 6
 local BUTTON_WIDTH = 176
-local BUY_MODES = { { Id = "One", Text = "x1" }, { Id = "Ten", Text = "x10" }, { Id = "Max", Text = "Max" } }
-local BUY_AMOUNTS: { [string]: any } = { One = 1, Ten = 10, Max = "Max" }
 local SPARKS = 12
 
 type NodeParts = {
@@ -46,6 +45,7 @@ type NodeParts = {
 	Ring: UIStroke,
 	Rank: TextLabel,
 	Lock: GuiObject?,
+	Ready: GuiObject,
 }
 
 local function coreLuckCostOverride(nodeId: string): SkillConfig.CostOverride?
@@ -58,7 +58,6 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	local ranks: { [string]: number } = {}
 	local branch = SkillConfig.Branches[1].Id
 	local selected: string? = nil
-	local buyMode = "One"
 	local nodes: { [string]: NodeParts } = {}
 	local lines: { [string]: Frame } = {}
 
@@ -81,7 +80,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		TextSize = 15,
 		TextColor3 = colors.SubText,
 		Position = UDim2.fromOffset(6, UIKit.TAB_HEIGHT + 8),
-		Size = UDim2.new(1, -230, 0, MODE_HEIGHT),
+		Size = UDim2.new(1, -12, 0, MODE_HEIGHT),
 		TextWrapped = true,
 		Parent = content,
 	})
@@ -185,7 +184,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		Parent = sheet,
 	}, "+1", 0, function()
 		if selected then
-			send("Buy", selected, BUY_AMOUNTS[buyMode])
+			send("Buy", selected, 1)
 		end
 	end)
 	local sheetNote = UIKit.label({
@@ -207,17 +206,11 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 
 	-- Short screens (phones in landscape): the sheet sits beside the tree instead of under it, with
 	-- the price button across its bottom.
-	-- The branch tabs and x1/x10/Max share one row there, and the sheet drops its summary.
+	-- The sheet drops its summary and the branch blurb hides there.
 	local function applyCompact(compact: boolean)
-		local modeBar = content:FindFirstChild("BuyMode") :: Frame?
 		local top = if compact then UIKit.TAB_HEIGHT + 6 else TREE_TOP
 		blurb.Visible = not compact
 		sheetSummary.Visible = not compact
-		tabs.Size = if compact then UDim2.new(0.6, -6, 0, UIKit.TAB_HEIGHT) else UDim2.new(1, 0, 0, UIKit.TAB_HEIGHT)
-		if modeBar then
-			modeBar.Position = if compact then UDim2.fromScale(1, 0) else UDim2.new(1, -10, 0, UIKit.TAB_HEIGHT + 8)
-			modeBar.Size = if compact then UDim2.new(0.4, 0, 0, UIKit.TAB_HEIGHT) else UDim2.fromOffset(204, MODE_HEIGHT)
-		end
 		tree.Position = UDim2.fromOffset(0, top)
 		local glow = content:FindFirstChild("Glow") :: Frame?
 		if compact then
@@ -274,38 +267,18 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			render()
 		end)
 	end
-	UIKit.tabBar(content, BUY_MODES, buyMode, function(id)
-		buyMode = id
-		render()
-	end, {
-		Name = "BuyMode",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -10, 0, UIKit.TAB_HEIGHT + 8),
-		Size = UDim2.fromOffset(204, MODE_HEIGHT),
-	})
-
 	UIKit.watchCompact(applyCompact)
 
 	local function maxRankOf(node: SkillConfig.Node): number
 		return BalanceTrials.skillMaxRank(node.Id, player:GetAttribute("Rebirths") or 0)
 	end
 
-	-- What the price button buys now: count and total cost (x10 / Max as many as CE allows).
+	-- What the price button buys now: always one rank (one tap = one upgrade).
 	local function quote(node: SkillConfig.Node): (number, number, boolean)
 		local rank = ranks[node.Id] or 0
-		local remaining = maxRankOf(node) - rank
-		local override = coreLuckCostOverride(node.Id)
-		local oneCost = SkillConfig.cost(node, rank, override) or 0
+		local cost = SkillConfig.cost(node, rank, coreLuckCostOverride(node.Id)) or 0
 		local ce = player:GetAttribute("CE") or 0
-		local count, cost = 1, oneCost
-		if buyMode ~= "One" and remaining > 0 then
-			local limit = if buyMode == "Ten" then math.min(10, remaining) else remaining
-			local bought, total = SkillConfig.affordable(node, rank, ce, limit, override)
-			if bought > 0 then
-				count, cost = bought, total
-			end
-		end
-		return count, cost, ce + 1e-9 >= oneCost
+		return 1, cost, ce + 1e-9 >= cost
 	end
 
 	local function nodeState(node: SkillConfig.Node): string
@@ -378,6 +351,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			elseif state == "Locked" then Color3.fromRGB(14, 11, 20)
 			else colors.Card
 		parts.Rank.TextColor3 = if state == "Maxed" then colors.Gold else colors.Text
+		parts.Ready.Visible = state == "Ready"
 		if parts.Lock then
 			parts.Lock.Visible = state == "Locked"
 		end
@@ -671,7 +645,27 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				Motion.punch(button, 2)
 				refreshAll()
 			end)
-			nodes[node.Id] = { Button = button, Ring = ring, Rank = rank, Lock = lock }
+			-- Red "i": you can upgrade this node right now.
+			local ready = UIKit.label({
+				Name = "Ready",
+				Text = "i",
+				FontFace = UIKit.TitleFont,
+				TextSize = 18,
+				TextColor3 = Color3.new(1, 1, 1),
+				TextXAlignment = Enum.TextXAlignment.Center,
+				BackgroundTransparency = 0,
+				BackgroundColor3 = colors.Red,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.new(1, -6, 0, 6),
+				Size = UDim2.fromOffset(24, 24),
+				ZIndex = 7,
+				Visible = false,
+				Parent = button,
+			})
+			UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = ready })
+			UIKit.stroke(Color3.new(1, 1, 1), 2, 0).Parent = ready
+			Motion.badge(ready)
+			nodes[node.Id] = { Button = button, Ring = ring, Rank = rank, Lock = lock, Ready = ready }
 		end
 		tree.CanvasSize = UDim2.fromOffset(0, ROW_TOP + (rows - 1) * ROW_GAP + NODE)
 		selected = selected or first
