@@ -230,6 +230,51 @@ function PedestalService.EquipBest(player: Player): number
 	return EconomyService.GetIncomePerSec(player) - before
 end
 
+-- Free for everyone: an EMPTY unlocked pedestal takes the best relic not shown yet, so income starts
+-- with the first finds. It never swaps a displayed relic (that stays with Auto Equip / Equip Best).
+-- Returns the CE/sec gained.
+function PedestalService.FillEmpty(player: Player): number
+	local data = DataService.Get(player)
+	local cache = displayed[player]
+	if not data or not cache then
+		return 0
+	end
+	local empty = {}
+	for slot, pedestal in data.Pedestals do
+		if not pedestal.Locked and not cache[slot] then
+			table.insert(empty, slot)
+		end
+	end
+	if #empty == 0 then
+		return 0
+	end
+	local candidates = {}
+	for _, item in data.Inventory do
+		if not PedestalService.IsDisplayed(player, item.Uid) and not CosmeticEquipService.IsFloating(player, item.Uid) then
+			table.insert(candidates, { Item = item, Income = relicIncome(item) })
+		end
+	end
+	if #candidates == 0 then
+		return 0
+	end
+	table.sort(candidates, function(a, b)
+		return a.Income > b.Income
+	end)
+	-- Best relic on the best empty pedestal.
+	table.sort(empty, function(a, b)
+		return multiplier(data.Pedestals[a]) > multiplier(data.Pedestals[b])
+	end)
+	local before = EconomyService.GetIncomePerSec(player)
+	for index, slot in empty do
+		local pick = candidates[index]
+		if not pick then
+			break
+		end
+		setDisplay(player, slot, pick.Item)
+	end
+	return EconomyService.GetIncomePerSec(player) - before
+end
+
 function PedestalService.AutoEquipOn(player: Player): boolean
 	local data = DataService.Get(player)
 	return data ~= nil and data.Settings.AutoEquip == true and GamePassService.Owns(player, "AutoEquip")

@@ -63,8 +63,8 @@ local STEPS: { Step } = {
 	},
 	{
 		Target = "AutoRoll",
-		-- Beside the switch: above it would cover the ROLL button.
-		Side = "Right",
+		-- Beside the switch: above it would cover the ROLL button, to the right the Upgrades button.
+		Side = "Left",
 		Text = "Now let it roll for you: turn on Auto Roll.",
 		Done = function(player)
 			return player:GetAttribute("AutoRoll") ~= false
@@ -73,20 +73,17 @@ local STEPS: { Step } = {
 	{
 		Target = "BackpackButton",
 		Side = "Above",
-		Text = "Open your Backpack to see your relics.",
+		Text = "Your finds fill empty pedestals and earn CE. Open your Backpack to see them all.",
 		Done = function(player)
 			local ui = player:FindFirstChildOfClass("PlayerGui")
 			local menu = ui and ui:FindFirstChild("RelicsMenu", true)
-			return number(player, "IncomePerSec") > 0 or (menu ~= nil and (menu :: GuiObject).Visible)
+			return menu ~= nil and (menu :: GuiObject).Visible
 		end,
 	},
 	{
 		Target = "RelicsMenu/EquipBest",
 		Side = "Above",
-		Text = "Press Equip Best: your best relics go on your pedestals and start earning CE.",
-		Done = function(player)
-			return number(player, "IncomePerSec") > 0
-		end,
+		Text = "Equip Best swaps your best relics onto your pedestals. Use it after a great find.",
 		Fallback = { Target = "BackpackButton", Side = "Above", Text = "Open your Backpack and press Equip Best." },
 	},
 	{
