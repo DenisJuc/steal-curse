@@ -20,7 +20,7 @@ local BuffTimers = {}
 
 local PILL_WIDTH = 196
 local PILL_HEIGHT = 30
--- On touch screens the jump button owns the bottom-right corner.
+-- On touch screens the jump button owns the bottom-right corner (the -56 clears the SFX button).
 local TOUCH_LIFT = 150
 -- Under this many seconds left the pill bounces every second.
 local WARN_SECONDS = 10
@@ -93,7 +93,7 @@ function BuffTimers.Start(screen: ScreenGui)
 	local holder = UIKit.create("Frame", {
 		Name = "BuffTimers",
 		AnchorPoint = Vector2.new(1, 1),
-		Position = UDim2.new(1, -12, 1, -12 - lift),
+		Position = UDim2.new(1, -12, 1, -56 - lift),
 		Size = UDim2.fromOffset(PILL_WIDTH, (PILL_HEIGHT + 6) * #buffs),
 		BackgroundTransparency = 1,
 		Parent = screen,
