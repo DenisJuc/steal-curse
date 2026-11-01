@@ -1,10 +1,17 @@
 -- Menu windows (UIKit.modal) open with a springy pop and close with a quick shrink. While a menu
 -- is open the world behind it is blurred (not on Low effects) and dimmed, and clicking empty space
--- (or Escape / Backspace) closes it; the HUD stays bright and clickable. Panels keep simply setting window.Visible: on a
+-- (or Escape / Backspace) closes it; the HUD stays bright and clickable.
+-- RULE: a click closes menus only when its position is outside every open (or closing) window and
+-- outside every visible "MenuPopup" layer. Never rely on Active/input sinking for this: clicks on
+-- labels, images, scroll gaps or parts that stick out of a window reach the backdrop anyway. A popup
+-- parented outside its window gets the "MenuPopup" attribute so clicks on it count as inside.
+-- Panels keep simply setting window.Visible: on a
 -- close this module shows the window again until the shrink finishes (marked with the "Closing"
 -- attribute so controller support can ignore it; clearing it reopens the window).
 
+local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -28,6 +35,8 @@ local FADE = TweenInfo.new(0.22, Enum.EasingStyle.Quad)
 local POP_WINDOW = 0.6
 local POP_STAGGER = 0.035
 local POP_LIMIT = 14
+-- Extra pixels around a window that still count as inside it (edge strokes, shadows, near-misses).
+local INSIDE_MARGIN = 6
 
 function MenuMotion.Start(screen: ScreenGui)
 	local backdrop = Instance.new("TextButton")
@@ -95,7 +104,81 @@ function MenuMotion.Start(screen: ScreenGui)
 			end
 		end
 	end
-	backdrop.Activated:Connect(closeAll)
+
+	local function within(object: GuiObject, point: Vector2, margin: number): boolean
+		local topLeft, size = object.AbsolutePosition, object.AbsoluteSize
+		return point.X >= topLeft.X - margin
+			and point.Y >= topLeft.Y - margin
+			and point.X <= topLeft.X + size.X + margin
+			and point.Y <= topLeft.Y + size.Y + margin
+	end
+
+	-- True when the hit object is really drawn at the point: visible all the way up, and not
+	-- clipped away by a ScrollingFrame / ClipsDescendants ancestor (scrolled-off rows don't count).
+	local function shownAt(object: GuiObject, point: Vector2): boolean
+		local node: Instance? = object
+		while node and node ~= screen do
+			if node:IsA("GuiObject") then
+				if not node.Visible then
+					return false
+				end
+				if node ~= object and (node.ClipsDescendants or node:IsA("ScrollingFrame")) and not within(node, point, 0) then
+					return false
+				end
+			end
+			node = node.Parent
+		end
+		return true
+	end
+
+	local function isMenuLayer(object: Instance): boolean
+		local node: Instance? = object
+		while node and node ~= screen do
+			if node == backdrop then
+				return false
+			end
+			if node:GetAttribute("MenuPopup") or (node:IsA("GuiObject") and states[node] and states[node] ~= "Closed") then
+				return true
+			end
+			node = node.Parent
+		end
+		return false
+	end
+
+	-- Both checks use ScreenGui space (AbsolutePosition): an InputObject's Position already is that
+	-- space unless the ScreenGui ignores the top-bar inset.
+	local function insideAnyMenu(point: Vector2): boolean
+		for window, state in states do
+			if state ~= "Closed" and window.Visible and within(window, point, INSIDE_MARGIN) then
+				return true
+			end
+		end
+		local player = Players.LocalPlayer
+		local playerGui = player and player:FindFirstChildOfClass("PlayerGui")
+		if not playerGui then
+			return false
+		end
+		local hits = playerGui:GetGuiObjectsAtPosition(point.X, point.Y)
+		for _, hit in hits do
+			if hit ~= backdrop and isMenuLayer(hit) and shownAt(hit, point) then
+				return true
+			end
+		end
+		return false
+	end
+
+	backdrop.Activated:Connect(function(input: InputObject?)
+		if input and input.Position then
+			local point = Vector2.new(input.Position.X, input.Position.Y)
+			if screen.IgnoreGuiInset then
+				point += GuiService:GetGuiInset()
+			end
+			if insideAnyMenu(point) then
+				return
+			end
+		end
+		closeAll()
+	end)
 	-- Menus have no close button: Escape (or Backspace, since Roblox may keep Escape for its own
 	-- menu) closes them too. Gamepad B is handled by GamepadController.
 	UserInputService.InputBegan:Connect(function(input, processed)
@@ -111,8 +194,8 @@ function MenuMotion.Start(screen: ScreenGui)
 			return
 		end
 		local window = child :: GuiObject
-		-- An inactive Frame lets clicks fall through to the backdrop button, which closes every
-		-- menu; an active window sinks them, so only clicks outside it close it.
+		-- Sinks clicks so they don't reach the world; whether a click closes the menu is decided by
+		-- position in the backdrop handler (see the rule at the top), not by this.
 		window.Active = true
 		local juice = window:FindFirstChild("Juice") :: UIScale?
 		if not juice then
