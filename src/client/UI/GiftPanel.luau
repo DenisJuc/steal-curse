@@ -10,6 +10,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local ItemConfig = require(ReplicatedStorage.Shared.ItemConfig)
 local Motion = require(script.Parent.Motion)
+local Sounds = require(script.Parent.Parent.Sounds)
 local Toasts = require(script.Parent.Toasts)
 local UIKit = require(script.Parent.UIKit)
 
@@ -117,6 +118,9 @@ function GiftPanel.Start(
 		}, function()
 			local ok, message = pcall(ClaimPlaytimeGift.InvokeServer, ClaimPlaytimeGift, index)
 			Toasts.Show(if ok and type(message) == "string" then message else "Try again in a moment.")
+			if ok and type(message) == "string" and string.find(message, "Gift", 1, true) == 1 then
+				Sounds.Play("Collect")
+			end
 		end)
 		table.insert(rows, { Button = button, Index = index })
 	end

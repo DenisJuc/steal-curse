@@ -216,6 +216,9 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 	local function ask(remote: RemoteFunction, ...: any)
 		local ok, message = pcall(remote.InvokeServer, remote, ...)
 		Toasts.Show(if ok and type(message) == "string" then message else "Try again in a moment.")
+		if ok and type(message) == "string" and (string.find(message, "Code", 1, true) == 1 or string.find(message, "Thanks", 1, true) == 1) then
+			Sounds.Play("Collect")
+		end
 	end
 
 	local codeRow = row(#ClientSettings.Schema + 1, "Code", 300)
