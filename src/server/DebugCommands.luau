@@ -56,6 +56,7 @@ local TextChatService = game:GetService("TextChatService")
 
 local CodexBook = require(ReplicatedStorage.Shared.CodexBook)
 local Config = require(ReplicatedStorage.Shared.Config)
+local Economy = require(ReplicatedStorage.Shared.Economy)
 local Format = require(ReplicatedStorage.Shared.Format)
 local ItemConfig = require(ReplicatedStorage.Shared.ItemConfig)
 local MapPropConfig = require(ReplicatedStorage.Shared.MapPropConfig)
@@ -445,9 +446,11 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				reply(player, "Usage: /ce <amount> or /ce set <amount>")
 				return
 			end
-			data.CE = math.max(0, if setMode then amount else data.CE + amount)
+			-- "5e555" parses as infinity: safeCE caps it at Economy.MaxCE instead of breaking the balance.
+			data.CE = Economy.safeCE(if setMode then amount else data.CE + amount, data.CE)
 			EconomyService.Mirror(player)
-			reply(player, `You now have {Format.ce(data.CE)} CE.`)
+			local capped = if data.CE >= Economy.MaxCE then " (the maximum)" else ""
+			reply(player, `You now have {Format.ce(data.CE)} CE{capped}.`)
 		end,
 
 		offline = function(player, args)

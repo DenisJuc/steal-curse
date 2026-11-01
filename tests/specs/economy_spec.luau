@@ -231,6 +231,18 @@ return {
 		end,
 	},
 	{
+		Name = "safeCE keeps huge, infinite and NaN balances finite",
+		Run = function()
+			expect.equal(Economy.safeCE(1234.5), 1234.5)
+			expect.equal(Economy.safeCE(tonumber("5e555")), Economy.MaxCE)
+			expect.equal(Economy.safeCE(-math.huge), 0)
+			expect.equal(Economy.safeCE(0 / 0), 0)
+			expect.equal(Economy.safeCE(0 / 0, 77), 77)
+			expect.equal(Economy.safeCE("lots"), 0)
+			expect.truthy(Economy.safeCE(math.huge) + 1e300 < math.huge, "capped value still has room to add")
+		end,
+	},
+	{
 		Name = "pacing: selling is a drip, far below pedestal income",
 		Run = function()
 			for _, seed in SEEDS do

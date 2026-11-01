@@ -56,11 +56,18 @@ function EconomyService.GetIncomePerSec(player: Player): number
 	return Economy.totalIncome(contributionsOf(player), EconomyService.GetIncomeMultiplier(player))
 end
 
+-- Keeps the balances finite (Economy.safeCE) before they are shown or saved.
+local function keepFinite(data: any)
+	data.CE = Economy.safeCE(data.CE)
+	data.LifetimeCE = Economy.safeCE(data.LifetimeCE)
+end
+
 function EconomyService.Mirror(player: Player)
 	local data = DataService.Get(player)
 	if not data then
 		return
 	end
+	keepFinite(data)
 	player:SetAttribute("CE", data.CE)
 	player:SetAttribute("IncomePerSec", EconomyService.GetIncomePerSec(player))
 end
@@ -98,9 +105,10 @@ local function tick(player: Player, seconds: number)
 	data.Offline.At = os.time()
 	sessionIncome[player] = (sessionIncome[player] or 0) + earned
 	if data.AfkLog.Active then
-		data.AfkLog.CE += earned
+		data.AfkLog.CE = Economy.safeCE(data.AfkLog.CE + earned)
 		data.AfkLog.Seconds += seconds
 	end
+	keepFinite(data)
 	player:SetAttribute("CE", data.CE)
 	player:SetAttribute("IncomePerSec", perSec)
 	player:SetAttribute("SessionIncome", sessionIncome[player])

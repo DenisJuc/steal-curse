@@ -169,4 +169,17 @@ function Economy.equipBest(slots: { EquipSlot }, candidates: { EquipCandidate })
 	return plan
 end
 
+-- Highest CE balance the game keeps. Doubles end near 1.8e308; past that a value becomes infinity,
+-- which breaks every sum and display (inf - inf = NaN, shown as 0) and cannot be saved as JSON.
+Economy.MaxCE = 1e300
+
+-- A CE amount that is always a finite number in 0..MaxCE: infinity is capped, NaN and junk become
+-- `fallback` (default 0).
+function Economy.safeCE(value: any, fallback: number?): number
+	if type(value) ~= "number" or value ~= value then
+		return fallback or 0
+	end
+	return math.clamp(value, 0, Economy.MaxCE)
+end
+
 return Economy
