@@ -35,6 +35,7 @@
 --   /gamepass <name> [on|off]   pretend you own (or don't own) a game pass, e.g. /gamepass autoequip
 --   /buy <product>     grant a developer product without Roblox, e.g. /buy serverluck
 --   /friends <n>       pretend n friends are in the server (friend luck bonus)
+--   /gifts <minutes>   move this session's playtime clock forward (playtime gifts)
 --   /give <relicId> [mutation|none] [huge|titanic|normal] [count]   grant copies (Size optional; Studio SoftCap)
 --   /sizekit [relicId]   Studio fixture: Huge + Titanic of a relic (defaults to a Rare) for visual/ownership checks
 --   /codexfill [n]     mark the first n relics (rarity order, default all) as discovered, without items
@@ -81,6 +82,7 @@ local EconomyService = require(script.Parent.Services.EconomyService)
 local GamePassService = require(script.Parent.Services.GamePassService)
 local ShopService = require(script.Parent.Services.ShopService)
 local FriendService = require(script.Parent.Services.FriendService)
+local PlaytimeService = require(script.Parent.Services.PlaytimeService)
 local ItemService = require(script.Parent.Services.ItemService)
 local MultiplierService = require(script.Parent.Services.MultiplierService)
 local PedestalService = require(script.Parent.Services.PedestalService)
@@ -540,6 +542,12 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			local on = string.lower(args[2] or "on") ~= "off"
 			GamePassService.SetOwned(player, name, on)
 			reply(player, `Game pass {name}: {if on then "owned" else "not owned"} (this session).`)
+		end,
+
+		gifts = function(player, args)
+			local minutes = tonumber(args[1]) or 60
+			PlaytimeService.Skip(player, minutes)
+			reply(player, `Playtime clock +{minutes} min.`)
 		end,
 
 		friends = function(player, args)

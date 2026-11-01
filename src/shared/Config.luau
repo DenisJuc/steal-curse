@@ -293,6 +293,17 @@ Config.DevProducts = {
 -- Upgrades menu: the v0.1 skill tree (SkillTreePanel); false = the old list (SkillListPanel).
 Config.SkillTreeUI = true
 
+-- Playtime gifts (PlaytimeService): one chest per step of this session's play time (AFK counts),
+-- claimed from the gift button. Restarts every session. CEMinutes = minutes of current income.
+Config.PlaytimeGifts = {
+	{ Minutes = 5, Potions = { LuckPotion = 1 } },
+	{ Minutes = 10, CEMinutes = 5 },
+	{ Minutes = 20, Potions = { HastePotion = 1 } },
+	{ Minutes = 30, CEMinutes = 10, Potions = { FortunePotion = 1 } },
+	{ Minutes = 45, Potions = { LuckPotion = 2 } },
+	{ Minutes = 60, CEMinutes = 20, Potions = { LuckPotion = 1, HastePotion = 1, FortunePotion = 1 } },
+}
+
 -- Friend bonus (FriendService): extra Luck for each Roblox friend in the same server, capped.
 Config.Friends = {
 	LuckPerFriend = 0.1,

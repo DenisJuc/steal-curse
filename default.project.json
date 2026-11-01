@@ -72,6 +72,9 @@
         "ServerLuckBought": {
           "$className": "RemoteEvent"
         },
+        "ClaimPlaytimeGift": {
+          "$className": "RemoteFunction"
+        },
         "SetClientSetting": {
           "$className": "RemoteEvent"
         },
