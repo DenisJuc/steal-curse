@@ -15,6 +15,8 @@ Status on 2026-11-01. Everything listed as done is committed locally on `claude/
 | Codes | LAUNCH, SEALED; group reward ready | `CodeService` |
 | Data | Onboarding funnel, rebirth, rare finds, CE flow to the Creator Dashboard (live servers only) | `LiveAnalytics` |
 | Names | 75 relic display names de-parodied (ids unchanged) | `docs/RENAMES.md` |
+| First minutes | New finds fill empty pedestals (no swaps), one instruction at a time during the tutorial, spawn view clear of the HUD, Upgrades "!" badge, bounties claimable from the Gifts menu | `PedestalService.FillEmpty`, `Onboarding`, `RollBar` |
+| Placeholders | Relics without a model show as dark tinted stones (below Epic) | `RelicModels.luau` |
 
 Unit tests: `lune run tests/run` (295 passing).
 
@@ -29,9 +31,7 @@ Unit tests: `lune run tests/run` (295 passing).
 
 - Real ProfileStore saves (collection, sizes, playtime gifts, purchases) are untested outside the Studio mock.
 - Sealing bounties are unit-tested; not yet seen in Studio (today's random picks had none).
-- Gift, code and bounty CE rewards use current income, which includes the Fortune potion buff.
 - On very small screens (660x333) every menu is cramped; 844x390 is fine.
-- The Auto Roll tutorial bubble covers the Upgrades button for that step.
 - 45 of 92 relics still have no model (Tripo credits reset 2026-11-09).
 - Live servers run the Studio balance trial on purpose (`BalanceTrials.ShipTrial`).
 
