@@ -290,6 +290,9 @@ Config.DevProducts = {
 	ServerLuck = 0,
 }
 
+-- Upgrades menu: the v0.1 skill tree (SkillTreePanel); false = the old list (SkillListPanel).
+Config.SkillTreeUI = true
+
 -- Friend bonus (FriendService): extra Luck for each Roblox friend in the same server, capped.
 Config.Friends = {
 	LuckPerFriend = 0.1,

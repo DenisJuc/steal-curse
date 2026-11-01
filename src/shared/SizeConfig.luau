@@ -134,8 +134,9 @@ function SizeConfig.rank(size: string?): number
 	return 0
 end
 
--- rng(): number in [0, 1). Returns nil for Normal.
-function SizeConfig.roll(tierId: string, rng: () -> number): SizeId?
+-- rng(): number in [0, 1). Returns nil for Normal. hugeMult / titanicMult scale the chances
+-- (skill tree Huge / Titanic Attunement); nil = 1.
+function SizeConfig.roll(tierId: string, rng: () -> number, hugeMult: number?, titanicMult: number?): SizeId?
 	if not SizeConfig.enabled() then
 		return nil
 	end
@@ -144,12 +145,12 @@ function SizeConfig.roll(tierId: string, rng: () -> number): SizeId?
 		return nil
 	end
 	local r = rng()
-	local pT = row.Titanic or 0
+	local pT = (row.Titanic or 0) * (titanicMult or 1)
 	if pT > 0 and r < pT then
 		return "Titanic"
 	end
 	r -= pT
-	local pH = row.Huge or 0
+	local pH = (row.Huge or 0) * (hugeMult or 1)
 	if pH > 0 and r < pH then
 		return "Huge"
 	end

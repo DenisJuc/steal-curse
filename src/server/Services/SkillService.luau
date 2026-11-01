@@ -55,6 +55,8 @@ local function applied(player: Player, nodeId: string)
 	MultiplierService.Refresh(player)
 	if nodeId == "ScanSpeed" then
 		ScanService.Restart(player)
+	elseif nodeId == "Kindred" then
+		require(script.Parent.FriendService).Refresh(player)
 	end
 	applyWalkSpeed(player)
 	EconomyService.Mirror(player)
@@ -97,6 +99,10 @@ local function buy(player: Player, nodeId: any, amount: any): string?
 		return nil
 	end
 	local rank = data.Skills[node.Id] or 0
+	if not SkillConfig.unlocked(node.Id, data.Skills) then
+		local required = SkillConfig.ById[node.Requires :: string]
+		return `Unlock {if required then required.Name else "the node above"} first.`
+	end
 	if rank >= maxRank then
 		local msg = if maxRank < node.MaxRank and node.Id == "CoreLuck" and rebirths < 1
 			then `{node.Name} caps at rank {maxRank} until Rebirth.`

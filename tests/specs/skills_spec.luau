@@ -32,7 +32,7 @@ return {
 			for id in DataTemplate.Template.Skills do
 				expect.truthy(nodes[id], `DataTemplate.Skills.{id} is not a skill node`)
 			end
-			expect.equal(count, 12, "GDD 6.6 nodes + Swift Step + Studio PedestalMastery")
+			expect.equal(count, 15, "GDD 6.6 nodes + Swift Step + Studio PedestalMastery + v0.1 Huge/Titanic/Kindred")
 			expect.truthy(nodes.PedestalMastery ~= nil, "PedestalMastery node exists")
 			expect.equal(nodes.PedestalMastery.MaxRank, 5, "PedestalMastery max")
 		end,
@@ -129,6 +129,28 @@ return {
 			expect.equal(total, 0, "maxed spends nothing")
 			ranks = SkillConfig.affordable(nodes.SpiritReservoir, 0, 1000000 + 49999999, 2)
 			expect.equal(ranks, 1, "no partial purchase")
+		end,
+	},
+	{
+		Name = "tree paths: roots open, children need their parent, owned nodes stay open; every node has a place",
+		Run = function()
+			expect.truthy(SkillConfig.unlocked("CoreLuck", {}), "root open")
+			expect.truthy(not SkillConfig.unlocked("ScanSpeed", {}), "child locked")
+			expect.truthy(SkillConfig.unlocked("ScanSpeed", { CoreLuck = 1 }), "child open after parent")
+			expect.truthy(SkillConfig.unlocked("ScanSpeed", { ScanSpeed = 3 }), "old save keeps an owned node")
+			local seen = {}
+			for _, node in SkillConfig.Nodes do
+				if node.Requires then
+					expect.truthy(nodes[node.Requires], `{node.Id} requires an unknown node`)
+					expect.equal(nodes[node.Requires].Branch, node.Branch, `{node.Id} requires a node in another branch`)
+				end
+				local key = `{node.Branch}:{node.Pos[1]}:{node.Pos[2]}`
+				expect.truthy(not seen[key], `{node.Id} shares a tree cell`)
+				seen[key] = true
+			end
+			expect.near(SkillConfig.hugeChanceMult(5), 1.4, 1e-9, "Huge Attunement max")
+			expect.near(SkillConfig.titanicChanceMult(3), 1.3, 1e-9, "Titanic Attunement max")
+			expect.near(SkillConfig.kindredBonus(2), 0.02, 1e-9, "Kindred max")
 		end,
 	},
 }

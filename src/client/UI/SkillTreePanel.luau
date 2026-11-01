@@ -1,27 +1,23 @@
--- Skills menu (GDD 6.6): three branch tabs (Resonance, Sanctuary, Binding Arts), one row per node
--- with its rank, what it does now and at the next rank, and one price button that buys 1, 10 or
--- Max ranks (the x1 / x10 / Max toggle above the list).
--- Costs come from SkillConfig (shared with the server); the server re-checks every purchase and
--- answers with the fresh ranks.
--- Feel: rows pop in one after another when the menu opens (MenuMotion "PopIn") or the tab changes; a purchase flashes
--- the row gold, springs its rank bar forward and plays the upgrade sound (plus a shine when the
--- node maxes); buttons you can't afford shake "no" (Toasts says how much CE is missing).
+-- Skills menu as a tree (GDD 6.6, v0.1): one tree per branch tab (Resonance, Sanctuary, Binding
+-- Arts). Each node is a round icon with its rank under it, placed by SkillConfig Pos and joined to
+-- the node it Requires by a line that lights up once the path is open. Tapping a node opens the
+-- sheet at the bottom: name, rank, what it does now -> next, and one price button (x1 / x10 / Max
+-- toggle). Locked nodes say which node opens them; nodes you can afford breathe gold.
+-- Feel: a purchase bounces the node, bursts sparks from it, runs light down its child lines and
+-- plays the upgrade sound (plus a shine when it maxes). The server re-checks every purchase
+-- (SkillService) and answers with the fresh ranks. Effect texts come from SkillListPanel, the
+-- old list menu kept as a fallback (Config.SkillTreeUI = false).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
-local Config = require(ReplicatedStorage.Shared.Config)
-local Format = require(ReplicatedStorage.Shared.Format)
-local Formulas = require(ReplicatedStorage.Shared.Formulas)
-local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
-
-local function coreLuckCostOverride(): SkillConfig.CostOverride?
-	return BalanceTrials.coreLuckCostOverride()
-end
+local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
-local Spring = require(script.Parent.Spring)
+local SkillListPanel = require(script.Parent.SkillListPanel)
 local UIKit = require(script.Parent.UIKit)
 local Sounds = require(script.Parent.Parent.Sounds)
 
@@ -30,74 +26,42 @@ local SkillAction = Remotes:WaitForChild("SkillAction") :: RemoteFunction
 
 local SkillTreePanel = {}
 
-local ROW_HEIGHT = 84
+local NODE = 78
+local ICON = 46
+local COLUMN_X = { 0.18, 0.5, 0.82 }
+local ROW_TOP = 58
+local ROW_GAP = 124
+local SHEET_HEIGHT = 156
 local MODE_HEIGHT = 40
-local LIST_TOP = UIKit.TAB_HEIGHT + 8 + MODE_HEIGHT + 8
-local STAGGER = 0.045
-local BUTTON_WIDTH = 168
-local BUTTON_HEIGHT = 56
+local TREE_TOP = UIKit.TAB_HEIGHT + 8 + MODE_HEIGHT + 6
+local BUTTON_WIDTH = 176
 local BUY_MODES = { { Id = "One", Text = "x1" }, { Id = "Ten", Text = "x10" }, { Id = "Max", Text = "Max" } }
--- What each mode asks the server for (SkillAction "Buy", nodeId, 1 | 10 | "Max").
 local BUY_AMOUNTS: { [string]: any } = { One = 1, Ten = 10, Max = "Max" }
+local SPARKS = 12
 
-local function percent(value: number): string
-	return `{Format.number(value * 100)}%`
+type NodeParts = {
+	Button: TextButton,
+	Ring: UIStroke,
+	Rank: TextLabel,
+	Lock: GuiObject?,
+}
+
+local function coreLuckCostOverride(nodeId: string): SkillConfig.CostOverride?
+	return if nodeId == "CoreLuck" then BalanceTrials.coreLuckCostOverride() else nil
 end
-
--- What a node does at `rank`, in a few words.
-local function effectText(nodeId: string, rank: number): string
-	if nodeId == "CoreLuck" then
-		local trial = BalanceTrials.current()
-		return `x{Format.number(Formulas.coreLuck(rank, if trial then trial.LuckDivisor else nil))} luck`
-	elseif nodeId == "ScanSpeed" then
-		return `scan every {Format.seconds(SkillConfig.scanInterval(rank))}`
-	elseif nodeId == "FrequencyFocus" then
-		return `Frequency x{Format.number(Config.Frequency.MultiplierByRank[rank] or 1)}`
-	elseif nodeId == "MutationResonance" then
-		if rank <= 0 then
-			return "no mutations"
-		end
-		local unlocked = 0
-		for _, mutation in MutationConfig.Mutations do
-			if mutation.UnlockRank <= rank then
-				unlocked += 1
-			end
-		end
-		return `{percent(MutationConfig.ChanceAt(rank))} mutated, {unlocked} variant{if unlocked == 1 then "" else "s"}`
-	elseif nodeId == "EnergyConduction" then
-		return `+{percent(SkillConfig.incomeBonus(rank))} income`
-	elseif nodeId == "SpiritMerchant" then
-		return `+{percent(SkillConfig.sellBonus(rank))} sell value`
-	elseif nodeId == "SpiritReservoir" then
-		return `offline up to {Format.duration(SkillConfig.offlineCapSeconds(rank))}`
-	elseif nodeId == "SpiritSight" then
-		return `see {Format.number(SkillConfig.sightRange(rank))} studs, pulse {Format.seconds(SkillConfig.pulseCooldown(rank))}`
-	elseif nodeId == "BindingEfficiency" then
-		return `bind in {Format.seconds(SkillConfig.holdSeconds(rank))}`
-	elseif nodeId == "ResonantHarvest" then
-		return `+{percent(SkillConfig.harvestMultiplier(rank) - 1)} bonus finds`
-	elseif nodeId == "SwiftStep" then
-		return `walk speed {Format.number(SkillConfig.walkSpeed(rank))}`
-	elseif nodeId == "PedestalMastery" then
-		return `+{percent(rank * SkillConfig.Effects.IncomePerMasteryRank)} pedestal income`
-	end
-	return ""
-end
-
-type RowParts = { Card: Frame, Fill: Frame, Rank: TextLabel, MaxRank: number }
 
 function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (boolean) -> () }
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
 	local ranks: { [string]: number } = {}
 	local branch = SkillConfig.Branches[1].Id
-	local costButtons: { any } = {}
+	local selected: string? = nil
 	local buyMode = "One"
-	local rows: { [string]: RowParts } = {}
-	local popNext = false
+	local nodes: { [string]: NodeParts } = {}
+	local lines: { [string]: Frame } = {}
 
 	local panel, content =
-		UIKit.modal(screen, "SkillsMenu", "SKILLS", colors.Accent, Vector2.new(560, 620), "Upgrades")
+		UIKit.modal(screen, "SkillsMenu", "SKILLS", colors.Accent, Vector2.new(620, 700), "Upgrades")
 
 	local tabs = UIKit.create("Frame", {
 		BackgroundTransparency = 1,
@@ -110,10 +74,114 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			Padding = UDim.new(0, 6),
 		}),
 	})
-	local list = UIKit.scrollList(content, 6)
-	list.Position = UDim2.fromOffset(0, LIST_TOP)
-	list.Size = UDim2.new(1, 0, 1, -LIST_TOP)
-	list.ScrollBarImageColor3 = colors.Trim
+	local blurb = UIKit.label({
+		Text = "",
+		TextSize = 15,
+		TextColor3 = colors.SubText,
+		Position = UDim2.fromOffset(6, UIKit.TAB_HEIGHT + 8),
+		Size = UDim2.new(1, -230, 0, MODE_HEIGHT),
+		TextWrapped = true,
+		Parent = content,
+	})
+
+	local tree = UIKit.create("ScrollingFrame", {
+		Name = "Tree",
+		Position = UDim2.fromOffset(0, TREE_TOP),
+		Size = UDim2.new(1, 0, 1, -(TREE_TOP + SHEET_HEIGHT + 8)),
+		BackgroundTransparency = 1,
+		BorderSizePixel = 0,
+		ScrollBarThickness = 6,
+		ScrollBarImageColor3 = colors.Trim,
+		ScrollingDirection = Enum.ScrollingDirection.Y,
+		CanvasSize = UDim2.new(),
+		Parent = content,
+	})
+	local canvas = UIKit.create("Frame", {
+		Name = "Canvas",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromScale(1, 1),
+		Parent = tree,
+	})
+
+	-- Bottom sheet: the selected node.
+	local sheet = UIKit.create("Frame", {
+		Name = "Sheet",
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, 0, 0, SHEET_HEIGHT),
+		BackgroundColor3 = colors.Card,
+		Parent = content,
+	}, { UIKit.corner(12), UIKit.padding(12) })
+	UIKit.skinCard(sheet)
+	local sheetIcon = UIKit.create("Frame", {
+		Name = "IconHolder",
+		BackgroundTransparency = 1,
+		Size = UDim2.fromOffset(64, 64),
+		Parent = sheet,
+	})
+	local sheetName = UIKit.label({
+		FontFace = UIKit.TitleFont,
+		TextSize = 24,
+		Position = UDim2.fromOffset(76, 0),
+		Size = UDim2.new(1, -76 - BUTTON_WIDTH - 12, 0, 28),
+		Parent = sheet,
+	})
+	local sheetRank = UIKit.label({
+		TextSize = 16,
+		TextColor3 = colors.Gold,
+		Position = UDim2.fromOffset(76, 28),
+		Size = UDim2.new(1, -76 - BUTTON_WIDTH - 12, 0, 20),
+		Parent = sheet,
+	})
+	local sheetSummary = UIKit.label({
+		TextSize = 15,
+		TextColor3 = colors.SubText,
+		TextWrapped = true,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		Position = UDim2.fromOffset(0, 70),
+		Size = UDim2.new(1, -BUTTON_WIDTH - 12, 0, 38),
+		Parent = sheet,
+	})
+	local sheetEffect = UIKit.label({
+		TextSize = 17,
+		TextScaled = true,
+		TextColor3 = colors.Cyan,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.new(1, -BUTTON_WIDTH - 12, 0, 24),
+		Parent = sheet,
+	})
+	UIKit.create("UITextSizeConstraint", { MaxTextSize = 17, MinTextSize = 11, Parent = sheetEffect })
+
+	local send: (string, ...any) -> ()
+	local buyButton = UIKit.priceButton({
+		Name = "Buy",
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.fromScale(1, 1),
+		Size = UDim2.fromOffset(BUTTON_WIDTH, 60),
+		TextSize = 20,
+		Parent = sheet,
+	}, "+1", 0, function()
+		if selected then
+			send("Buy", selected, BUY_AMOUNTS[buyMode])
+		end
+	end)
+	local sheetNote = UIKit.label({
+		Name = "Note",
+		Text = "",
+		TextSize = 17,
+		TextWrapped = true,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextColor3 = colors.SubText,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.fromScale(1, 1),
+		Size = UDim2.fromOffset(BUTTON_WIDTH, 60),
+		BackgroundTransparency = 0,
+		BackgroundColor3 = colors.Panel,
+		Visible = false,
+		Parent = sheet,
+	})
+	UIKit.corner(8).Parent = sheetNote
 
 	local render: () -> ()
 	local tabButtons: { [string]: TextButton } = {}
@@ -129,31 +197,13 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				return
 			end
 			branch = each.Id
-			popNext = true
+			selected = nil
 			render()
 		end)
 	end
-
-	-- Prices each row's button for the buy mode: x10 and Max buy as many ranks as CE allows (up to
-	-- 10 / the cap), like the server; with none affordable the button shows the next rank's price.
-	local function refreshAffordability()
-		local ce = player:GetAttribute("CE") or 0
-		for _, entry in costButtons do
-			local count, cost = 1, entry.OneCost
-			if buyMode ~= "One" then
-				local limit = if buyMode == "Ten" then math.min(10, entry.Remaining) else entry.Remaining
-				local bought, total = SkillConfig.affordable(entry.Node, entry.Rank, ce, limit, entry.Override)
-				if bought > 0 then
-					count, cost = bought, total
-				end
-			end
-			UIKit.setPrice(entry.Button, `+{count}`, cost)
-			UIKit.setAffordable(entry.Button, ce + 1e-9 >= cost, cost)
-		end
-	end
 	UIKit.tabBar(content, BUY_MODES, buyMode, function(id)
 		buyMode = id
-		refreshAffordability()
+		render()
 	end, {
 		Name = "BuyMode",
 		AnchorPoint = Vector2.new(1, 0),
@@ -161,26 +211,233 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		Size = UDim2.fromOffset(204, MODE_HEIGHT),
 	})
 
-	-- Celebrates the rows whose rank went up (rows were just rebuilt by render).
-	local function celebrate(before: { [string]: number })
-		for nodeId, parts in rows do
-			local old = before[nodeId] or 0
-			local new = ranks[nodeId] or 0
-			if new <= old then
-				continue
+	local function maxRankOf(node: SkillConfig.Node): number
+		return BalanceTrials.skillMaxRank(node.Id, player:GetAttribute("Rebirths") or 0)
+	end
+
+	-- What the price button buys now: count and total cost (x10 / Max as many as CE allows).
+	local function quote(node: SkillConfig.Node): (number, number, boolean)
+		local rank = ranks[node.Id] or 0
+		local remaining = maxRankOf(node) - rank
+		local override = coreLuckCostOverride(node.Id)
+		local oneCost = SkillConfig.cost(node, rank, override) or 0
+		local ce = player:GetAttribute("CE") or 0
+		local count, cost = 1, oneCost
+		if buyMode ~= "One" and remaining > 0 then
+			local limit = if buyMode == "Ten" then math.min(10, remaining) else remaining
+			local bought, total = SkillConfig.affordable(node, rank, ce, limit, override)
+			if bought > 0 then
+				count, cost = bought, total
 			end
-			parts.Fill.Size = UDim2.fromScale(math.clamp(old / parts.MaxRank, 0, 1), 1)
-			Spring.target(parts.Fill, 3, 0.6, { Size = UDim2.fromScale(math.clamp(new / parts.MaxRank, 0, 1), 1) })
-			Motion.purchased(parts.Card)
-			Motion.punch(parts.Rank, 3)
-			if new >= parts.MaxRank then
-				Motion.shine(parts.Card, 0.9)
-				Sounds.Play("Shine")
+		end
+		return count, cost, ce + 1e-9 >= oneCost
+	end
+
+	local function nodeState(node: SkillConfig.Node): string
+		local rank = ranks[node.Id] or 0
+		if rank >= maxRankOf(node) then
+			return "Maxed"
+		elseif not SkillConfig.unlocked(node.Id, ranks) then
+			return "Locked"
+		end
+		local _, _, affordable = quote(node)
+		return if affordable then "Ready" else "Open"
+	end
+
+	local function refreshSheet()
+		local node = selected and SkillConfig.ById[selected]
+		sheet.Visible = node ~= nil
+		if not node then
+			return
+		end
+		for _, child in sheetIcon:GetChildren() do
+			child:Destroy()
+		end
+		local icon = Icons.image(sheetIcon, node.Icon, 64)
+		if icon then
+			icon.Position = UDim2.fromOffset(0, 0)
+		end
+		local rank = ranks[node.Id] or 0
+		local maxRank = maxRankOf(node)
+		local state = nodeState(node)
+		sheetName.Text = node.Name
+		sheetRank.Text = `Rank {rank}/{maxRank}`
+		sheetSummary.Text = node.Summary
+		local now = SkillListPanel.effectText(node.Id, rank)
+		sheetEffect.Text = if state == "Maxed" then now else `{now}  \u{2192}  {SkillListPanel.effectText(node.Id, rank + 1)}`
+		buyButton.Visible = state ~= "Maxed" and state ~= "Locked"
+		sheetNote.Visible = not buyButton.Visible
+		if state == "Maxed" then
+			sheetNote.Text = "MAXED"
+			sheetNote.TextColor3 = colors.Gold
+		elseif state == "Locked" then
+			local required = SkillConfig.ById[node.Requires :: string]
+			sheetNote.Text = `Unlock {if required then required.Name else "the node above"} first`
+			sheetNote.TextColor3 = colors.SubText
+		else
+			local count, cost, affordable = quote(node)
+			UIKit.setPrice(buyButton, `+{count}`, cost)
+			UIKit.setAffordable(buyButton, affordable, cost)
+		end
+	end
+
+	local function styleNode(node: SkillConfig.Node)
+		local parts = nodes[node.Id]
+		if not parts then
+			return
+		end
+		local state = nodeState(node)
+		local rank = ranks[node.Id] or 0
+		parts.Rank.Text = `{rank}/{maxRankOf(node)}`
+		parts.Ring.Color = if state == "Maxed"
+			then colors.Gold
+			elseif state == "Ready" then colors.Gold
+			elseif state == "Open" then colors.Accent
+			else colors.Trim
+		parts.Ring.Thickness = if node.Id == selected then 5 else 3
+		parts.Button.BackgroundColor3 = if state == "Maxed" then Color3.fromRGB(70, 56, 30) else colors.Card
+		parts.Rank.TextColor3 = if state == "Maxed" then colors.Gold else colors.Text
+		if parts.Lock then
+			parts.Lock.Visible = state == "Locked"
+		end
+		local icon = parts.Button:FindFirstChild(`{node.Icon}Icon`) :: ImageLabel?
+		if icon then
+			icon.ImageTransparency = if state == "Locked" then 0.65 else 0
+		end
+		local line = lines[node.Id]
+		if line then
+			local open = SkillConfig.unlocked(node.Id, ranks)
+			line.BackgroundColor3 = if rank > 0 then colors.Gold elseif open then colors.Accent else colors.Track
+			line.BackgroundTransparency = if open then 0.1 else 0.4
+		end
+	end
+
+	local function refreshAll()
+		for _, node in SkillConfig.Nodes do
+			styleNode(node)
+		end
+		refreshSheet()
+	end
+
+	-- Canvas width in layout units: AbsoluteSize includes the menu's UIScale, offsets don't.
+	local function canvasWidth(): number
+		local factor = 1
+		for _, parts in nodes do
+			local size = (parts.Button.Parent :: Frame).AbsoluteSize.X
+			if size > 0 then
+				factor = size / NODE
+			end
+			break
+		end
+		return canvas.AbsoluteSize.X / factor
+	end
+
+	-- Centre of a node in canvas layout units.
+	local function centre(node: SkillConfig.Node, width: number): Vector2
+		return Vector2.new(width * COLUMN_X[node.Pos[1]], ROW_TOP + (node.Pos[2] - 1) * ROW_GAP)
+	end
+
+	local function placeLine(line: Frame, from: Vector2, to: Vector2)
+		local delta = to - from
+		line.Size = UDim2.fromOffset(delta.Magnitude, 6)
+		line.Position = UDim2.fromOffset((from.X + to.X) / 2, (from.Y + to.Y) / 2)
+		line.Rotation = math.deg(math.atan2(delta.Y, delta.X))
+	end
+
+	local function layout()
+		local width = canvasWidth()
+		for _, node in SkillConfig.Nodes do
+			local parts = nodes[node.Id]
+			if parts then
+				local at = centre(node, width)
+				parts.Button.Parent.Position = UDim2.new(COLUMN_X[node.Pos[1]], 0, 0, at.Y)
+				local line = lines[node.Id]
+				local parent = node.Requires and SkillConfig.ById[node.Requires]
+				if line and parent then
+					placeLine(line, centre(parent, width), at)
+				end
+			end
+		end
+	end
+	canvas:GetPropertyChangedSignal("AbsoluteSize"):Connect(layout)
+
+	-- Sparks out of a node and a light running down each line to its children.
+	local function burst(nodeId: string)
+		local parts = nodes[nodeId]
+		if not parts then
+			return
+		end
+		local holder = parts.Button.Parent :: Frame
+		for index = 1, SPARKS do
+			local angle = (index / SPARKS) * math.pi * 2 + math.random() * 0.4
+			local spark = UIKit.create("Frame", {
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Position = UDim2.fromScale(0.5, 0.5),
+				Size = UDim2.fromOffset(9, 9),
+				BackgroundColor3 = if index % 3 == 0 then colors.Accent else colors.Gold,
+				ZIndex = 8,
+				Parent = holder,
+			}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+			local distance = NODE * (0.8 + math.random() * 0.5)
+			local tween = TweenService:Create(
+				spark,
+				TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+				{
+					Position = UDim2.new(0.5, math.cos(angle) * distance, 0.5, math.sin(angle) * distance),
+					Size = UDim2.fromOffset(2, 2),
+					BackgroundTransparency = 1,
+				}
+			)
+			tween:Play()
+			tween.Completed:Once(function()
+				spark:Destroy()
+			end)
+		end
+		local ring = UIKit.create("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromOffset(NODE, NODE),
+			BackgroundTransparency = 1,
+			ZIndex = 7,
+			Parent = holder,
+		}, {
+			UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+			UIKit.create("UIStroke", { Color = colors.Gold, Thickness = 4 }),
+		})
+		local stroke = ring:FindFirstChildOfClass("UIStroke") :: UIStroke
+		TweenService:Create(ring, TweenInfo.new(0.5, Enum.EasingStyle.Quad), { Size = UDim2.fromOffset(NODE * 1.9, NODE * 1.9) })
+			:Play()
+		local fade = TweenService:Create(stroke, TweenInfo.new(0.5), { Transparency = 1 })
+		fade:Play()
+		fade.Completed:Once(function()
+			ring:Destroy()
+		end)
+		for _, child in SkillConfig.Nodes do
+			local line = lines[child.Id]
+			if child.Requires == nodeId and line then
+				Motion.flash(line, colors.Text, 0)
 			end
 		end
 	end
 
-	local function send(action: string, ...: any)
+	local function celebrate(before: { [string]: number })
+		for nodeId, parts in nodes do
+			local old = before[nodeId] or 0
+			local new = ranks[nodeId] or 0
+			if new > old then
+				Motion.purchased(parts.Button)
+				Motion.punch(parts.Rank, 3)
+				burst(nodeId)
+				local node = SkillConfig.ById[nodeId]
+				if node and new >= maxRankOf(node) then
+					Motion.shine(parts.Button, 0.9)
+					Sounds.Play("Shine")
+				end
+			end
+		end
+	end
+
+	function send(action: string, ...: any)
 		local args = table.pack(...)
 		task.spawn(function()
 			local ok, result = pcall(function()
@@ -189,163 +446,137 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			if ok and type(result) == "table" and type(result.State) == "table" then
 				local before = table.clone(ranks)
 				ranks = result.State.Ranks or ranks
-				render()
+				refreshAll()
 				if action == "Buy" then
 					celebrate(before)
+					local node = selected and nodes[selected]
+					if node and (ranks[selected :: string] or 0) <= (before[selected :: string] or 0) then
+						Motion.deny(buyButton)
+					end
 				end
 			end
 		end)
 	end
 
 	function render()
-		costButtons = {}
-		rows = {}
 		for id, tab in tabButtons do
 			UIKit.skinTab(tab, id == branch)
 		end
-		for _, child in list:GetChildren() do
-			if child:IsA("GuiObject") then
-				child:Destroy()
+		for _, each in SkillConfig.Branches do
+			if each.Id == branch then
+				blurb.Text = each.Blurb
 			end
 		end
-		local order = 0
-		local rebirths = player:GetAttribute("Rebirths") or 0
+		for _, child in canvas:GetChildren() do
+			child:Destroy()
+		end
+		nodes = {}
+		lines = {}
+		local rows = 1
+		local first: string? = nil
 		for _, node in SkillConfig.Nodes do
-			if node.Branch ~= branch then
+			if node.Branch ~= branch or not BalanceTrials.skillNodeEnabled(node.Id) then
 				continue
 			end
-			if not BalanceTrials.skillNodeEnabled(node.Id) then
-				continue
+			rows = math.max(rows, node.Pos[2])
+			first = first or node.Id
+			if node.Requires then
+				lines[node.Id] = UIKit.create("Frame", {
+					Name = `Line_{node.Id}`,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					BorderSizePixel = 0,
+					BackgroundColor3 = colors.Track,
+					ZIndex = 1,
+					Parent = canvas,
+				}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
 			end
-			order += 1
-			local rank = ranks[node.Id] or 0
-			local trialMax = BalanceTrials.skillMaxRank(node.Id, rebirths)
-			local maxed = rank >= trialMax
-			local slot = UIKit.slot(list, node.Id, UDim2.new(1, -10, 0, ROW_HEIGHT), order)
-			local card = UIKit.create("Frame", {
-				Name = "Card",
+			local holder = UIKit.create("Frame", {
+				Name = node.Id,
+				AnchorPoint = Vector2.new(0.5, 0.5),
+				Size = UDim2.fromOffset(NODE, NODE + 26),
+				BackgroundTransparency = 1,
+				ZIndex = 2,
+				Parent = canvas,
+			})
+			local button = UIKit.create("TextButton", {
+				Name = "Node",
+				Text = "",
+				AutoButtonColor = false,
+				Size = UDim2.fromOffset(NODE, NODE),
 				BackgroundColor3 = colors.Card,
-				Parent = slot,
-			}, {
-				UIKit.corner(10),
-				UIKit.stroke(if maxed then colors.Gold else colors.Trim, 1.5, if maxed then 0.2 else 0.7),
-				UIKit.create("UIGradient", {
-					Rotation = 90,
-					Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(150, 145, 160)),
-				}),
-			})
-			UIKit.fill(card)
-			UIKit.create("Frame", {
-				Name = "Spine",
-				Position = UDim2.fromOffset(0, 10),
-				Size = UDim2.new(0, 3, 1, -20),
-				BackgroundColor3 = if maxed then colors.Gold else colors.Accent,
-				BorderSizePixel = 0,
-				Parent = card,
-			}, { UIKit.corner(2) })
-			local textWidth = UDim2.new(1, -(12 + BUTTON_WIDTH + 20), 0, 0)
-			UIKit.label({
-				Text = node.Name,
-				TextSize = 21,
-				Position = UDim2.fromOffset(12, 8),
-				Size = textWidth + UDim2.fromOffset(-70, 26),
-				Parent = card,
-			})
-			local rankLabel = UIKit.label({
-				Name = "Rank",
-				Text = `{rank}/{trialMax}`,
-				TextSize = 18,
-				TextColor3 = if maxed then colors.Gold else colors.SubText,
-				TextXAlignment = Enum.TextXAlignment.Right,
-				Position = UDim2.new(1, -(BUTTON_WIDTH + 20 + 70), 0, 8),
-				Size = UDim2.fromOffset(70, 26),
-				Parent = card,
-			})
-			-- Now -> next on one line that shrinks to fit (never cut off).
-			local now = effectText(node.Id, rank)
-			local effect = UIKit.label({
-				Name = "Effect",
-				Text = if maxed then now else `{now}  \u{2192}  {effectText(node.Id, rank + 1)}`,
-				TextSize = 18,
-				TextScaled = true,
-				TextColor3 = colors.Cyan,
-				Position = UDim2.fromOffset(12, 38),
-				Size = textWidth + UDim2.fromOffset(0, 22),
-				Parent = card,
-			})
-			UIKit.create("UITextSizeConstraint", { MaxTextSize = 18, MinTextSize = 12, Parent = effect })
-			local track = UIKit.create("Frame", {
-				Name = "RankBar",
-				Position = UDim2.new(0, 12, 1, -14),
-				Size = textWidth + UDim2.fromOffset(0, 6),
-				BackgroundColor3 = colors.Track,
-				BorderSizePixel = 0,
-				Parent = card,
+				ZIndex = 3,
+				Parent = holder,
 			}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
-			local fill = UIKit.create("Frame", {
-				Name = "Fill",
-				Size = UDim2.fromScale(math.clamp(rank / trialMax, 0, 1), 1),
-				BackgroundColor3 = if maxed then colors.Gold else colors.Accent,
-				BorderSizePixel = 0,
-				Parent = track,
-			}, {
-				UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
-				UIKit.create("UIGradient", {
-					Color = ColorSequence.new(Color3.fromRGB(200, 200, 210), Color3.new(1, 1, 1)),
-				}),
+			local ring = UIKit.create("UIStroke", {
+				Color = colors.Trim,
+				Thickness = 3,
+				ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+				Parent = button,
 			})
-			rows[node.Id] = { Card = card, Fill = fill, Rank = rankLabel, MaxRank = trialMax }
-			card:SetAttribute("PopIn", true)
-			if popNext then
-				Motion.pop(card, (order - 1) * STAGGER, 0.6)
+			Motion.button(button)
+			local icon = Icons.image(button, node.Icon, ICON)
+			if icon then
+				icon.AnchorPoint = Vector2.new(0.5, 0.5)
+				icon.Position = UDim2.fromScale(0.5, 0.5)
+				icon.ZIndex = 4
 			end
-
+			local lock = Icons.image(button, "Lock", 26)
+			if lock then
+				lock.AnchorPoint = Vector2.new(1, 1)
+				lock.Position = UDim2.new(1, 4, 1, 4)
+				lock.ZIndex = 5
+			end
+			local rank = UIKit.label({
+				Name = "Rank",
+				TextSize = 16,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.fromScale(0.5, 1),
+				Size = UDim2.fromOffset(NODE + 20, 22),
+				ZIndex = 4,
+				Parent = holder,
+			})
 			local nodeId = node.Id
-			if maxed then
-				local tag = UIKit.label({
-					Text = "MAXED",
-					TextSize = 20,
-					TextColor3 = colors.Panel,
-					TextXAlignment = Enum.TextXAlignment.Center,
-					BackgroundTransparency = 0,
-					BackgroundColor3 = colors.Gold,
-					AnchorPoint = Vector2.new(1, 0.5),
-					Position = UDim2.new(1, -10, 0.5, 0),
-					Size = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT),
-					Parent = card,
-				})
-				UIKit.corner(8).Parent = tag
-				continue
-			end
-			local costOverride = if nodeId == "CoreLuck" then coreLuckCostOverride() else nil
-			local oneCost = SkillConfig.cost(node, rank, costOverride) or 0
-			local upgrade = UIKit.priceButton({
-				Name = "Upgrade",
-				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -10, 0.5, 0),
-				Size = UDim2.fromOffset(BUTTON_WIDTH, BUTTON_HEIGHT),
-				TextSize = 20,
-				Parent = card,
-			}, "+1", oneCost, function()
-				send("Buy", nodeId, BUY_AMOUNTS[buyMode])
+			button.Activated:Connect(function()
+				selected = nodeId
+				Motion.punch(button, 2)
+				refreshAll()
 			end)
-			table.insert(costButtons, {
-				Button = upgrade,
-				Node = node,
-				Rank = rank,
-				Remaining = trialMax - rank,
-				OneCost = oneCost,
-				Override = costOverride,
-			})
+			nodes[node.Id] = { Button = button, Ring = ring, Rank = rank, Lock = lock }
 		end
-		popNext = false
-		refreshAffordability()
+		tree.CanvasSize = UDim2.fromOffset(0, ROW_TOP + (rows - 1) * ROW_GAP + NODE)
+		selected = selected or first
+		layout()
+		refreshAll()
 	end
-	player:GetAttributeChangedSignal("CE"):Connect(refreshAffordability)
+
+	-- Nodes you can afford breathe so the tree pulls you back.
+	RunService.Heartbeat:Connect(function()
+		if not panel.Visible then
+			return
+		end
+		local pulse = 0.5 + 0.5 * math.sin(os.clock() * 4)
+		for nodeId, parts in nodes do
+			local node = SkillConfig.ById[nodeId]
+			if node and parts.Ring.Color == colors.Gold and (ranks[nodeId] or 0) < maxRankOf(node) then
+				parts.Ring.Transparency = 0.35 * pulse
+			else
+				parts.Ring.Transparency = 0
+			end
+		end
+	end)
+	player:GetAttributeChangedSignal("CE"):Connect(function()
+		if panel.Visible then
+			refreshAll()
+		end
+	end)
+
+	render()
 
 	return {
 		Toggle = function()
 			if UIKit.toggle(panel) then
+				render()
 				send("Get")
 			end
 		end,

@@ -255,6 +255,9 @@ DataTemplate.Template = {
 		BindingEfficiency = 0,
 		ResonantHarvest = 0,
 		SwiftStep = 0,
+		HugeAttunement = 0,
+		TitanicAttunement = 0,
+		Kindred = 0,
 	},
 	Showcases = {
 		Active = "",

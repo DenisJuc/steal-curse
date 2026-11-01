@@ -14,6 +14,7 @@ local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local RollRules = require(ReplicatedStorage.Shared.RollRules)
 local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
+local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local DataService = require(script.Parent.DataService)
 local GameEvents = require(script.Parent.GameEvents)
 local MultiplierService = require(script.Parent.MultiplierService)
@@ -134,9 +135,13 @@ function RollService.RollMany(player: Player, count: number, options: RollOption
 	local nextNumber = numberSource(rngFor(player))
 	local results = table.create(count)
 	local CollectionService = require(script.Parent.CollectionService)
+	local data = DataService.Get(player)
+	local skills = if data then data.Skills else {}
+	local hugeMult = SkillConfig.hugeChanceMult(skills.HugeAttunement or 0)
+	local titanicMult = SkillConfig.titanicChanceMult(skills.TitanicAttunement or 0)
 	for index = 1, count do
 		local relic, mutation = RollMath.roll(ctx, nextNumber)
-		local size = SizeConfig.roll(relic.Tier, nextNumber)
+		local size = SizeConfig.roll(relic.Tier, nextNumber, hugeMult, titanicMult)
 		results[index] = { Id = relic.Id, Mutation = mutation, Size = size }
 		-- Attune / Mutation Focus consume per AFK scan; hunt batches use HuntFamily instead.
 		if not options or not options.HuntFamily then

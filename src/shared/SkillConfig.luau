@@ -15,6 +15,12 @@ export type Node = {
 	CostBase: number?,
 	CostGrowth: number?,
 	Summary: string,
+	-- Tree layout (SkillTreePanel): column 1-3 and row of the node in its branch's tree.
+	Pos: { number },
+	-- The node above it on the path: it unlocks once that node has rank 1 (nil = branch root).
+	Requires: string?,
+	-- IconAssets key drawn on the node.
+	Icon: string,
 }
 
 SkillConfig.Branches = {
@@ -26,6 +32,8 @@ SkillConfig.Branches = {
 SkillConfig.Nodes = {
 	{
 		Id = "CoreLuck",
+		Pos = { 2, 1 },
+		Icon = "Luck",
 		Branch = "Resonance",
 		Name = "Core Luck",
 		MaxRank = 100,
@@ -36,6 +44,9 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "ScanSpeed",
+		Pos = { 1, 2 },
+		Requires = "CoreLuck",
+		Icon = "PotionHaste",
 		Branch = "Resonance",
 		Name = "Scan Speed",
 		MaxRank = 12,
@@ -45,6 +56,9 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "FrequencyFocus",
+		Pos = { 3, 2 },
+		Requires = "CoreLuck",
+		Icon = "Pulse",
 		Branch = "Resonance",
 		Name = "Frequency Focus",
 		MaxRank = 5,
@@ -53,6 +67,9 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "MutationResonance",
+		Pos = { 3, 3 },
+		Requires = "FrequencyFocus",
+		Icon = "Lightning",
 		Branch = "Resonance",
 		Name = "Mutation Resonance",
 		MaxRank = 5,
@@ -62,6 +79,8 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "EnergyConduction",
+		Pos = { 2, 1 },
+		Icon = "CursedEnergy",
 		Branch = "Sanctuary",
 		Name = "Energy Conduction",
 		MaxRank = 20,
@@ -72,6 +91,9 @@ SkillConfig.Nodes = {
 	{
 		-- Studio Phase 3 trial only (BalanceTrials.pedestalMasteryEnabled). +4%/rank on pedestal income.
 		Id = "PedestalMastery",
+		Pos = { 3, 2 },
+		Requires = "EnergyConduction",
+		Icon = "Pedestals",
 		Branch = "Sanctuary",
 		Name = "Pedestal Mastery",
 		MaxRank = 5,
@@ -81,6 +103,9 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "SpiritMerchant",
+		Pos = { 1, 2 },
+		Requires = "EnergyConduction",
+		Icon = "PotionFortune",
 		Branch = "Sanctuary",
 		Name = "Spirit Merchant",
 		MaxRank = 5,
@@ -90,6 +115,9 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "SpiritReservoir",
+		Pos = { 1, 3 },
+		Requires = "SpiritMerchant",
+		Icon = "Streak",
 		Branch = "Sanctuary",
 		Name = "Spirit Reservoir",
 		MaxRank = 2,
@@ -98,6 +126,9 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "SpiritSight",
+		Pos = { 1, 2 },
+		Requires = "SwiftStep",
+		Icon = "SpiritSight",
 		Branch = "BindingArts",
 		Name = "Spirit Sight",
 		MaxRank = 5,
@@ -107,6 +138,9 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "BindingEfficiency",
+		Pos = { 3, 2 },
+		Requires = "SwiftStep",
+		Icon = "Bind",
 		Branch = "BindingArts",
 		Name = "Binding Efficiency",
 		MaxRank = 5,
@@ -116,6 +150,9 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "ResonantHarvest",
+		Pos = { 2, 3 },
+		Requires = "SpiritSight",
+		Icon = "Wild",
 		Branch = "BindingArts",
 		Name = "Resonant Harvest",
 		MaxRank = 5,
@@ -125,12 +162,49 @@ SkillConfig.Nodes = {
 	},
 	{
 		Id = "SwiftStep",
+		Pos = { 2, 1 },
+		Icon = "Home",
 		Branch = "BindingArts",
 		Name = "Swift Step",
 		MaxRank = 10,
 		CostBase = 1000,
 		CostGrowth = 1.9,
 		Summary = "Walk faster: +4 walk speed per rank (16 up to 56).",
+	},
+	{
+		-- Overnight v0.1 nodes (Config-free, balance in this file): bigger relics show up more often.
+		Id = "HugeAttunement",
+		Pos = { 1, 3 },
+		Requires = "ScanSpeed",
+		Icon = "Pedestals",
+		Branch = "Resonance",
+		Name = "Huge Attunement",
+		MaxRank = 5,
+		CostBase = 50000,
+		CostGrowth = 3,
+		Summary = "Huge relics turn up more often: +8% Huge chance per rank.",
+	},
+	{
+		Id = "TitanicAttunement",
+		Pos = { 2, 4 },
+		Requires = "HugeAttunement",
+		Icon = "Rebirth",
+		Branch = "Resonance",
+		Name = "Titanic Attunement",
+		MaxRank = 3,
+		Costs = { 2000000, 20000000, 200000000 },
+		Summary = "Titanic relics turn up more often: +10% Titanic chance per rank.",
+	},
+	{
+		Id = "Kindred",
+		Pos = { 3, 3 },
+		Requires = "EnergyConduction",
+		Icon = "Favorite",
+		Branch = "Sanctuary",
+		Name = "Kindred Spirits",
+		MaxRank = 2,
+		Costs = { 100000, 1000000 },
+		Summary = "Friends in your server help more: +1% luck per friend per rank.",
 	},
 } :: { Node }
 
@@ -158,6 +232,9 @@ SkillConfig.Effects = {
 	HarvestPerRank = 0.10,
 	WalkBaseSpeed = 16,
 	WalkSpeedPerRank = 4,
+	HugeChancePerRank = 0.08,
+	TitanicChancePerRank = 0.10,
+	FriendLuckPerKindredRank = 0.01,
 }
 
 export type CostOverride = {
@@ -253,6 +330,32 @@ end
 -- Humanoid WalkSpeed (studs/s).
 function SkillConfig.walkSpeed(rank: number): number
 	return effects.WalkBaseSpeed + effects.WalkSpeedPerRank * rank
+end
+
+-- Multipliers on the Huge / Titanic size chances (SizeConfig.roll).
+function SkillConfig.hugeChanceMult(rank: number): number
+	return 1 + effects.HugeChancePerRank * rank
+end
+
+function SkillConfig.titanicChanceMult(rank: number): number
+	return 1 + effects.TitanicChancePerRank * rank
+end
+
+-- Extra luck per friend in the server (on top of Config.Friends.LuckPerFriend).
+function SkillConfig.kindredBonus(rank: number): number
+	return effects.FriendLuckPerKindredRank * rank
+end
+
+-- Can `nodeId` be bought given these ranks? Owned nodes always stay open (old saves).
+function SkillConfig.unlocked(nodeId: string, ranks: { [string]: number }): boolean
+	local node = SkillConfig.ById[nodeId]
+	if not node then
+		return false
+	end
+	if (ranks[nodeId] or 0) > 0 or not node.Requires then
+		return true
+	end
+	return (ranks[node.Requires] or 0) > 0
 end
 
 return SkillConfig
