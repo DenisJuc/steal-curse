@@ -137,6 +137,10 @@ function ShopPanel.Start(screen: ScreenGui, onOpen: () -> ()): { Toggle: () -> (
 		Parent = screen,
 	})
 	UIKit.scaler(holder)
+	-- Small screens: SHOP and GIFTS share one row under the travel bar, clear of Spirit Sight.
+	UIKit.watchCompact(function(compact: boolean)
+		holder.Position = if compact then UDim2.new(1, -190, 0, 34) else UDim2.new(1, -40, 0, 116)
+	end)
 	local open = UIKit.button({
 		Text = "SHOP",
 		FontFace = UIKit.TitleFont,

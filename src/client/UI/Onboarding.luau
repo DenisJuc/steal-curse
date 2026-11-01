@@ -109,6 +109,21 @@ local STEPS: { Step } = {
 		Fallback = { Target = "ShrineButton", Side = "Right", Text = "When you have enough CE, open Pedestals and upgrade one." },
 	},
 	{
+		Target = "UpgradesButton",
+		Side = "Above",
+		Text = "Upgrades is your skill tree. Core Luck finds rarer relics: tap a node, then buy.",
+		Done = function(player)
+			local ui = player:FindFirstChildOfClass("PlayerGui")
+			local menu = ui and ui:FindFirstChild("SkillsMenu", true)
+			return menu ~= nil and (menu :: GuiObject).Visible
+		end,
+	},
+	{
+		Target = "GiftButton",
+		Side = "Left",
+		Text = "Free gifts unlock while you play, even when you're AFK. Claim them here.",
+	},
+	{
 		Target = "CodexButton",
 		Side = "Right",
 		Text = "The Codex tracks every relic you find. Milestones give permanent Luck and income.",

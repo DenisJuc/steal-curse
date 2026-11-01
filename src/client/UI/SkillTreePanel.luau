@@ -185,6 +185,48 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	})
 	UIKit.corner(8).Parent = sheetNote
 
+	-- Short screens (phones in landscape): the sheet sits beside the tree instead of under it, with
+	-- the price button across its bottom.
+	-- The branch tabs and x1/x10/Max share one row there, and the sheet drops its summary.
+	local function applyCompact(compact: boolean)
+		local modeBar = content:FindFirstChild("BuyMode") :: Frame?
+		local top = if compact then UIKit.TAB_HEIGHT + 6 else TREE_TOP
+		blurb.Visible = not compact
+		sheetSummary.Visible = not compact
+		tabs.Size = if compact then UDim2.new(0.6, -6, 0, UIKit.TAB_HEIGHT) else UDim2.new(1, 0, 0, UIKit.TAB_HEIGHT)
+		if modeBar then
+			modeBar.Position = if compact then UDim2.fromScale(1, 0) else UDim2.new(1, -10, 0, UIKit.TAB_HEIGHT + 8)
+			modeBar.Size = if compact then UDim2.new(0.4, 0, 0, UIKit.TAB_HEIGHT) else UDim2.fromOffset(204, MODE_HEIGHT)
+		end
+		tree.Position = UDim2.fromOffset(0, top)
+		if compact then
+			tree.Size = UDim2.new(0.55, 0, 1, -top)
+			sheet.AnchorPoint = Vector2.new(1, 0)
+			sheet.Position = UDim2.new(1, 0, 0, top)
+			sheet.Size = UDim2.new(0.45, -8, 1, -top)
+			sheetName.Size = UDim2.new(1, -76, 0, 28)
+			sheetRank.Size = UDim2.new(1, -76, 0, 20)
+			sheetEffect.Position = UDim2.new(0, 0, 1, -58)
+			sheetEffect.Size = UDim2.new(1, 0, 0, 22)
+			for _, button in { buyButton, sheetNote } do
+				button.Size = UDim2.new(1, 0, 0, 50)
+			end
+		else
+			tree.Size = UDim2.new(1, 0, 1, -(TREE_TOP + SHEET_HEIGHT + 8))
+			sheet.AnchorPoint = Vector2.new(0, 1)
+			sheet.Position = UDim2.fromScale(0, 1)
+			sheet.Size = UDim2.new(1, 0, 0, SHEET_HEIGHT)
+			sheetName.Size = UDim2.new(1, -76 - BUTTON_WIDTH - 12, 0, 28)
+			sheetRank.Size = UDim2.new(1, -76 - BUTTON_WIDTH - 12, 0, 20)
+			sheetSummary.Size = UDim2.new(1, -BUTTON_WIDTH - 12, 0, 38)
+			sheetEffect.Position = UDim2.fromScale(0, 1)
+			sheetEffect.Size = UDim2.new(1, -BUTTON_WIDTH - 12, 0, 24)
+			for _, button in { buyButton, sheetNote } do
+				button.Size = UDim2.fromOffset(BUTTON_WIDTH, 60)
+			end
+		end
+	end
+
 	local render: () -> ()
 	local tabButtons: { [string]: TextButton } = {}
 	for index, each in SkillConfig.Branches do
@@ -212,6 +254,8 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		Position = UDim2.new(1, -10, 0, UIKit.TAB_HEIGHT + 8),
 		Size = UDim2.fromOffset(204, MODE_HEIGHT),
 	})
+
+	UIKit.watchCompact(applyCompact)
 
 	local function maxRankOf(node: SkillConfig.Node): number
 		return BalanceTrials.skillMaxRank(node.Id, player:GetAttribute("Rebirths") or 0)

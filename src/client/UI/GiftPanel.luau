@@ -119,6 +119,9 @@ function GiftPanel.Start(screen: ScreenGui, onOpen: () -> ()): { Toggle: () -> (
 		Parent = screen,
 	})
 	UIKit.scaler(holder)
+	UIKit.watchCompact(function(compact: boolean)
+		holder.Position = if compact then UDim2.new(1, -40, 0, 34) else UDim2.new(1, -40, 0, 186)
+	end)
 	local open = UIKit.button({
 		Text = "GIFTS",
 		FontFace = UIKit.TitleFont,
