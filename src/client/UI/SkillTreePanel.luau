@@ -17,6 +17,7 @@ local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
+local Toasts = require(script.Parent.Toasts)
 local SkillListPanel = require(script.Parent.SkillListPanel)
 local UIKit = require(script.Parent.UIKit)
 local Sounds = require(script.Parent.Parent.Sounds)
@@ -26,12 +27,13 @@ local SkillAction = Remotes:WaitForChild("SkillAction") :: RemoteFunction
 
 local SkillTreePanel = {}
 
-local NODE = 78
-local ICON = 46
+local NODE = 72
+local ICON = 42
 local COLUMN_X = { 0.18, 0.5, 0.82 }
-local ROW_TOP = 58
+local ROW_TOP = 50
 local ROW_GAP = 124
-local SHEET_HEIGHT = 156
+local SHEET_HEIGHT = 140
+local LABEL_HEIGHT = 34
 local MODE_HEIGHT = 40
 local TREE_TOP = UIKit.TAB_HEIGHT + 8 + MODE_HEIGHT + 6
 local BUTTON_WIDTH = 176
@@ -61,7 +63,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	local lines: { [string]: Frame } = {}
 
 	local panel, content =
-		UIKit.modal(screen, "SkillsMenu", "SKILLS", colors.Accent, Vector2.new(620, 700), "Upgrades")
+		UIKit.modal(screen, "SkillsMenu", "SKILLS", colors.Accent, Vector2.new(620, 740), "Upgrades")
 
 	local tabs = UIKit.create("Frame", {
 		BackgroundTransparency = 1,
@@ -250,12 +252,15 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		if not node then
 			return
 		end
-		for _, child in sheetIcon:GetChildren() do
-			child:Destroy()
-		end
-		local icon = Icons.image(sheetIcon, node.Icon, 64)
-		if icon then
-			icon.Position = UDim2.fromOffset(0, 0)
+		if sheetIcon:GetAttribute("Node") ~= node.Id then
+			sheetIcon:SetAttribute("Node", node.Id)
+			for _, child in sheetIcon:GetChildren() do
+				child:Destroy()
+			end
+			local icon = Icons.image(sheetIcon, node.Icon, 64)
+			if icon then
+				icon.Position = UDim2.fromOffset(0, 0)
+			end
 		end
 		local rank = ranks[node.Id] or 0
 		local maxRank = maxRankOf(node)
@@ -295,20 +300,25 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			elseif state == "Open" then colors.Accent
 			else colors.Trim
 		parts.Ring.Thickness = if node.Id == selected then 5 else 3
-		parts.Button.BackgroundColor3 = if state == "Maxed" then Color3.fromRGB(70, 56, 30) else colors.Card
+		parts.Button.BackgroundColor3 = if state == "Maxed"
+			then Color3.fromRGB(70, 56, 30)
+			elseif state == "Locked" then Color3.fromRGB(14, 11, 20)
+			else colors.Card
 		parts.Rank.TextColor3 = if state == "Maxed" then colors.Gold else colors.Text
 		if parts.Lock then
 			parts.Lock.Visible = state == "Locked"
 		end
 		local icon = parts.Button:FindFirstChild(`{node.Icon}Icon`) :: ImageLabel?
 		if icon then
-			icon.ImageTransparency = if state == "Locked" then 0.65 else 0
+			icon.ImageTransparency = if state == "Locked" then 0.55 else 0
+			icon.ImageColor3 = if state == "Locked" then Color3.fromRGB(120, 115, 130) else Color3.new(1, 1, 1)
 		end
 		local line = lines[node.Id]
 		if line then
 			local open = SkillConfig.unlocked(node.Id, ranks)
 			line.BackgroundColor3 = if rank > 0 then colors.Gold elseif open then colors.Accent else colors.Track
 			line.BackgroundTransparency = if open then 0.1 else 0.4
+			line.Size = UDim2.fromOffset(line.Size.X.Offset, if rank > 0 then 8 else 5)
 		end
 	end
 
@@ -336,10 +346,12 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 	local function centre(node: SkillConfig.Node, width: number): Vector2
 		return Vector2.new(width * COLUMN_X[node.Pos[1]], ROW_TOP + (node.Pos[2] - 1) * ROW_GAP)
 	end
+	-- Holders are anchored at their centre and hold the label under the round button.
+	local HOLDER_SHIFT = LABEL_HEIGHT / 2
 
 	local function placeLine(line: Frame, from: Vector2, to: Vector2)
 		local delta = to - from
-		line.Size = UDim2.fromOffset(delta.Magnitude, 6)
+		line.Size = UDim2.fromOffset(delta.Magnitude, if line.Size.Y.Offset > 0 then line.Size.Y.Offset else 6)
 		line.Position = UDim2.fromOffset((from.X + to.X) / 2, (from.Y + to.Y) / 2)
 		line.Rotation = math.deg(math.atan2(delta.Y, delta.X))
 	end
@@ -350,7 +362,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			local parts = nodes[node.Id]
 			if parts then
 				local at = centre(node, width)
-				parts.Button.Parent.Position = UDim2.new(COLUMN_X[node.Pos[1]], 0, 0, at.Y)
+				parts.Button.Parent.Position = UDim2.new(COLUMN_X[node.Pos[1]], 0, 0, at.Y + HOLDER_SHIFT)
 				local line = lines[node.Id]
 				local parent = node.Requires and SkillConfig.ById[node.Requires]
 				if line and parent then
@@ -452,6 +464,9 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 					local node = selected and nodes[selected]
 					if node and (ranks[selected :: string] or 0) <= (before[selected :: string] or 0) then
 						Motion.deny(buyButton)
+						if type(result.Message) == "string" then
+							Toasts.Show(result.Message)
+						end
 					end
 				end
 			end
@@ -493,7 +508,7 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			local holder = UIKit.create("Frame", {
 				Name = node.Id,
 				AnchorPoint = Vector2.new(0.5, 0.5),
-				Size = UDim2.fromOffset(NODE, NODE + 26),
+				Size = UDim2.fromOffset(NODE, NODE + LABEL_HEIGHT),
 				BackgroundTransparency = 1,
 				ZIndex = 2,
 				Parent = canvas,
@@ -526,13 +541,43 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				lock.Position = UDim2.new(1, 4, 1, 4)
 				lock.ZIndex = 5
 			end
+			if node.Badge then
+				local badge = UIKit.label({
+					Name = "Badge",
+					Text = node.Badge,
+					FontFace = UIKit.TitleFont,
+					TextSize = 18,
+					TextColor3 = colors.Panel,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					BackgroundTransparency = 0,
+					BackgroundColor3 = colors.Gold,
+					AnchorPoint = Vector2.new(0, 0),
+					Position = UDim2.fromOffset(-4, -4),
+					Size = UDim2.fromOffset(24, 24),
+					ZIndex = 6,
+					Parent = button,
+				})
+				UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = badge })
+			end
+			UIKit.label({
+				Name = "NodeName",
+				Text = node.Name,
+				TextSize = 13,
+				TextColor3 = colors.SubText,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				AnchorPoint = Vector2.new(0.5, 1),
+				Position = UDim2.new(0.5, 0, 1, -16),
+				Size = UDim2.fromOffset(NODE + 70, 16),
+				ZIndex = 4,
+				Parent = holder,
+			})
 			local rank = UIKit.label({
 				Name = "Rank",
-				TextSize = 16,
+				TextSize = 15,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.fromScale(0.5, 1),
-				Size = UDim2.fromOffset(NODE + 20, 22),
+				Size = UDim2.fromOffset(NODE + 20, 16),
 				ZIndex = 4,
 				Parent = holder,
 			})
@@ -548,6 +593,8 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		selected = selected or first
 		layout()
 		refreshAll()
+		-- Holder sizes are only known after a frame (the scale factor in canvasWidth).
+		task.defer(layout)
 	end
 
 	-- Nodes you can afford breathe so the tree pulls you back.
@@ -565,6 +612,25 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			end
 		end
 	end)
+	-- Ranks also come from the Skill_<id> attributes (rebirth, data reset, debug) so the tree is
+	-- right before Get answers and while it stays open.
+	local function readAttributes()
+		for _, node in SkillConfig.Nodes do
+			local value = player:GetAttribute(`Skill_{node.Id}`)
+			if type(value) == "number" then
+				ranks[node.Id] = value
+			end
+		end
+	end
+	readAttributes()
+	for _, node in SkillConfig.Nodes do
+		player:GetAttributeChangedSignal(`Skill_{node.Id}`):Connect(function()
+			readAttributes()
+			if panel.Visible then
+				refreshAll()
+			end
+		end)
+	end
 	player:GetAttributeChangedSignal("CE"):Connect(function()
 		if panel.Visible then
 			refreshAll()

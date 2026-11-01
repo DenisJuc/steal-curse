@@ -19,8 +19,9 @@ export type Node = {
 	Pos: { number },
 	-- The node above it on the path: it unlocks once that node has rank 1 (nil = branch root).
 	Requires: string?,
-	-- IconAssets key drawn on the node.
+	-- IconAssets key drawn on the node, and an optional letter badge over it.
 	Icon: string,
+	Badge: string?,
 }
 
 SkillConfig.Branches = {
@@ -177,34 +178,36 @@ SkillConfig.Nodes = {
 		Pos = { 1, 3 },
 		Requires = "ScanSpeed",
 		Icon = "Pedestals",
+		Badge = "H",
 		Branch = "Resonance",
 		Name = "Huge Attunement",
 		MaxRank = 5,
-		CostBase = 50000,
-		CostGrowth = 3,
-		Summary = "Huge relics turn up more often: +8% Huge chance per rank.",
+		CostBase = 25000,
+		CostGrowth = 2.5,
+		Summary = "Huge relics turn up more often: +25% Huge chance per rank.",
 	},
 	{
 		Id = "TitanicAttunement",
 		Pos = { 2, 4 },
 		Requires = "HugeAttunement",
-		Icon = "Rebirth",
+		Icon = "Pedestals",
+		Badge = "T",
 		Branch = "Resonance",
 		Name = "Titanic Attunement",
 		MaxRank = 3,
-		Costs = { 2000000, 20000000, 200000000 },
-		Summary = "Titanic relics turn up more often: +10% Titanic chance per rank.",
+		Costs = { 500000, 4000000, 30000000 },
+		Summary = "Titanic relics turn up more often: +25% Titanic chance per rank.",
 	},
 	{
 		Id = "Kindred",
-		Pos = { 3, 3 },
+		Pos = { 2, 3 },
 		Requires = "EnergyConduction",
 		Icon = "Favorite",
 		Branch = "Sanctuary",
 		Name = "Kindred Spirits",
 		MaxRank = 2,
-		Costs = { 100000, 1000000 },
-		Summary = "Friends in your server help more: +1% luck per friend per rank.",
+		Costs = { 50000, 500000 },
+		Summary = "Friends in your server help more: +5% luck per friend per rank.",
 	},
 } :: { Node }
 
@@ -232,9 +235,9 @@ SkillConfig.Effects = {
 	HarvestPerRank = 0.10,
 	WalkBaseSpeed = 16,
 	WalkSpeedPerRank = 4,
-	HugeChancePerRank = 0.08,
-	TitanicChancePerRank = 0.10,
-	FriendLuckPerKindredRank = 0.01,
+	HugeChancePerRank = 0.25,
+	TitanicChancePerRank = 0.25,
+	FriendLuckPerKindredRank = 0.05,
 }
 
 export type CostOverride = {

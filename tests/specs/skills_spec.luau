@@ -148,9 +148,9 @@ return {
 				expect.truthy(not seen[key], `{node.Id} shares a tree cell`)
 				seen[key] = true
 			end
-			expect.near(SkillConfig.hugeChanceMult(5), 1.4, 1e-9, "Huge Attunement max")
-			expect.near(SkillConfig.titanicChanceMult(3), 1.3, 1e-9, "Titanic Attunement max")
-			expect.near(SkillConfig.kindredBonus(2), 0.02, 1e-9, "Kindred max")
+			expect.near(SkillConfig.hugeChanceMult(5), 2.25, 1e-9, "Huge Attunement max")
+			expect.near(SkillConfig.titanicChanceMult(3), 1.75, 1e-9, "Titanic Attunement max")
+			expect.near(SkillConfig.kindredBonus(2), 0.10, 1e-9, "Kindred max")
 		end,
 	},
 }
