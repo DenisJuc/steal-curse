@@ -305,7 +305,7 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 			paper.Rotation = math.noise(t * 30, 0.5) * (1 + build * 4)
 			aura.BackgroundTransparency = 0.6 - build * 0.25 + math.sin(t * (10 + build * 14)) * 0.15
 		end)
-		hush = { Connection = connection, Riser = Sounds.Play("BindRiser") }
+		hush = { Connection = connection, Riser = Sounds.PlayReveal("BindRiser") }
 		local beats = 2 + (result.TierIndex - 4)
 		for beat = 1, beats do
 			-- Quicker and quicker: each gap shorter than the one before.

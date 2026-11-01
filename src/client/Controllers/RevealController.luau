@@ -5,8 +5,10 @@
 -- second stage after the base relic. Overlays queue in arrival order (Presentation queue); extra
 -- ones are coalesced into "+N more in your Journal". Nothing here touches scanning or movement.
 -- Legendary and rarer finds always get the overlay (unless Reveals is Off), with a full-width band
--- behind the card (rarity name, "1 in N", tap to skip) that grows with the tier, and the world
--- dimmed for the whole reveal.
+-- behind the card (rarity name, "1 in N") that grows with the tier, and the world dimmed. These have
+-- no Skip button: they stay on screen until the player clicks or taps anywhere.
+-- Reveal animation Off shows Legendary+ at once, fully built (still waiting for a click), and sends
+-- the rest to the feed. Camera zoom is relative to CameraFov.Rest, so overlapping reveals never stack.
 -- Scan finds arrive through RollReel once the roll reel has landed on them. A hunt's finds arrive
 -- after the hunt papers (HuntRolls): only the new ones get a reveal then.
 
@@ -23,6 +25,7 @@ local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local RelicModels = require(ReplicatedStorage.Shared.RelicModels)
 local RewardPresentation = require(ReplicatedStorage.Shared.RewardPresentation)
 local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
+local CameraFov = require(script.Parent.Parent.Effects.CameraFov)
 local MutationVFX = require(script.Parent.Parent.Effects.MutationVFX)
 local RelicProjection = require(script.Parent.Parent.Effects.RelicProjection)
 local Odds = require(script.Parent.Parent.UI.Odds)
@@ -42,6 +45,9 @@ local BAND_INDEX = RarityConfig.IndexById.Legendary or 5
 -- Room above and below the card for the rarity name and the odds.
 local BAND_MARGIN = 92
 local BAND_STEP_HEIGHT = 34
+-- A banded reveal ignores clicks this long after it appears, so a click meant for the roll button
+-- doesn't close a Legendary before the player sees it.
+local BAND_CLOSE_GUARD = 0.6
 
 local SOURCE_TEXT: { [string]: string } = {
 	Scan = "Found by your Spirit Resonator",
@@ -74,6 +80,7 @@ local running = false
 local skipRequested = false
 local showing = false
 local showingLarge = false
+local closeAllowedAt = 0
 local holdUntil = 0
 local model: BasePart? = nil
 local modelBase = CFrame.new()
@@ -163,7 +170,7 @@ local function build(screen: ScreenGui): Ui
 	UIKit.create("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 2, Transparency = 0.3, Parent = bandOdds })
 	UIKit.label({
 		Name = "SkipHint",
-		Text = "Tap to skip",
+		Text = "Tap anywhere to close",
 		TextSize = 18,
 		TextColor3 = colors.SubText,
 		TextXAlignment = Enum.TextXAlignment.Center,
@@ -378,6 +385,10 @@ local function play(entry: Presentation.Entry, dropped: number)
 	elseif sizeId == "Huge" then
 		baseSeconds += 0.25
 	end
+	local instant = Settings.Get("RevealAnimation") == "Off"
+	if instant then
+		baseSeconds, mutationSeconds = 0, 0
+	end
 	local tierColor = UIKit.tierColor(relic.Tier)
 	local accent = if sizeId == "Titanic"
 		then Color3.fromRGB(255, 210, 90)
@@ -385,7 +396,7 @@ local function play(entry: Presentation.Entry, dropped: number)
 		then Color3.fromRGB(160, 210, 255)
 		else tierColor
 	local tier = RarityConfig.Get(relic.Tier)
-	local low = Settings.LowEffects()
+	local low = Settings.LowEffects() or instant
 	local prefix = if result.First
 		then "NEW! "
 		elseif result.NewSize
@@ -416,7 +427,6 @@ local function play(entry: Presentation.Entry, dropped: number)
 		note = `+{dropped} more rare find{if dropped == 1 then "" else "s"} in your Journal`
 	end
 	ui.NoteLabel.Text = note
-	ui.SkipButton.Visible = true
 	ui.Rays.Visible = (large or sizeId == "Titanic") and not low
 	for _, ray in ui.Rays:GetChildren() do
 		if ray:IsA("Frame") then
@@ -428,6 +438,8 @@ local function play(entry: Presentation.Entry, dropped: number)
 	local index = tierIndex(relic.Id)
 	local banded = index >= BAND_INDEX
 	local step = index - BAND_INDEX
+	ui.SkipButton.Visible = not banded
+	closeAllowedAt = if banded then os.clock() + BAND_CLOSE_GUARD else 0
 	ui.Band.Visible = banded
 	-- The band says the rarity in big letters; the card keeps the model, name and note.
 	ui.TierLabel.Visible = not banded
@@ -450,7 +462,7 @@ local function play(entry: Presentation.Entry, dropped: number)
 		if rainbow then
 			rainbow:Destroy()
 		end
-		if relic.Tier == "Cosmic" and not low then
+		if relic.Tier == "Cosmic" and not Settings.LowEffects() then
 			UIKit.create("UIGradient", {
 				Name = "Rainbow",
 				Color = ColorSequence.new({
@@ -463,26 +475,37 @@ local function play(entry: Presentation.Entry, dropped: number)
 			})
 			ui.BandTitle.TextColor3 = Color3.new(1, 1, 1)
 		end
-		ui.Band.Size = UDim2.new(1, 0, 0, height * 0.4)
-		UIKit.tween(ui.Band, 0.28, { Size = UDim2.new(1, 0, 0, height) }, Enum.EasingStyle.Back)
+		if instant then
+			ui.Band.Size = UDim2.new(1, 0, 0, height)
+		else
+			ui.Band.Size = UDim2.new(1, 0, 0, height * 0.4)
+			UIKit.tween(ui.Band, 0.28, { Size = UDim2.new(1, 0, 0, height) }, Enum.EasingStyle.Back)
+		end
 	end
 	local dimmed = large or banded
+	local dimTo = if large then 0.4 else 0.5
 	ui.Dim.Visible = dimmed
-	ui.Dim.BackgroundTransparency = 1
-	if dimmed then
-		UIKit.tween(ui.Dim, 0.3, { BackgroundTransparency = if large then 0.4 else 0.5 })
+	-- While a banded reveal waits for its click, the dim sinks clicks so they reach no button below.
+	ui.Dim.Active = banded
+	ui.Dim.BackgroundTransparency = if instant then dimTo else 1
+	if dimmed and not instant then
+		UIKit.tween(ui.Dim, 0.3, { BackgroundTransparency = dimTo })
 	end
-	ui.Card.Size = UDim2.fromOffset(CARD_SIZE.X * 0.8, CARD_SIZE.Y * 0.8)
 	ui.Card.BackgroundTransparency = 0.05
 	ui.Card.Visible = true
-	UIKit.tween(ui.Card, 0.22, { Size = UDim2.fromOffset(CARD_SIZE.X, CARD_SIZE.Y) }, Enum.EasingStyle.Back)
-	flash(accent, if large then 0.35 else 0.7, if large then 0.9 else 0.45)
-	Sounds.Play(if large then "RevealLarge" else "RevealMedium")
-	RelicProjection.Spawn(relic.Id, mutation, category, baseSeconds + mutationSeconds, low, sizeId)
+	if instant then
+		ui.Card.Size = UDim2.fromOffset(CARD_SIZE.X, CARD_SIZE.Y)
+	else
+		ui.Card.Size = UDim2.fromOffset(CARD_SIZE.X * 0.8, CARD_SIZE.Y * 0.8)
+		UIKit.tween(ui.Card, 0.22, { Size = UDim2.fromOffset(CARD_SIZE.X, CARD_SIZE.Y) }, Enum.EasingStyle.Back)
+		flash(accent, if large then 0.35 else 0.7, if large then 0.9 else 0.45)
+		RelicProjection.Spawn(relic.Id, mutation, category, baseSeconds + mutationSeconds, low, sizeId)
+	end
+	Sounds.PlayReveal(if large then "RevealLarge" else "RevealMedium")
 
 	local camera = workspace.CurrentCamera
-	local baseFov = camera and camera.FieldOfView
-	local zoom = large and Settings.Get("Camera") == "On" and camera ~= nil
+	local baseFov = CameraFov.Rest()
+	local zoom = large and not instant and Settings.Get("Camera") == "On" and camera ~= nil
 	if zoom and camera and baseFov then
 		UIKit.tween(camera, 0.35, { FieldOfView = baseFov - CAMERA_ZOOM_FOV })
 	end
@@ -501,24 +524,31 @@ local function play(entry: Presentation.Entry, dropped: number)
 		if model then
 			MutationVFX.Apply(model, mutation, { Highlight = false, Particles = false })
 		end
-		flash(color, if large then 0.45 else 0.75, 0.5)
-		Sounds.Play("Mutation")
+		if not instant then
+			flash(color, if large then 0.45 else 0.75, 0.5)
+		end
+		Sounds.PlayReveal("Mutation")
 		waitUnlessSkipped(mutationSeconds)
 	elseif finished and sizeId and not mutation then
 		ui.MutationLabel.Text = `+ {string.upper(sizeId)} SIZE  (×{SizeConfig.incomeMult(sizeId)} income)`
 		ui.MutationLabel.TextColor3 = accent
 		ui.MutationLabel.Visible = true
-		waitUnlessSkipped(0.45)
+		waitUnlessSkipped(if instant then 0 else 0.45)
 	end
 
 	if zoom and camera and baseFov then
 		UIKit.tween(camera, 0.5, { FieldOfView = baseFov })
 	end
+	-- Legendary and up stay on screen until the player clicks or taps anywhere.
+	while banded and not skipRequested do
+		task.wait(0.03)
+	end
 	showingLarge = false
 	showing = false
+	ui.Dim.Active = false
 	ui.SkipButton.Visible = false
-	-- A skipped reveal vanishes at once; a finished one fades out.
-	if not skipRequested then
+	-- A skipped reveal vanishes at once; a finished or clicked-away banded one fades out.
+	if not skipRequested or banded then
 		UIKit.tween(ui.Card, 0.18, { BackgroundTransparency = 1, Size = UDim2.fromOffset(CARD_SIZE.X * 0.9, CARD_SIZE.Y * 0.9) })
 		if ui.Dim.Visible then
 			UIKit.tween(ui.Dim, 0.25, { BackgroundTransparency = 1 })
@@ -555,6 +585,7 @@ local function runQueue()
 				ui.Card.Visible = false
 				ui.Band.Visible = false
 				ui.Dim.Visible = false
+				ui.Dim.Active = false
 			end
 		end
 		running = false
@@ -566,6 +597,7 @@ local function onResults(results: { any }, hunt: boolean)
 		return
 	end
 	local mode = tostring(Settings.Get("Reveals"))
+	local instant = Settings.Get("RevealAnimation") == "Off"
 	local low = Settings.LowEffects()
 	local smallShown = 0
 	for _, result in results do
@@ -596,6 +628,10 @@ local function onResults(results: { any }, hunt: boolean)
 			end
 		end
 		category = Presentation.applyMode(category, mode)
+		-- Reveal animation Off: only Legendary+ keep a card; the rest are in the feed already.
+		if instant and index < BAND_INDEX and category ~= "Small" then
+			continue
+		end
 		if hunt and category == "Small" then
 			continue
 		end
@@ -609,7 +645,7 @@ local function onResults(results: { any }, hunt: boolean)
 			-- One soft projection per batch for notable Small finds (e.g. Rare).
 			if smallShown == 0 and os.clock() >= holdUntil then
 				RelicProjection.Spawn(result.Id, result.Mutation, "Small", Config.Reveal.SmallSeconds, low, sizeId)
-				Sounds.Play("RevealSmall")
+				Sounds.PlayReveal("RevealSmall")
 			end
 			smallShown += 1
 		else
@@ -634,9 +670,10 @@ function RevealController.Release()
 	holdUntil = 0
 end
 
--- Ends the reveal on screen right away (Skip button, any click or tap, Enter, gamepad B).
+-- Ends the reveal on screen right away (Skip button, any click or tap, Enter, gamepad B). A banded
+-- (Legendary+) reveal ignores this for its first BAND_CLOSE_GUARD seconds.
 function RevealController.Skip()
-	if showing then
+	if showing and os.clock() >= closeAllowedAt then
 		skipRequested = true
 	end
 end
@@ -646,6 +683,7 @@ function RevealController.IsShowingLarge(): boolean
 end
 
 function RevealController.Start(screen: ScreenGui)
+	CameraFov.Rest()
 	ui = build(screen)
 	RollReel.OnResults(onResults)
 

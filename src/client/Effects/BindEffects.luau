@@ -13,6 +13,7 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
+local CameraFov = require(script.Parent.CameraFov)
 local ChainRig = require(script.Parent.ChainRig)
 local HuntFX = require(script.Parent.HuntFX)
 local SealBurst = require(script.Parent.SealBurst)
@@ -117,7 +118,7 @@ function BindEffects.Start(id: number)
 		Rig = rig,
 		Pose = SealPose.Start(character),
 		CameraType = camera.CameraType,
-		FieldOfView = camera.FieldOfView,
+		FieldOfView = CameraFov.Rest(),
 		View = camera.CFrame,
 		Grade = grade,
 		Clock = 0,

@@ -41,6 +41,20 @@ ClientSettings.Schema = {
 		Default = "Full",
 	},
 	{
+		Key = "RevealAnimation",
+		Label = "Reveal animation",
+		Help = "Off skips the build-up: Legendary and rarer show at once, the rest go to the feed.",
+		Options = { "On", "Off" },
+		Default = "On",
+	},
+	{
+		Key = "RevealSound",
+		Label = "Reveal sound",
+		Help = "Off mutes the roll landing and rare reveal sounds.",
+		Options = { "On", "Off" },
+		Default = "On",
+	},
+	{
 		Key = "RollAnimation",
 		Label = "Roll animation",
 		Help = "The roll above the bottom bar. Fast rolls briefly; Off shows results right away.",

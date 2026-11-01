@@ -166,7 +166,7 @@ function ScanSeal.Play(relicId: string, sizeId: string?)
 		end)
 	end
 	if tier >= RARE then
-		Sounds.Play("Seal", nil, if tier >= LEGENDARY then 0.85 else 1.1)
+		Sounds.PlayReveal("Seal", nil, if tier >= LEGENDARY then 0.85 else 1.1)
 	end
 	local tierId = RarityConfig.Tiers[tier] and RarityConfig.Tiers[tier].Id
 	local flare = tierId and FLARE_SECONDS[tierId]

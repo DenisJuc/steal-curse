@@ -66,6 +66,14 @@ function Sounds.Play(name: string, at: Instance?, pitch: number?): Sound?
 	return sound
 end
 
+-- Play for a reveal moment (roll landing, rare reveal card): silent when Reveal sound is Off.
+function Sounds.PlayReveal(name: string, at: Instance?, pitch: number?): Sound?
+	if Settings.Get("RevealSound") == "Off" then
+		return nil
+	end
+	return Sounds.Play(name, at, pitch)
+end
+
 -- Preview for the temp SoundMixer: skips the rate-limit gap so knobs can be auditioned freely.
 function Sounds.Preview(name: string): Sound?
 	lastPlayed[name] = nil

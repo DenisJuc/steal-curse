@@ -191,10 +191,10 @@ end
 
 -- Landing sound, bigger for rarer tiers.
 function RollKit.landSound(info: Info)
-	Sounds.Play("ReelLand", nil, 1 + (info.TierIndex - 1) * 0.025)
+	Sounds.PlayReveal("ReelLand", nil, 1 + (info.TierIndex - 1) * 0.025)
 	if info.TierIndex >= LEGENDARY then
 		-- A heavy stamp: deeper for rarer tiers.
-		Sounds.Play("Seal", nil, 1.15 - (info.TierIndex - LEGENDARY) * 0.08)
+		Sounds.PlayReveal("Seal", nil, 1.15 - (info.TierIndex - LEGENDARY) * 0.08)
 	end
 end
 
