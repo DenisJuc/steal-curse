@@ -1,12 +1,15 @@
 -- Bottom-right buff timers (Slice 12): one pill per active buff with its time left, read from the
 -- BuffEnds_<id> attributes: every potion (timers only run while you are online; the server pauses
--- them offline) plus Lightning Luck from capturing lightning-struck spirits.
+-- them offline) plus Lightning Luck from capturing lightning-struck spirits. Zone events get a pill
+-- too (workspace attributes from ZoneEventService): "<event> in m:ss" during the warning, then
+-- "<event> m:ss" while it runs, so players know when to head into the wild.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
+local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local ItemConfig = require(ReplicatedStorage.Shared.ItemConfig)
 local Icons = require(script.Parent.Icons)
@@ -15,7 +18,7 @@ local UIKit = require(script.Parent.UIKit)
 
 local BuffTimers = {}
 
-local PILL_WIDTH = 170
+local PILL_WIDTH = 196
 local PILL_HEIGHT = 30
 -- On touch screens the jump button owns the bottom-right corner.
 local TOUCH_LIFT = 150
@@ -28,7 +31,15 @@ local SHORT_NAMES = {
 	Fortune = "Fortune +50%",
 }
 
-type Buff = { Id: string, Icon: string, Color: Color3, Label: (Player) -> string }
+type Buff = { Id: string, Icon: string, Color: Color3, Label: (Player) -> string, Ends: ((Player) -> any)? }
+
+-- A buff's end time: its own Ends reader, else the player's BuffEnds_<id> attribute.
+local function endsOf(buff: Buff, player: Player): any
+	if buff.Ends then
+		return buff.Ends(player)
+	end
+	return player:GetAttribute(`BuffEnds_{buff.Id}`)
+end
 
 local function buffList(): { Buff }
 	local list: { Buff } = {}
@@ -52,6 +63,25 @@ local function buffList(): { Buff }
 			return `Lightning x{Format.multiplier(if type(factor) == "number" then factor else 1)}`
 		end,
 	})
+	for _, event in Config.ZoneEvents.Events do
+		local function soon(): boolean
+			return workspace:GetAttribute("ZoneEventSoon") == event.Id
+		end
+		table.insert(list, {
+			Id = `Zone_{event.Id}`,
+			Icon = "",
+			Color = Color3.fromRGB(event.Color[1], event.Color[2], event.Color[3]),
+			Label = function()
+				return if soon() then `{event.Name} in` else event.Name
+			end,
+			Ends = function()
+				if workspace:GetAttribute("ZoneEvent") == event.Id then
+					return workspace:GetAttribute("ZoneEventEndsAt")
+				end
+				return if soon() then workspace:GetAttribute("ZoneEventStartsAt") else nil
+			end,
+		})
+	end
 	return list
 end
 
@@ -122,7 +152,7 @@ function BuffTimers.Start(screen: ScreenGui)
 		for _, buff in buffs do
 			local pill = pills[buff.Id]
 			local slot = slots[buff.Id]
-			local ends = player:GetAttribute(`BuffEnds_{buff.Id}`)
+			local ends = endsOf(buff, player)
 			local left = if type(ends) == "number" then ends - now else 0
 			local active = left > 0
 			if active and not slot.Visible then
