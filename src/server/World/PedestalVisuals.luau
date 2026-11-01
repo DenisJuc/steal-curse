@@ -136,7 +136,8 @@ end
 local function buildInfo(top: BasePart): BillboardGui
 	local gui = Instance.new("BillboardGui")
 	gui.Name = "Info"
-	gui.Size = UDim2.fromScale(8, 3)
+	-- Half studs, half pixels: readable from across the plot without filling the screen up close.
+	gui.Size = UDim2.new(2, 130, 0.75, 49)
 	gui.StudsOffset = Vector3.new(0, EMPTY_INFO_OFFSET, 0)
 	gui.LightInfluence = 0
 	gui.MaxDistance = 70
