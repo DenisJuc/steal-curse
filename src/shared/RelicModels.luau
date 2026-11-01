@@ -146,10 +146,11 @@ local function placeholder(relic: RelicConfig.Relic, at: CFrame, scale: number, 
 	part.CFrame = props.CFrame
 	part.TopSurface = Enum.SurfaceType.Smooth
 	part.BottomSurface = Enum.SurfaceType.Smooth
-	part.Color = tierColor(relic)
-	part.Material = if spectral or (RarityConfig.IndexById[relic.Tier] or 1) >= NEON_FROM_TIER
-		then Enum.Material.Neon
-		else Enum.Material.SmoothPlastic
+	local neon = spectral or (RarityConfig.IndexById[relic.Tier] or 1) >= NEON_FROM_TIER
+	-- Low tiers: a dark sealed stone tinted by the tier (a bright white block under the chamber
+	-- lights read as a missing asset); high tiers keep the neon glow.
+	part.Color = if neon then tierColor(relic) else tierColor(relic):Lerp(Color3.fromRGB(26, 22, 34), 0.55)
+	part.Material = if neon then Enum.Material.Neon else Enum.Material.Slate
 	part:SetAttribute("ModelNeeded", relic.Id)
 	return part
 end
