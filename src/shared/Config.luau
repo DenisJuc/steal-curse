@@ -276,6 +276,20 @@ Config.GamePasses = {
 	AutoEquip = 0,
 }
 
+-- Codes (CodeService): typed in Settings, each one works once per player. Upper-case keys.
+-- Potions = ItemConfig ids -> count, CEMinutes = minutes of the player's current income
+-- (at least Bounties MinCE). Remove a code here to retire it.
+Config.Codes = {
+	LAUNCH = { Potions = { LuckPotion = 1, HastePotion = 1 } },
+	SEALED = { CEMinutes = 10 },
+}
+
+-- One-time reward for being in the Roblox group (GroupId 0 = off until the group exists).
+Config.Group = {
+	GroupId = 0,
+	Reward = { LuckPotion = 3 },
+}
+
 Config.Rebirth = {
 	BaseCost = 4e8,
 	CostGrowth = 4,

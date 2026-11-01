@@ -2,18 +2,24 @@
 -- Welcome Back summary and beginner hints (ClientSettings, saved by the server). One short label
 -- per row; option settings show every option as pills (On/Off reads as a switch); range settings
 -- (sound volume) are sliders that can be dragged, or moved with the -/+ buttons (gamepad).
+-- Below them: a code box (CodeService) and, once Config.Group has an id, the group reward.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local ClientSettings = require(ReplicatedStorage.Shared.ClientSettings)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Motion = require(script.Parent.Motion)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
+local Toasts = require(script.Parent.Toasts)
 local UIKit = require(script.Parent.UIKit)
 
 local player = Players.LocalPlayer
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local RedeemCode = Remotes:WaitForChild("RedeemCode") :: RemoteFunction
+local ClaimGroupReward = Remotes:WaitForChild("ClaimGroupReward") :: RemoteFunction
 
 local SettingsPanel = {}
 
@@ -205,6 +211,53 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 			local count = #(setting.Options :: { any })
 			optionsControl(row(order, setting.Label, count * OPTION_WIDTH), setting)
 		end
+	end
+
+	local function ask(remote: RemoteFunction, ...: any)
+		local ok, message = pcall(remote.InvokeServer, remote, ...)
+		Toasts.Show(if ok and type(message) == "string" then message else "Try again in a moment.")
+	end
+
+	local codeRow = row(#ClientSettings.Schema + 1, "Code", 300)
+	local codeBox = UIKit.create("TextBox", {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -112, 0.5, 0),
+		Size = UDim2.fromOffset(186, 38),
+		BackgroundColor3 = colors.Panel,
+		Font = UIKit.Font,
+		TextSize = 18,
+		TextColor3 = colors.Text,
+		PlaceholderText = "Enter code",
+		Text = "",
+		ClearTextOnFocus = false,
+		Parent = codeRow,
+	}, { UIKit.corner(8) })
+	local redeem = UIKit.button({
+		Text = "Redeem",
+		TextSize = 18,
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.fromScale(1, 0.5),
+		Size = UDim2.fromOffset(104, 38),
+		Parent = codeRow,
+	}, function()
+		ask(RedeemCode, codeBox.Text)
+		codeBox.Text = ""
+	end)
+	UIKit.skinButton(redeem, "Gold")
+
+	if Config.Group.GroupId > 0 then
+		local groupRow = row(#ClientSettings.Schema + 2, "Group reward", 140)
+		local claim = UIKit.button({
+			Text = "Claim",
+			TextSize = 18,
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.fromScale(1, 0.5),
+			Size = UDim2.fromOffset(120, 38),
+			Parent = groupRow,
+		}, function()
+			ask(ClaimGroupReward)
+		end)
+		UIKit.skinButton(claim, "Gold")
 	end
 
 	return {

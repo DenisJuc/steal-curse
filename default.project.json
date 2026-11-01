@@ -63,6 +63,12 @@
         "ClaimCodex": {
           "$className": "RemoteFunction"
         },
+        "RedeemCode": {
+          "$className": "RemoteFunction"
+        },
+        "ClaimGroupReward": {
+          "$className": "RemoteFunction"
+        },
         "SetClientSetting": {
           "$className": "RemoteEvent"
         },
