@@ -1,7 +1,8 @@
 -- Premade auras (RelicAura) on relics shown on pedestals. The server tags each RelicDisplay part
 -- with RelicId and Size (PedestalVisuals); this picks the tier's aura, boosts it for Huge /
 -- Titanic and layers the Titanic extra. Only the nearest MAX_ACTIVE displays within RANGE studs
--- of the camera carry an aura, so a crowded server stays cheap. Visual only.
+-- of the camera carry an aura, so a crowded server stays cheap. Visual only. A player's floating
+-- relic (CosmeticEquipService "FloatingRelic") gets its aura the same way.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -134,7 +135,7 @@ local function deactivate(part: BasePart)
 end
 
 local function track(item: Instance)
-	if item:IsA("BasePart") and item.Name == "RelicDisplay" then
+	if item:IsA("BasePart") and (item.Name == "RelicDisplay" or item.Name == "FloatingRelic") then
 		displays[item] = true
 		item.AncestryChanged:Connect(function()
 			if not item:IsDescendantOf(workspace) then

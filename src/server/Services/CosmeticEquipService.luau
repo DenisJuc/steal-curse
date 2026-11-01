@@ -81,6 +81,9 @@ local function build(character: Model, relicId: string, mutationId: string?, siz
 	end
 	part.Name = MODEL_NAME
 	part.Anchored = false
+	-- PedestalAuras gives the floating relic the same aura as on a pedestal (everyone sees it).
+	part:SetAttribute("RelicId", relicId)
+	part:SetAttribute("Size", SizeConfig.normalize(sizeId))
 
 	local mutation = mutationId and MutationConfig.ById[mutationId]
 	if mutation then
