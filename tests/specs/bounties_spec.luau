@@ -181,4 +181,18 @@ return {
 			expect.equal(Bounties.secondsLeft(86400 * DAY + 3600), 82800, "seconds to midnight")
 		end,
 	},
+	{
+		Name = "sealing bounties: MinTier counts rarer tiers, MinSize Huge also counts Titanic",
+		Run = function()
+			local epic = Bounties.byId(options, "SealEpic1") :: any
+			expect.truthy(Bounties.matches(epic, "Sealed", { Tier = "Mythic" }), "Mythic counts for Epic+")
+			expect.truthy(not Bounties.matches(epic, "Sealed", { Tier = "Rare" }), "Rare doesn't")
+			local huge = Bounties.byId(options, "SealHuge1") :: any
+			expect.truthy(Bounties.matches(huge, "Sealed", { Tier = "Common", Size = "Titanic" }), "Titanic counts")
+			expect.truthy(not Bounties.matches(huge, "Sealed", { Tier = "Common" }), "Normal doesn't")
+			local plain = Bounties.byId(options, "Seal100") :: any
+			expect.truthy(Bounties.matches(plain, "Sealed", { Tier = "Common" }), "any seal counts")
+			expect.truthy(not Bounties.matches(plain, "Captured", {}), "captures don't")
+		end,
+	},
 }

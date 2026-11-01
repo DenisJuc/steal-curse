@@ -11,6 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Bounties = require(ReplicatedStorage.Shared.Bounties)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
+local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local WildLayout = require(ReplicatedStorage.Shared.WildLayout)
 local DataService = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
@@ -161,9 +162,21 @@ function BountyService.Record(player: Player, event: string, payload: { [string]
 	if not data then
 		return
 	end
-	refresh(player)
+	local refreshed = refresh(player)
 	local before = Bounties.claimable(data.Bounties, OPTIONS)
+	local function progressSum(): number
+		local sum = data.Bounties.Weekly.Progress
+		for _, slot in data.Bounties.Slots do
+			sum += slot.Progress
+		end
+		return sum
+	end
+	local progressBefore = progressSum()
 	local completed = Bounties.record(data.Bounties, OPTIONS, event, payload)
+	-- Sealed fires on every scan: only tell the client when a bounty actually moved.
+	if not refreshed and progressSum() == progressBefore then
+		return
+	end
 	for _, def in completed do
 		Notify:FireClient(player, `Bounty complete: {def.Text} - claim it at the Bounty Board in town`, "Item")
 	end
@@ -262,6 +275,12 @@ function BountyService.Init()
 	GameEvents.On("Captured", function(player: Player, info: any)
 		if type(info) == "table" then
 			BountyService.Record(player, "Captured", info)
+		end
+	end)
+	GameEvents.On("Discovery", function(player: Player, item: any)
+		local relic = type(item) == "table" and RelicConfig.ById[item.Id]
+		if relic then
+			BountyService.Record(player, "Sealed", { Tier = relic.Tier, Size = item.Size })
 		end
 	end)
 	GameEvents.On("ShrineCleansed", function(player: Player, _id: string, area: string)

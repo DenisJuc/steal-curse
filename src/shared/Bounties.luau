@@ -40,6 +40,9 @@ Bounties.Daily = { "Easy", "Medium", "Hard" }
 local SECONDS_PER_DAY = 86400
 local MODULUS = 2147483647
 local BAND_RANK = { Edge = 1, Deep = 2, Heart = 3 }
+-- "Sealed" bounties (every discovery): MinTier compares rarity order, MinSize Huge also counts Titanic.
+local TIER_RANK = { Common = 1, Uncommon = 2, Rare = 3, Epic = 4, Legendary = 5, Mythic = 6, Celestial = 7, Cosmic = 8 }
+local SIZE_RANK = { Huge = 1, Titanic = 2 }
 
 function Bounties.dayOf(unixTime: number): number
 	return unixTime // SECONDS_PER_DAY
@@ -138,6 +141,12 @@ function Bounties.matches(def: Def, event: string, payload: { [string]: any }): 
 		return false
 	end
 	if filter.Struck and payload.Struck ~= true then
+		return false
+	end
+	if filter.MinTier and (TIER_RANK[payload.Tier] or 0) < (TIER_RANK[filter.MinTier] or 0) then
+		return false
+	end
+	if filter.MinSize and (SIZE_RANK[payload.Size] or 0) < (SIZE_RANK[filter.MinSize] or 0) then
 		return false
 	end
 	if filter.Event then

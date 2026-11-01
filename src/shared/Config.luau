@@ -624,6 +624,15 @@ Config.Bounties = {
 	-- stylua: ignore
 	Pool = {
 		{ Id = "Capture5", Difficulty = "Easy", Text = "Capture 5 spirits", Event = "Captured", Goal = 5 },
+		-- Sealing bounties (every discovery counts, AFK included).
+		{ Id = "Seal100", Difficulty = "Easy", Text = "Seal 100 relics", Event = "Sealed", Goal = 100 },
+		{ Id = "SealRare5", Difficulty = "Easy", Text = "Seal 5 Rare or rarer relics", Event = "Sealed", Goal = 5, Filter = { MinTier = "Rare" } },
+		{ Id = "Seal400", Difficulty = "Medium", Text = "Seal 400 relics", Event = "Sealed", Goal = 400 },
+		{ Id = "SealEpic1", Difficulty = "Medium", Text = "Seal an Epic or rarer relic", Event = "Sealed", Goal = 1, Filter = { MinTier = "Epic" } },
+		{ Id = "SealHuge1", Difficulty = "Hard", Text = "Seal a Huge relic", Event = "Sealed", Goal = 1, Filter = { MinSize = "Huge" } },
+		{ Id = "SealEpic5", Difficulty = "Hard", Text = "Seal 5 Epic or rarer relics", Event = "Sealed", Goal = 5, Filter = { MinTier = "Epic" } },
+		{ Id = "Seal3000", Difficulty = "Weekly", Text = "Seal 3,000 relics", Event = "Sealed", Goal = 3000 },
+		{ Id = "SealHuge3", Difficulty = "Weekly", Text = "Seal 3 Huge relics", Event = "Sealed", Goal = 3, Filter = { MinSize = "Huge" } },
 		{ Id = "Forest4", Difficulty = "Easy", Text = "Capture 4 spirits in the Haunted Forest", Event = "Captured", Goal = 4, Filter = { Area = "HauntedForest" } },
 		{ Id = "Village4", Difficulty = "Easy", Text = "Capture 4 spirits in the Abandoned Village", Event = "Captured", Goal = 4, Filter = { Area = "AbandonedVillage" } },
 		{ Id = "Ruins4", Difficulty = "Easy", Text = "Capture 4 spirits in the Ancient Ruins", Event = "Captured", Goal = 4, Filter = { Area = "AncientRuins" } },
