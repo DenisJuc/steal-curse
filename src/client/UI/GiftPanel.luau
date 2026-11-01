@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local ItemConfig = require(ReplicatedStorage.Shared.ItemConfig)
+local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local Sounds = require(script.Parent.Parent.Sounds)
 local Toasts = require(script.Parent.Toasts)
@@ -20,18 +21,37 @@ local player = Players.LocalPlayer
 
 local GiftPanel = {}
 
-local ROW_HEIGHT = 64
+local COLUMNS = 4
+local TILE_HEIGHT = 160
 
-local function rewardText(gift: any): string
-	local parts = {}
-	if gift.CEMinutes then
-		table.insert(parts, `{gift.CEMinutes} min of CE`)
-	end
-	for id, count in gift.Potions or {} do
+-- The tile's picture: the first potion, else Cursed Energy.
+local function iconOf(gift: any): string
+	for id in gift.Potions or {} do
 		local item = ItemConfig.ById[id]
-		table.insert(parts, if count > 1 then `{count}x {item and item.Name or id}` else (item and item.Name or id))
+		if item then
+			return `Potion{item.Effect}`
+		end
 	end
-	return table.concat(parts, " + ")
+	return "CursedEnergy"
+end
+
+-- A few words for a tile: "Luck Potion", "5 min CE", "2 potions + CE".
+local function shortReward(gift: any): string
+	local potions = 0
+	local name = nil
+	for id, count in gift.Potions or {} do
+		potions += count
+		local item = ItemConfig.ById[id]
+		name = item and item.Name or id
+	end
+	if potions == 0 then
+		return `{gift.CEMinutes} min of CE`
+	elseif potions == 1 and not gift.CEMinutes then
+		return name :: string
+	elseif gift.CEMinutes then
+		return `{potions} potion{if potions == 1 then "" else "s"} + CE`
+	end
+	return `{potions} potions`
 end
 
 local function claimed(index: number): boolean
@@ -62,7 +82,7 @@ function GiftPanel.Start(
 	onBounties: () -> ()
 ): { Toggle: () -> (), SetVisible: (boolean) -> () }
 	local colors = UIKit.Colors
-	local panel, content = UIKit.modal(screen, "GiftsMenu", "GIFTS", colors.Gold, Vector2.new(480, 520))
+	local panel, content = UIKit.modal(screen, "GiftsMenu", "FREE GIFTS", colors.Gold, Vector2.new(560, 520))
 	local list = UIKit.scrollList(content, 8)
 	local bounties = UIKit.button({
 		Text = "Daily bounties",
@@ -71,7 +91,7 @@ function GiftPanel.Start(
 		Size = UDim2.new(1, -10, 0, 44),
 		Parent = list,
 	}, onBounties)
-	local rows: { { Button: TextButton, Index: number } } = {}
+	local rows: { { Button: TextButton, Index: number, Card: Frame, Stroke: UIStroke, Icon: ImageLabel? } } = {}
 	-- skinButton "Gold" darkens the text and "Dark" doesn't undo it; only restyle on a change.
 	local function skin(button: TextButton, kind: string)
 		if button:GetAttribute("Skin") == kind then
@@ -84,45 +104,80 @@ function GiftPanel.Start(
 		end
 	end
 
+	-- Gifts as a grid of glowing tiles: big icon, short reward, a timer that turns into CLAIM!.
+	local grid = UIKit.create("Frame", {
+		LayoutOrder = 1,
+		Size = UDim2.new(1, -10, 0, math.ceil(#Config.PlaytimeGifts / COLUMNS) * (TILE_HEIGHT + 10)),
+		BackgroundTransparency = 1,
+		Parent = list,
+	}, {
+		UIKit.create("UIGridLayout", {
+			CellSize = UDim2.new(1 / COLUMNS, -8, 0, TILE_HEIGHT),
+			CellPadding = UDim2.fromOffset(10, 10),
+			SortOrder = Enum.SortOrder.LayoutOrder,
+		}),
+	})
 	for index, gift in Config.PlaytimeGifts do
-		local slot = UIKit.slot(list, `Gift{index}`, UDim2.new(1, -10, 0, ROW_HEIGHT), index)
-		local card = UIKit.create("Frame", { BackgroundColor3 = colors.Card, Parent = slot }, {
-			UIKit.corner(10),
-			UIKit.padding(10),
+		local card = UIKit.create("Frame", {
+			Name = `Gift{index}`,
+			LayoutOrder = index,
+			BackgroundColor3 = Color3.new(1, 1, 1),
+			ClipsDescendants = true,
+			Parent = grid,
+		}, {
+			UIKit.corner(14),
+			UIKit.create("UIGradient", { Rotation = 90 }),
 		})
-		UIKit.fill(card)
-		UIKit.skinCard(card)
+		local stroke = UIKit.stroke(colors.Trim, 2.5, 0.2)
+		stroke.Parent = card
+		Motion.shineLoop(card, 2.2, function()
+			return card:GetAttribute("Ready") == true
+		end)
 		UIKit.label({
-			Text = `{gift.Minutes} min`,
+			Text = `{gift.Minutes} MIN`,
 			FontFace = UIKit.TitleFont,
-			TextSize = 22,
-			TextColor3 = colors.Gold,
-			Size = UDim2.new(0, 80, 1, 0),
-			Parent = card,
-		})
-		UIKit.label({
-			Text = rewardText(gift),
 			TextSize = 16,
-			TextWrapped = true,
-			Position = UDim2.fromOffset(84, 0),
-			Size = UDim2.new(1, -84 - 130, 1, 0),
+			TextColor3 = colors.Gold,
+			TextXAlignment = Enum.TextXAlignment.Center,
+			Position = UDim2.fromOffset(0, 6),
+			Size = UDim2.new(1, 0, 0, 18),
 			Parent = card,
 		})
+		local icon = Icons.image(card, iconOf(gift), 56)
+		if icon then
+			icon.AnchorPoint = Vector2.new(0.5, 0)
+			icon.Position = UDim2.new(0.5, 0, 0, 26)
+		end
+		local label = UIKit.label({
+			Text = shortReward(gift),
+			TextSize = 13,
+			TextColor3 = Color3.fromRGB(230, 222, 240),
+			TextXAlignment = Enum.TextXAlignment.Center,
+			TextWrapped = true,
+			Position = UDim2.fromOffset(4, 84),
+			Size = UDim2.new(1, -8, 0, 30),
+			Parent = card,
+		})
+		UIKit.create("UITextSizeConstraint", { MaxTextSize = 17, MinTextSize = 11, Parent = label })
+		label.TextScaled = true
 		local button = UIKit.button({
 			Text = "",
-			TextSize = 18,
-			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.fromScale(1, 0.5),
-			Size = UDim2.fromOffset(120, 40),
+			FontFace = UIKit.TitleFont,
+			TextSize = 17,
+			AnchorPoint = Vector2.new(0.5, 1),
+			Position = UDim2.new(0.5, 0, 1, -8),
+			Size = UDim2.new(1, -14, 0, 32),
+			ZIndex = 3,
 			Parent = card,
 		}, function()
 			local ok, message = pcall(ClaimPlaytimeGift.InvokeServer, ClaimPlaytimeGift, index)
 			Toasts.Show(if ok and type(message) == "string" then message else "Try again in a moment.")
 			if ok and type(message) == "string" and string.find(message, "Gift", 1, true) == 1 then
 				Sounds.Play("Collect")
+				Motion.flash(card, colors.Gold, 0.2)
 			end
 		end)
-		table.insert(rows, { Button = button, Index = index })
+		table.insert(rows, { Button = button, Index = index, Card = card, Stroke = stroke, Icon = icon })
 	end
 
 	-- The HUD button under SHOP.
@@ -190,15 +245,34 @@ function GiftPanel.Start(
 		end
 		for _, row in rows do
 			local left = secondsLeft(row.Index)
-			if claimed(row.Index) then
-				row.Button.Text = "Claimed"
+			local state = if claimed(row.Index) then "Claimed" elseif left and left <= 0 then "Ready" else "Waiting"
+			if state == "Claimed" then
+				row.Button.Text = "\u{2713} Claimed"
 				skin(row.Button, "Dark")
-			elseif left and left <= 0 then
-				row.Button.Text = "Claim"
+			elseif state == "Ready" then
+				row.Button.Text = "CLAIM!"
 				skin(row.Button, "Gold")
 			else
 				row.Button.Text = if left then Format.duration(math.ceil(left)) else "..."
 				skin(row.Button, "Dark")
+			end
+			if row.Card:GetAttribute("State") ~= state then
+				row.Card:SetAttribute("State", state)
+				row.Card:SetAttribute("Ready", state == "Ready")
+				local top = if state == "Ready"
+					then Color3.fromRGB(150, 104, 30)
+					elseif state == "Claimed" then Color3.fromRGB(30, 26, 38)
+					else Color3.fromRGB(64, 40, 96)
+				local gradient = row.Card:FindFirstChildOfClass("UIGradient") :: UIGradient
+				gradient.Color = ColorSequence.new(top, Color3.fromRGB(16, 12, 24))
+				row.Stroke.Color = if state == "Ready" then colors.Gold else colors.Trim
+				row.Stroke.Transparency = if state == "Claimed" then 0.7 else 0.1
+				if row.Icon then
+					row.Icon.ImageTransparency = if state == "Claimed" then 0.6 else 0
+				end
+				if state == "Ready" then
+					Motion.pop(row.Card, 0, 0.8)
+				end
 			end
 		end
 	end)
