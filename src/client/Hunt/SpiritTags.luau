@@ -13,7 +13,7 @@ local SpiritTags = {}
 -- Tag fades out past this many studs (the strongest type is seen from farther).
 local TAG_RANGE = { Wisp = 70, Restless = 100, Vengeful = 170 }
 
-type Tag = { Orb: BasePart, Type: string, Gui: BillboardGui }
+type Tag = { Orb: BasePart, Type: string, Gui: BillboardGui, Highlight: Highlight }
 
 local tags: { [number]: Tag } = {}
 
@@ -39,6 +39,7 @@ end
 local function decorate(orb: BasePart, typeId: string): Tag
 	local spirit = SpiritTypes.get(typeId, Config.Spirits :: any)
 	local color = rgb(spirit.Color)
+	orb.Color = color
 	for _, child in orb:GetDescendants() do
 		if child:IsA("PointLight") then
 			child.Color = color
@@ -60,7 +61,21 @@ local function decorate(orb: BasePart, typeId: string): Tag
 	label(gui, `+{spirit.Bonus} ROLLS`, color, 0, 0.6, true)
 	label(gui, string.upper(spirit.Name), Color3.fromRGB(230, 225, 240), 0.6, 0.4, false)
 	gui.Parent = orb
-	return { Orb = orb, Type = typeId, Gui = gui }
+	-- Tints the whole orb (body and talismans) so the type reads without the tag.
+	local model = orb.Parent
+	local highlight = Instance.new("Highlight")
+	highlight.Name = "SpiritTint"
+	highlight.Adornee = if model and model:IsA("Model") and string.sub(model.Name, 1, 6) == "Signal"
+		then model
+		else orb
+	highlight.FillColor = color
+	highlight.OutlineColor = color
+	highlight.FillTransparency = 0.45
+	highlight.OutlineTransparency = 0.15
+	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+	highlight.Enabled = false
+	highlight.Parent = orb
+	return { Orb = orb, Type = typeId, Gui = gui, Highlight = highlight }
 end
 
 -- `types`: signal id -> spirit type id (nil entries: no type, e.g. spirit types off).
@@ -68,6 +83,7 @@ function SpiritTags.Sync(types: { [number]: string })
 	for id, tag in tags do
 		if types[id] ~= tag.Type or not tag.Orb.Parent then
 			tag.Gui:Destroy()
+			tag.Highlight:Destroy()
 			tags[id] = nil
 		end
 	end
@@ -92,6 +108,7 @@ function SpiritTags.Update(types: { [number]: string })
 			tags[id] = nil
 		else
 			tag.Gui.Enabled = on
+			tag.Highlight.Enabled = on
 		end
 	end
 	-- Orbs rebuilt by SpiritSight (e.g. low-effects toggle) get their tag back.

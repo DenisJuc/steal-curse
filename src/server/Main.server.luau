@@ -2,6 +2,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
+local Config = require(ReplicatedStorage.Shared.Config)
 local RelicIncome = require(ReplicatedStorage.Shared.RelicIncome)
 local SizeConfig = require(ReplicatedStorage.Shared.SizeConfig)
 local SoftCapRarity = require(ReplicatedStorage.Shared.SoftCapRarity)
@@ -89,7 +90,10 @@ local trial = BalanceTrials.current()
 local balanceId = if trial then trial.Id else "LIVE"
 local collectionOn = BalanceTrials.collectionEnabled()
 local sampler = BalanceTrials.raritySampler()
-local maxBonus = if trial and trial.Hunt.MaxBonusRolls then trial.Hunt.MaxBonusRolls else nil
+local maxBonus = if Config.Spirits.Enabled
+	then Config.Spirits.MaxBonusRolls
+	elseif trial and trial.Hunt.MaxBonusRolls then trial.Hunt.MaxBonusRolls
+	else nil
 local maxTotal = if maxBonus then 1 + maxBonus else nil
 print(`[Main] Balance={balanceId} Collection={collectionOn} RaritySampler={sampler}`)
 if maxTotal then
