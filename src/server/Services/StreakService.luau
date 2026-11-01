@@ -54,21 +54,31 @@ local function inWild(player: Player): boolean
 	return WorldLayout.inWild(Config.World, root.Position.X, root.Position.Z)
 end
 
+local function captureOptions(): HuntStreak.Options
+	if not Config.Spirits.Enabled then
+		return Config.HuntStreak
+	end
+	-- Spirit types: every capture adds the same streak; the spirit itself carries the reward.
+	local gain = Config.Spirits.StreakGain
+	local options = table.clone(Config.HuntStreak)
+	options.Gains = { Edge = gain, Deep = gain, Heart = gain }
+	return options
+end
+
 -- Adds a capture in `band` and returns the multiplier for it.
 function StreakService.Capture(player: Player, band: HuntStreak.Band, extraIdle: number?): number
 	local entry = entryFor(player)
 	entry.Idle = Config.HuntStreak.IdleSeconds + (extraIdle or 0)
 	entry.Paused = false
-	local options = Config.HuntStreak
-	if Config.Spirits.Enabled then
-		-- Spirit types: every capture adds the same streak; the spirit itself carries the reward.
-		local gain = Config.Spirits.StreakGain
-		options = table.clone(Config.HuntStreak)
-		options.Gains = { Edge = gain, Deep = gain, Heart = gain }
-	end
-	local value = HuntStreak.capture(entry.State, band, options, extraIdle)
+	local value = HuntStreak.capture(entry.State, band, captureOptions(), extraIdle)
 	mirror(player, entry)
 	return value
+end
+
+-- The multiplier a capture in `band` would give right now (nothing changes).
+function StreakService.Preview(player: Player, band: HuntStreak.Band): number
+	local entry = entries[player]
+	return HuntStreak.preview(if entry then entry.State else HuntStreak.new(), band, captureOptions())
 end
 
 function StreakService.Get(player: Player): number

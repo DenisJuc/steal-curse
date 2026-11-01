@@ -39,6 +39,10 @@ type State = {
 
 local spawnPoints: { SpawnPoint } = {}
 local states: { [Player]: State } = {}
+-- BindService.PreviewTotalRolls (set from BindService to avoid a require cycle): the exact total
+-- rolls each spirit's capture would give, shown on its tag. Last pushed values per player.
+local rollPreview: ((Player, Signal) -> number?)? = nil
+local pushedRolls: { [Player]: { [number]: number | false } } = {}
 
 local function countOf(state: State): number
 	local count = 0
@@ -48,10 +52,28 @@ local function countOf(state: State): number
 	return count
 end
 
+local function previewRolls(player: Player, state: State): { [number]: number | false }
+	local rolls = {}
+	if rollPreview then
+		for id, signal in state.Signals do
+			rolls[id] = rollPreview(player, signal) or false
+		end
+	end
+	return rolls
+end
+
 local function push(player: Player, state: State)
+	local rolls = previewRolls(player, state)
+	pushedRolls[player] = rolls
 	local list = {}
 	for _, signal in state.Signals do
-		table.insert(list, { Id = signal.Id, Position = signal.Position, StruckUntil = signal.StruckUntil, Type = signal.Type })
+		table.insert(list, {
+			Id = signal.Id,
+			Position = signal.Position,
+			StruckUntil = signal.StruckUntil,
+			Type = signal.Type,
+			Rolls = rolls[signal.Id] or nil,
+		})
 	end
 	SignalsUpdated:FireClient(player, list)
 	player:SetAttribute("SignalCount", #list)
@@ -227,6 +249,24 @@ function SignalService.Init(points: { SpawnPoint })
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		states[player] = nil
+		pushedRolls[player] = nil
+	end)
+
+	-- Streak idle-end, zone events, skills and purification change the roll tags: re-push when any
+	-- spirit's total differs from what the player last got.
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			for player, state in states do
+				local last = pushedRolls[player] or {}
+				for id, rolls in previewRolls(player, state) do
+					if last[id] ~= rolls then
+						push(player, state)
+						break
+					end
+				end
+			end
+		end
 	end)
 
 	task.spawn(function()
@@ -257,6 +297,18 @@ function SignalService.Init(points: { SpawnPoint })
 			end
 		end
 	end)
+end
+
+function SignalService.SetRollPreview(preview: (Player, Signal) -> number?)
+	rollPreview = preview
+end
+
+-- Re-sends the player's signals (with fresh roll totals).
+function SignalService.Refresh(player: Player)
+	local state = states[player]
+	if state then
+		push(player, state)
+	end
 end
 
 function SignalService.Get(player: Player, signalId: number): Signal?

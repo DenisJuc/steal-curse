@@ -1,5 +1,6 @@
 -- Spirit type look on signal orbs (Config.Spirits): tints the orb's light and sparkles to its
--- type and floats a small tag with the type name and the bonus rolls it gives. Kept outside
+-- type and floats a small tag with the type name and the exact total rolls its capture gives now
+-- (server preview: relic + bonus after streak, events, skills and caps). Kept outside
 -- SpiritSight so it only decorates the orbs SpiritSight already builds.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,7 +14,7 @@ local SpiritTags = {}
 -- Tag fades out past this many studs (the strongest type is seen from farther).
 local TAG_RANGE = { Wisp = 70, Restless = 100, Vengeful = 170 }
 
-type Tag = { Orb: BasePart, Type: string, Gui: BillboardGui, Highlight: Highlight }
+type Tag = { Orb: BasePart, Type: string, Gui: BillboardGui, Highlight: Highlight, Rolls: TextLabel }
 
 local tags: { [number]: Tag } = {}
 
@@ -36,7 +37,20 @@ local function label(parent: Instance, text: string, color: Color3, y: number, h
 	return l
 end
 
-local function decorate(orb: BasePart, typeId: string): Tag
+-- Tag headline: the previewed total, LIGHTNING LUCK on a struck spirit, else the type's default.
+local function rollsText(id: number, typeId: string, rolls: { [number]: number }, struck: { [number]: number }): string
+	local total = rolls[id]
+	if total then
+		return `+{total} ROLLS`
+	end
+	local untilTime = struck[id]
+	if untilTime and workspace:GetServerTimeNow() <= untilTime then
+		return "LIGHTNING LUCK"
+	end
+	return `+{1 + SpiritTypes.get(typeId, Config.Spirits :: any).Bonus} ROLLS`
+end
+
+local function decorate(orb: BasePart, typeId: string, text: string): Tag
 	local spirit = SpiritTypes.get(typeId, Config.Spirits :: any)
 	local color = rgb(spirit.Color)
 	orb.Color = color
@@ -58,7 +72,7 @@ local function decorate(orb: BasePart, typeId: string): Tag
 	gui.LightInfluence = 0
 	gui.MaxDistance = TAG_RANGE[typeId] or 100
 	gui.Enabled = false
-	label(gui, `+{spirit.Bonus} ROLLS`, color, 0, 0.6, true)
+	local rollsLabel = label(gui, text, color, 0, 0.6, true)
 	label(gui, string.upper(spirit.Name), Color3.fromRGB(230, 225, 240), 0.6, 0.4, false)
 	gui.Parent = orb
 	-- Tints the whole orb (body and talismans) so the type reads without the tag.
@@ -75,11 +89,12 @@ local function decorate(orb: BasePart, typeId: string): Tag
 	highlight.DepthMode = Enum.HighlightDepthMode.Occluded
 	highlight.Enabled = false
 	highlight.Parent = orb
-	return { Orb = orb, Type = typeId, Gui = gui, Highlight = highlight }
+	return { Orb = orb, Type = typeId, Gui = gui, Highlight = highlight, Rolls = rollsLabel }
 end
 
--- `types`: signal id -> spirit type id (nil entries: no type, e.g. spirit types off).
-function SpiritTags.Sync(types: { [number]: string })
+-- `types`: signal id -> spirit type id (nil entries: no type, e.g. spirit types off); `rolls`:
+-- signal id -> previewed total rolls; `struck`: signal id -> lightning struck-until time.
+function SpiritTags.Sync(types: { [number]: string }, rolls: { [number]: number }, struck: { [number]: number })
 	for id, tag in tags do
 		if types[id] ~= tag.Type or not tag.Orb.Parent then
 			tag.Gui:Destroy()
@@ -94,14 +109,20 @@ function SpiritTags.Sync(types: { [number]: string })
 		if not tags[id] then
 			local orb = SpiritSight.GetOrb(id)
 			if orb then
-				tags[id] = decorate(orb, typeId)
+				tags[id] = decorate(orb, typeId, rollsText(id, typeId, rolls, struck))
 			end
+		end
+	end
+	for id, tag in tags do
+		local text = rollsText(id, tag.Type, rolls, struck)
+		if tag.Rolls.Text ~= text then
+			tag.Rolls.Text = text
 		end
 	end
 end
 
 -- Tags show only while Spirit Sight is on.
-function SpiritTags.Update(types: { [number]: string })
+function SpiritTags.Update(types: { [number]: string }, rolls: { [number]: number }, struck: { [number]: number })
 	local on = SpiritSight.IsEnabled()
 	for id, tag in tags do
 		if not tag.Orb.Parent then
@@ -114,7 +135,7 @@ function SpiritTags.Update(types: { [number]: string })
 	-- Orbs rebuilt by SpiritSight (e.g. low-effects toggle) get their tag back.
 	for id in types do
 		if not tags[id] then
-			SpiritTags.Sync(types)
+			SpiritTags.Sync(types, rolls, struck)
 			break
 		end
 	end

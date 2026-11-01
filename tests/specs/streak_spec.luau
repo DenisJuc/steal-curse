@@ -29,6 +29,20 @@ return {
 		end,
 	},
 	{
+		Name = "preview gives the next capture's multiplier without changing the streak",
+		Run = function()
+			local state = HuntStreak.new()
+			expect.near(HuntStreak.preview(state, "Deep", options), 1 + options.Gains.Deep, 1e-9, "fresh")
+			expect.equal(state.Value, 1, "unchanged")
+			expect.equal(state.Captures, 0, "no capture counted")
+			HuntStreak.capture(state, "Deep", options)
+			local predicted = HuntStreak.preview(state, "Heart", options)
+			expect.near(HuntStreak.capture(state, "Heart", options), predicted, 1e-9, "matches the capture")
+			state.Value = options.Max
+			expect.equal(HuntStreak.preview(state, "Heart", options), options.Max, "capped")
+		end,
+	},
+	{
 		Name = "idle time ends the streak, a capture refreshes it",
 		Run = function()
 			local state = HuntStreak.new()

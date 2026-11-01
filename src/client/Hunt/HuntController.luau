@@ -57,6 +57,9 @@ local player = Players.LocalPlayer
 local signals: { [number]: Vector3 } = {}
 -- Signal id -> spirit type (Config.Spirits), for the orb tags.
 local spiritTypes: { [number]: string } = {}
+-- Signal id -> exact total rolls its capture gives now (server preview), and struck-until times.
+local spiritRolls: { [number]: number } = {}
+local struckUntil: { [number]: number } = {}
 local state = "Idle" -- Idle | Pending | Binding
 local activeId: number? = nil
 -- Remembered at bind start: the server removes the signal (and its orb) before the result arrives.
@@ -387,7 +390,7 @@ end
 local function step(dt: number)
 	local rootPart = getRoot()
 	SpiritSight.Update(dt, if rootPart then rootPart.Position else nil)
-	SpiritTags.Update(spiritTypes)
+	SpiritTags.Update(spiritTypes, spiritRolls, struckUntil)
 
 	local count = player:GetAttribute("SignalCount") or 0
 	local max = player:GetAttribute("SignalMax") or Config.Signals.MaxCount
@@ -447,16 +450,24 @@ function HuntController.Start(screen: ScreenGui, startOptions: Options)
 		end
 		table.clear(signals)
 		table.clear(spiritTypes)
+		table.clear(spiritRolls)
+		table.clear(struckUntil)
 		for _, signal in list do
 			if type(signal) == "table" and type(signal.Id) == "number" and typeof(signal.Position) == "Vector3" then
 				signals[signal.Id] = signal.Position
 				if type(signal.Type) == "string" then
 					spiritTypes[signal.Id] = signal.Type
 				end
+				if type(signal.Rolls) == "number" then
+					spiritRolls[signal.Id] = signal.Rolls
+				end
+				if type(signal.StruckUntil) == "number" then
+					struckUntil[signal.Id] = signal.StruckUntil
+				end
 			end
 		end
 		SpiritSight.SetSignals(signals)
-		SpiritTags.Sync(spiritTypes)
+		SpiritTags.Sync(spiritTypes, spiritRolls, struckUntil)
 	end)
 	BindResult.OnClientEvent:Connect(onBindResult)
 	player:GetAttributeChangedSignal("BindSignalId"):Connect(onBindConfirmed)

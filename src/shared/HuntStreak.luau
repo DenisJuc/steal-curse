@@ -50,10 +50,15 @@ end
 -- Adds one capture in `band`; `extraIdle` lengthens the idle window (mastery perk). Returns the
 -- new multiplier, which already applies to this capture.
 function HuntStreak.capture(state: State, band: Band, options: Options, extraIdle: number?): number
-	state.Value = math.min(options.Max, state.Value + (options.Gains[band] or 0))
+	state.Value = HuntStreak.preview(state, band, options)
 	state.IdleLeft = options.IdleSeconds + (extraIdle or 0)
 	state.Captures += 1
 	return state.Value
+end
+
+-- The multiplier the next capture in `band` would give, without changing `state`.
+function HuntStreak.preview(state: State, band: Band, options: Options): number
+	return math.min(options.Max, state.Value + (options.Gains[band] or 0))
 end
 
 -- Counts the idle timer down (not while `paused`). Returns true when the streak just ended.

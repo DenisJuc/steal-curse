@@ -298,6 +298,47 @@ local function bestRelic(relicIds: { string }): string?
 	return best
 end
 
+-- Every bonus factor for a capture in `area` at `streak` (streak, zone event, purified), with the
+-- capture card's labels added to `tags`. Also returns the active event's id when it is in `area`.
+local function bonusFactors(player: Player, area: string, streak: number, tags: { string }): ({ number }, string?)
+	local factors = { streak }
+	if streak > 1 then
+		table.insert(tags, `Streak x{Format.multiplier(streak)}`)
+	end
+	local eventId = nil
+	local event = ZoneEventService.Active()
+	if event and event.Area == area then
+		eventId = event.Id
+		table.insert(tags, event.Name)
+	end
+	table.insert(factors, ZoneEventService.Factors(area).Bonus)
+	local purified = CurseService.ZoneFactor(player, area)
+	if purified > 1 then
+		table.insert(factors, purified)
+		table.insert(tags, "Purified")
+	end
+	return factors, eventId
+end
+
+local function captureBand(position: Vector3, spiritType: string?): HuntStreak.Band
+	local spirit = spiritOf(spiritType)
+	return if spirit then spirit.Band else HuntStreak.band(position.X, position.Z, Config.HuntStreak)
+end
+
+-- Total rolls (captured relic + bonus) a capture of `signal` would give right now, or nil for a
+-- lightning-struck signal (it pays Lightning Luck instead). Mirrors onComplete; changes nothing.
+function BindService.PreviewTotalRolls(player: Player, signal: SignalService.Signal): number?
+	if signal.StruckUntil and workspace:GetServerTimeNow() <= signal.StruckUntil then
+		return nil
+	end
+	local position = signal.Position
+	local area = (WorldLayout.areaAt(Config.Areas, Config.World, position.X, position.Z))
+	local streak = StreakService.Preview(player, captureBand(position, signal.Type))
+	local factors = bonusFactors(player, area, streak, {})
+	local combined = HuntStreak.combine(factors, Config.Hunt.MaxBonusMultiplier)
+	return BindService.FinalizeBonus(player, combined, signal.Type).TotalRolls
+end
+
 local function onComplete(player: Player, signalId: any)
 	local bind = binds[player]
 	if type(signalId) ~= "number" or not bind or bind.SignalId ~= signalId then
@@ -332,9 +373,7 @@ local function onComplete(player: Player, signalId: any)
 	local struck = struckUntil ~= nil and workspace:GetServerTimeNow() <= struckUntil
 	local info: CaptureInfo = {
 		Area = (WorldLayout.areaAt(Config.Areas, Config.World, position.X, position.Z)),
-		Band = if spiritOf(bind.SpiritType)
-			then spiritOf(bind.SpiritType).Band
-			else HuntStreak.band(position.X, position.Z, Config.HuntStreak),
+		Band = captureBand(position, bind.SpiritType),
 		SpiritType = bind.SpiritType,
 		Position = position,
 		Streak = 1,
@@ -343,6 +382,8 @@ local function onComplete(player: Player, signalId: any)
 		Struck = struck,
 	}
 	info.Streak = StreakService.Capture(player, info.Band, MasteryService.ExtraIdle(player, info.Area))
+	-- The streak just grew: the remaining spirits' roll tags change.
+	SignalService.Refresh(player)
 	local entry = statsFor(player)
 	entry.Captures += 1
 	local now = os.clock()
@@ -358,22 +399,9 @@ local function onComplete(player: Player, signalId: any)
 		return
 	end
 
-	local factors = { info.Streak }
-	if info.Streak > 1 then
-		table.insert(info.Tags, `Streak x{Format.multiplier(info.Streak)}`)
-	end
-	local event = ZoneEventService.Active()
+	local factors, eventId = bonusFactors(player, info.Area, info.Streak, info.Tags)
+	info.Event = eventId
 	local eventFactors = ZoneEventService.Factors(info.Area)
-	if event and event.Area == info.Area then
-		info.Event = event.Id
-		table.insert(info.Tags, event.Name)
-	end
-	table.insert(factors, eventFactors.Bonus)
-	local purified = CurseService.ZoneFactor(player, info.Area)
-	if purified > 1 then
-		table.insert(factors, purified)
-		table.insert(info.Tags, "Purified")
-	end
 	info.Bonus = HuntStreak.combine(factors, Config.Hunt.MaxBonusMultiplier)
 	local breakdown = BindService.FinalizeBonus(player, info.Bonus, bind.SpiritType)
 	local bonusCount = breakdown.FinalBonus
@@ -520,6 +548,7 @@ function BindService.Init()
 	RemoteGuard.Event(BeginBind, onBegin, "Bind")
 	RemoteGuard.Event(CancelBind, onCancel, "Bind")
 	RemoteGuard.Event(CompleteBind, onComplete, "Bind")
+	SignalService.SetRollPreview(BindService.PreviewTotalRolls)
 
 	Players.PlayerRemoving:Connect(function(player)
 		binds[player] = nil
