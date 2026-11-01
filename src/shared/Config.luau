@@ -290,6 +290,12 @@ Config.DevProducts = {
 	ServerLuck = 0,
 }
 
+-- Friend bonus (FriendService): extra Luck for each Roblox friend in the same server, capped.
+Config.Friends = {
+	LuckPerFriend = 0.1,
+	MaxFriends = 3,
+}
+
 Config.Shop = {
 	DoubleLuckFactor = 2,
 	FasterSealFactor = 0.75,

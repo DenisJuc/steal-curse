@@ -256,10 +256,21 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local luckButton, _, luckChip = iconButton(buttons, "LuckButton", 4, "Luck", "Luck")
 	luckButton.Activated:Connect(callbacks.OnLuck)
 	luckChip.Visible = true
+	-- Friends in the server (FriendService): a second chip beside the button, e.g. "Friends +20%".
+	local friendChip = UIKit.iconChip(luckButton)
+	friendChip.Name = "FriendChip"
+	friendChip.TextSize = 14
+	friendChip.AnchorPoint = Vector2.new(0, 0.5)
+	friendChip.Position = UDim2.new(1, 8, 0.5, 0)
+	friendChip.TextColor3 = colors.Jade
 	local function refreshLuck()
 		luckChip.Text = `x{Format.number(player:GetAttribute("EffectiveLuck") or 1)}`
+		local friends = player:GetAttribute("FriendLuckPercent")
+		friendChip.Visible = type(friends) == "number" and friends > 0
+		friendChip.Text = `Friends +{friends or 0}%`
 	end
 	player:GetAttributeChangedSignal("EffectiveLuck"):Connect(refreshLuck)
+	player:GetAttributeChangedSignal("FriendLuckPercent"):Connect(refreshLuck)
 	refreshLuck()
 
 	-- Rebirth: shines and turns jade once the next Rebirth is affordable; the chip counts Rebirths.
