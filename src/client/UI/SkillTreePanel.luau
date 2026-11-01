@@ -98,6 +98,26 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 		CanvasSize = UDim2.new(),
 		Parent = content,
 	})
+	-- A faint violet glow behind the tree so it reads as a place, not a list.
+	UIKit.create("Frame", {
+		Name = "Glow",
+		Position = tree.Position,
+		Size = tree.Size,
+		BackgroundColor3 = colors.Accent,
+		BackgroundTransparency = 0.82,
+		ZIndex = 0,
+		Parent = content,
+	}, {
+		UIKit.corner(12),
+		UIKit.create("UIGradient", {
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0.2),
+				NumberSequenceKeypoint.new(0.6, 0.85),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+			Rotation = 90,
+		}),
+	})
 	local canvas = UIKit.create("Frame", {
 		Name = "Canvas",
 		BackgroundTransparency = 1,
@@ -199,8 +219,13 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			modeBar.Size = if compact then UDim2.new(0.4, 0, 0, UIKit.TAB_HEIGHT) else UDim2.fromOffset(204, MODE_HEIGHT)
 		end
 		tree.Position = UDim2.fromOffset(0, top)
+		local glow = content:FindFirstChild("Glow") :: Frame?
 		if compact then
 			tree.Size = UDim2.new(0.55, 0, 1, -top)
+			if glow then
+				glow.Position = tree.Position
+				glow.Size = tree.Size
+			end
 			sheet.AnchorPoint = Vector2.new(1, 0)
 			sheet.Position = UDim2.new(1, 0, 0, top)
 			sheet.Size = UDim2.new(0.45, -8, 1, -top)
@@ -213,6 +238,10 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 			end
 		else
 			tree.Size = UDim2.new(1, 0, 1, -(TREE_TOP + SHEET_HEIGHT + 8))
+			if glow then
+				glow.Position = tree.Position
+				glow.Size = tree.Size
+			end
 			sheet.AnchorPoint = Vector2.new(0, 1)
 			sheet.Position = UDim2.fromScale(0, 1)
 			sheet.Size = UDim2.new(1, 0, 0, SHEET_HEIGHT)
@@ -603,7 +632,8 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				})
 				UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = badge })
 			end
-			UIKit.label({
+			-- Name and rank sit on a dark pill so the path lines pass behind them.
+			local label = UIKit.label({
 				Name = "NodeName",
 				Text = node.Name,
 				TextSize = 13,
@@ -611,20 +641,30 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				TextXAlignment = Enum.TextXAlignment.Center,
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.new(0.5, 0, 1, -16),
-				Size = UDim2.fromOffset(NODE + 70, 16),
+				Size = UDim2.fromOffset(0, 16),
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundTransparency = 0.15,
+				BackgroundColor3 = colors.Panel,
 				ZIndex = 4,
 				Parent = holder,
 			})
+			UIKit.create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = label })
+			UIKit.create("UIPadding", { PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5), Parent = label })
 			local rank = UIKit.label({
 				Name = "Rank",
 				TextSize = 15,
 				TextXAlignment = Enum.TextXAlignment.Center,
 				AnchorPoint = Vector2.new(0.5, 1),
 				Position = UDim2.fromScale(0.5, 1),
-				Size = UDim2.fromOffset(NODE + 20, 16),
+				Size = UDim2.fromOffset(0, 16),
+				AutomaticSize = Enum.AutomaticSize.X,
+				BackgroundTransparency = 0.15,
+				BackgroundColor3 = colors.Panel,
 				ZIndex = 4,
 				Parent = holder,
 			})
+			UIKit.create("UICorner", { CornerRadius = UDim.new(0, 6), Parent = rank })
+			UIKit.create("UIPadding", { PaddingLeft = UDim.new(0, 5), PaddingRight = UDim.new(0, 5), Parent = rank })
 			local nodeId = node.Id
 			button.Activated:Connect(function()
 				selected = nodeId
