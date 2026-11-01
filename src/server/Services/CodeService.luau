@@ -50,7 +50,7 @@ local function redeem(player: Player, raw: unknown): string
 	local parts = {}
 	if reward.CEMinutes then
 		local amount =
-			math.max(Config.Bounties.MinCE, math.floor(reward.CEMinutes * 60 * EconomyService.GetIncomePerSec(player)))
+			math.max(Config.Bounties.MinCE, math.floor(reward.CEMinutes * 60 * EconomyService.GetRewardIncomePerSec(player)))
 		EconomyService.Add(player, amount)
 		table.insert(parts, `{Format.ce(amount)} CE`)
 	end

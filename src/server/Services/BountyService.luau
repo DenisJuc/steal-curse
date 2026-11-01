@@ -46,7 +46,7 @@ local function excluded(data: any): { [string]: boolean }
 end
 
 local function ceFor(player: Player, minutes: number): number
-	return math.max(OPTIONS.MinCE, math.floor(minutes * 60 * EconomyService.GetIncomePerSec(player)))
+	return math.max(OPTIONS.MinCE, math.floor(minutes * 60 * EconomyService.GetRewardIncomePerSec(player)))
 end
 
 -- Short text of a reward at the player's current income.

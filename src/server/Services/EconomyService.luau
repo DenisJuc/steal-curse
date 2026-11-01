@@ -57,6 +57,20 @@ function EconomyService.GetIncomePerSec(player: Player): number
 	return Economy.totalIncome(contributionsOf(player), EconomyService.GetIncomeMultiplier(player))
 end
 
+-- Income for "N minutes of CE" rewards (bounties, gifts, codes): without the Fortune potion's
+-- bonus, so drinking one right before claiming doesn't inflate the reward.
+function EconomyService.GetRewardIncomePerSec(player: Player): number
+	local total = MultiplierService.Get(player, "Income")
+	local potion = 0
+	for _, source in MultiplierService.Breakdown(player, "Income") do
+		if source.Name == "Potion" then
+			potion += source.Value
+		end
+	end
+	local scale = if total > 0 then math.max(0, total - potion) / total else 1
+	return EconomyService.GetIncomePerSec(player) * scale
+end
+
 -- Keeps the balances finite (Economy.safeCE) before they are shown or saved.
 local function keepFinite(data: any)
 	data.CE = Economy.safeCE(data.CE)

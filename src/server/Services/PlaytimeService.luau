@@ -73,7 +73,7 @@ local function claim(player: Player, index: unknown): string
 	local parts = {}
 	if gift.CEMinutes then
 		local amount =
-			math.max(Config.Bounties.MinCE, math.floor(gift.CEMinutes * 60 * EconomyService.GetIncomePerSec(player)))
+			math.max(Config.Bounties.MinCE, math.floor(gift.CEMinutes * 60 * EconomyService.GetRewardIncomePerSec(player)))
 		EconomyService.Add(player, amount)
 		table.insert(parts, `{Format.ce(amount)} CE`)
 	end
