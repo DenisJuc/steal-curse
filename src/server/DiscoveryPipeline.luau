@@ -207,7 +207,7 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 	return results
 end
 
--- One chat line to everyone for the rarest qualifying find of a batch (never more per batch).
+-- One chat line (and a banner for everyone else) for the rarest qualifying find of a batch (never more per batch).
 function DiscoveryPipeline.AnnounceBest(player: Player, results: { Result })
 	if not Config.Announce.Enabled then
 		return
@@ -224,7 +224,10 @@ function DiscoveryPipeline.AnnounceBest(player: Player, results: { Result })
 	end
 	if best then
 		for _, other in Players:GetPlayers() do
-			Announce:FireClient(other, { Name = player.DisplayName, Id = best.Id, Mutation = best.Mutation })
+			Announce:FireClient(
+				other,
+				{ Name = player.DisplayName, UserId = player.UserId, Id = best.Id, Mutation = best.Mutation, Size = best.Size }
+			)
 		end
 	end
 end
