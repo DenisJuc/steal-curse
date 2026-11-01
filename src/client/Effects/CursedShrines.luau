@@ -309,7 +309,7 @@ local function onResult(result: { [string]: any })
 			celebrate(shrine)
 		end
 		refreshLooks()
-		Banner.Show("SHRINE CLEANSED", tostring(result.Lore or ""), PURE_COLOR)
+		Banner.Show("SHRINE CLEANSED", tostring(result.Lore or ""), PURE_COLOR, 2)
 		Toasts.Show(tostring(result.Text or ""), "Item")
 		return
 	end

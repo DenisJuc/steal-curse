@@ -68,7 +68,8 @@ function AfkController.Start(): Controller
 					"ANTI-AFK",
 					`Moving you to a fresh server in {Config.Afk.HopWarningSeconds} s so you can keep AFKing. `
 						.. "Move to stay here.",
-					UIKit.Colors.Gold
+					UIKit.Colors.Gold,
+					2
 				)
 			end
 			if idle >= Config.Afk.HopAfterSeconds and os.clock() >= nextHopAttempt then

@@ -24,15 +24,15 @@ local KIND_COLORS = {
 	Jade = UIKit.Colors.Jade,
 	Milestone = UIKit.Colors.Accent,
 }
--- Few, big and slow enough to read: at most 3 at once, rewards stay 5.5 s, the same text twice in
+-- Few and readable: at most 3 at once, rewards stay 4 s, routine ones 3 s, the same text twice in
 -- a row is shown once.
 local MAX_SHOWN = 3
 local MAX_WIDTH = 720
-local TEXT_SIZE = 24
-local MIN_TEXT_SIZE = 17
-local TOAST_HEIGHT = 54
-local SECONDS = { Offline = 8, Item = 5.5, Milestone = 5.5, Error = 4 }
-local DEFAULT_SECONDS = 4.5
+local TEXT_SIZE = 21
+local MIN_TEXT_SIZE = 16
+local TOAST_HEIGHT = 46
+local SECONDS = { Offline = 8, Item = 4, Milestone = 4.5, Error = 3.5 }
+local DEFAULT_SECONDS = 3
 local NORMAL_POSITION = UDim2.new(0.5, 0, 1, -330)
 local MENU_POSITION = UDim2.new(0.5, 0, 1, -10)
 

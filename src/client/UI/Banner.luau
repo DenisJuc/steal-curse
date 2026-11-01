@@ -11,8 +11,13 @@ local UIKit = require(script.Parent.UIKit)
 
 local Banner = {}
 
--- Big and slow enough to read; only 2 wait in line (older ones are dropped, the newest matter).
-local SHOW_SECONDS = 4.5
+-- Two sizes. Important banners (priority 2: events, other players' rare finds, Server Luck,
+-- rebirth, anti-AFK) are big and stay 4.5 s; everything else is a small strip for 2.2 s. Only 2
+-- wait in line; when full, the least important pending one is dropped.
+local STYLES = {
+	[1] = { Seconds = 2.2, Size = Vector2.new(460, 90), Title = 26, Text = 21, TextTop = 32 },
+	[2] = { Seconds = 4.5, Size = Vector2.new(680, 132), Title = 38, Text = 25, TextTop = 50 },
+}
 local HIDE_SECONDS = 0.25
 local MAX_QUEUE = 2
 
@@ -39,6 +44,17 @@ local function playNext()
 	end
 	playing = true
 
+	local style = STYLES[entry.Priority] or STYLES[1]
+	frame.Size = UDim2.fromOffset(style.Size.X, style.Size.Y)
+	titleText.TextSize = style.Title
+	titleText.Size = UDim2.new(1, 0, 0, style.Title + 6)
+	bodyText.Position = UDim2.fromOffset(0, style.TextTop)
+	bodyText.Size = UDim2.new(1, 0, 1, -style.TextTop)
+	local limit = bodyText:FindFirstChildOfClass("UITextSizeConstraint")
+	if limit then
+		limit.MaxTextSize = style.Text
+		limit.MinTextSize = math.min(limit.MinTextSize, style.Text)
+	end
 	titleText.Text = entry.Title
 	titleText.TextColor3 = entry.Color
 	bodyText.Text = entry.Text
@@ -57,7 +73,7 @@ local function playNext()
 		end
 	end)
 
-	task.delay(SHOW_SECONDS, function()
+	task.delay(style.Seconds, function()
 		if titleText.Text ~= entry.Title then
 			playing = false
 			playNext()
@@ -120,7 +136,7 @@ function Banner.Start(screen: ScreenGui)
 		Size = UDim2.new(1, 0, 1, -50),
 		Parent = inner,
 	})
-	UIKit.create("UITextSizeConstraint", { MaxTextSize = 25, MinTextSize = 18, Parent = textLabel })
+	UIKit.create("UITextSizeConstraint", { MaxTextSize = 25, MinTextSize = 14, Parent = textLabel })
 	holder = frame
 	card = inner
 end

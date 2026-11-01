@@ -41,7 +41,7 @@ function Announcements.Start()
 		if type(name) ~= "string" or type(seconds) ~= "number" then
 			return
 		end
-		Banner.Show("SERVER LUCK!", `{name} boosted everyone's luck x2 for {Format.duration(seconds)}`, UIKit.Colors.Gold)
+		Banner.Show("SERVER LUCK!", `{name} boosted everyone's luck x2 for {Format.duration(seconds)}`, UIKit.Colors.Gold, 2)
 	end)
 	Announce.OnClientEvent:Connect(function(payload)
 		if type(payload) ~= "table" or type(payload.Id) ~= "string" or type(payload.Name) ~= "string" then
