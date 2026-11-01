@@ -14,6 +14,7 @@ local Odds = require(script.Parent.UI.Odds)
 local UIKit = require(script.Parent.UI.UIKit)
 
 local Announce = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("Announce") :: RemoteEvent
+local ServerLuckBought = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("ServerLuckBought") :: RemoteEvent
 
 local Announcements = {}
 
@@ -22,6 +23,12 @@ local function escape(text: string): string
 end
 
 function Announcements.Start()
+	ServerLuckBought.OnClientEvent:Connect(function(name: unknown, seconds: unknown)
+		if type(name) ~= "string" or type(seconds) ~= "number" then
+			return
+		end
+		Banner.Show("SERVER LUCK!", `{name} boosted everyone's luck x2 for {Format.duration(seconds)}`, UIKit.Colors.Gold)
+	end)
 	Announce.OnClientEvent:Connect(function(payload)
 		if type(payload) ~= "table" or type(payload.Id) ~= "string" or type(payload.Name) ~= "string" then
 			return

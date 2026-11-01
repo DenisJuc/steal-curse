@@ -134,6 +134,11 @@ function DataService.Get(player: Player): Data?
 	return if profile then profile.Data else nil
 end
 
+-- The live ProfileStore profile (ShopService waits on its saves for developer products).
+function DataService.GetProfile(player: Player): any
+	return profiles[player]
+end
+
 function DataService.IsLoaded(player: Player): boolean
 	return profiles[player] ~= nil
 end

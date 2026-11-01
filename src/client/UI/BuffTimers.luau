@@ -63,6 +63,17 @@ local function buffList(): { Buff }
 			return `Lightning x{Format.multiplier(if type(factor) == "number" then factor else 1)}`
 		end,
 	})
+	table.insert(list, {
+		Id = "ServerLuck",
+		Icon = "PotionLuck",
+		Color = Color3.fromRGB(255, 205, 90),
+		Label = function()
+			return `Server Luck x{Format.multiplier(Config.Shop.ServerLuckFactor)}`
+		end,
+		Ends = function()
+			return workspace:GetAttribute("ServerLuckEndsAt")
+		end,
+	})
 	for _, event in Config.ZoneEvents.Events do
 		local function soon(): boolean
 			return workspace:GetAttribute("ZoneEventSoon") == event.Id

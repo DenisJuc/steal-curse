@@ -26,6 +26,7 @@ local RollReel = require(script.Parent.UI.RollReel)
 local HuntRolls = require(script.Parent.UI.HuntRolls)
 local TravelBar = require(script.Parent.UI.TravelBar)
 local SettingsPanel = require(script.Parent.UI.SettingsPanel)
+local ShopPanel = require(script.Parent.UI.ShopPanel)
 local ShowcasePanel = require(script.Parent.UI.ShowcasePanel)
 local ShrinePanel = require(script.Parent.UI.ShrinePanel)
 local SkillTreePanel = require(script.Parent.UI.SkillTreePanel)
@@ -119,6 +120,11 @@ local journalPanel = JournalPanel.Start(screen)
 local bountyPanel = BountyPanel.Start(screen)
 local wardrobePanel = WardrobePanel.Start(screen)
 local settingsPanel = SettingsPanel.Start(screen)
+local shopPanel
+shopPanel = ShopPanel.Start(screen, function()
+	closeAllExcept(shopPanel)
+	shopPanel.Toggle()
+end)
 local rebirthPanel = RebirthPanel.Start(screen)
 local welcomeBack = WelcomeBack.Start(screen)
 menus = {
@@ -135,6 +141,7 @@ menus = {
 	bountyPanel,
 	wardrobePanel,
 	settingsPanel,
+	shopPanel,
 	welcomeBack,
 }
 MenuMotion.Start(screen)

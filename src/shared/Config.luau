@@ -271,9 +271,45 @@ Config.Offline = {
 -- Each Rebirth multiplies income by IncomeGrowth and luck by LuckGrowth, for good.
 -- Game pass ids from the Creator Dashboard (Monetization > Passes). 0 = not on sale yet: nobody
 -- owns it except through the Studio /gamepass command.
+-- Game passes: name -> pass id (0 = not on sale yet; ids come from the Creator Dashboard).
 Config.GamePasses = {
 	-- Auto-equip best after every find, purchase and upgrade (the Equip Best button stays free).
 	AutoEquip = 0,
+	-- x2 Luck, always (ShopService).
+	DoubleLuck = 0,
+	-- Scans 25% faster (ShopService).
+	FasterSeal = 0,
+	-- +50% CE income (ShopService).
+	MoreIncome = 0,
+}
+
+-- Developer products (ShopService.ProcessReceipt): name -> product id (0 = not on sale yet).
+Config.DevProducts = {
+	LuckPotion = 0,
+	PotionBundle = 0,
+	ServerLuck = 0,
+}
+
+Config.Shop = {
+	DoubleLuckFactor = 2,
+	FasterSealFactor = 0.75,
+	MoreIncomeBonus = 0.5,
+	PotionBundle = { LuckPotion = 1, HastePotion = 1, FortunePotion = 1 },
+	-- Server Luck: x2 luck for everyone in the server; buying again while active adds time.
+	ServerLuckFactor = 2,
+	ServerLuckSeconds = 900,
+	-- Menu order and text. Price comes from Roblox (GetProductInfo).
+	Passes = {
+		{ Name = "DoubleLuck", Title = "2x Luck", Text = "Double luck on every seal" },
+		{ Name = "FasterSeal", Title = "Faster Seal", Text = "Seal 25% faster" },
+		{ Name = "MoreIncome", Title = "+50% Income", Text = "More CE from every pedestal" },
+		{ Name = "AutoEquip", Title = "Auto Equip", Text = "Best relics placed for you" },
+	},
+	Products = {
+		{ Name = "ServerLuck", Title = "Server Luck", Text = "x2 luck for everyone, 15 min" },
+		{ Name = "PotionBundle", Title = "Potion Bundle", Text = "Luck, Haste and Fortune" },
+		{ Name = "LuckPotion", Title = "Luck Potion", Text = "One Luck potion" },
+	},
 }
 
 -- Codes (CodeService): typed in Settings, each one works once per player. Upper-case keys.

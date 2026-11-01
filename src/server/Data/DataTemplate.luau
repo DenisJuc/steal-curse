@@ -115,6 +115,8 @@ export type Data = {
 	Buffs: { [string]: number },
 	-- One-time item rewards already given (e.g. "FirstRare") = time.
 	ItemRewards: { [string]: number },
+	-- Last developer-product PurchaseIds granted (ShopService), so a receipt is never paid twice.
+	PurchaseIdCache: { string },
 	-- Offering boxes opened in a row below the second reward tier (Offerings pity).
 	OfferingPity: number,
 	-- Title shown over the player's head: an earned title, "Auto" (best earned) or "Off".
@@ -265,6 +267,7 @@ DataTemplate.Template = {
 	Items = {},
 	Buffs = {},
 	ItemRewards = {},
+	PurchaseIdCache = {},
 	OfferingPity = 0,
 	TitleChoice = "Auto",
 	Lanterns = {
