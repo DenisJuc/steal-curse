@@ -1,4 +1,5 @@
--- Big celebratory banner in the upper middle of the screen. While a menu is open it moves up to the
+-- Big celebratory banner in the upper middle of the screen. Several at once never overlap: the
+-- next ones wait as cards stacked under the current one, with a skip arrow that shows the count. While a menu is open it moves up to the
 -- top edge, above the menu, so it never covers the menu's header or tabs. It never blocks
 -- clicks. Banners queue: each one plays in full (pop in, hold, shrink away) before the next starts,
 -- so zone-depth and reward banners never stack on top of each other.
@@ -12,14 +13,14 @@ local UIKit = require(script.Parent.UIKit)
 local Banner = {}
 
 -- Two sizes. Important banners (priority 2: events, other players' rare finds, Server Luck,
--- rebirth, anti-AFK) are big and stay 4.5 s; everything else is a small strip for 2.2 s. Only 2
--- wait in line; when full, the least important pending one is dropped.
+-- rebirth, anti-AFK) are big and stay 4.5 s; everything else is a small strip for 2.2 s. Up to 4
+-- wait in line (stacked, with a skip arrow); when full, the least important pending one is dropped.
 local STYLES = {
 	[1] = { Seconds = 2.2, Size = Vector2.new(460, 90), Title = 26, Text = 21, TextTop = 32 },
 	[2] = { Seconds = 4.5, Size = Vector2.new(680, 132), Title = 38, Text = 25, TextTop = 50 },
 }
 local HIDE_SECONDS = 0.25
-local MAX_QUEUE = 2
+local MAX_QUEUE = 4
 
 type Entry = { Title: string, Text: string, Color: Color3, Priority: number }
 
@@ -29,9 +30,45 @@ local titleLabel: TextLabel? = nil
 local textLabel: TextLabel? = nil
 local queue: { Entry } = {}
 local playing = false
+local token = 0
+local skipButton: TextButton? = nil
+local ghosts: { Frame } = {}
 
-local function playNext()
+-- Waiting banners show as cards stacked under the current one, plus a skip arrow with the count.
+local function refreshStack()
+	for index, ghost in ghosts do
+		ghost.Visible = playing and #queue >= index
+	end
+	local button = skipButton
+	if button then
+		button.Visible = playing and #queue > 0
+		button.Text = `{#queue} \u{25B6}`
+	end
+end
+
+local playNext: () -> ()
+
+local function finish(myToken: number)
+	local frame, inner = holder, card
+	if myToken ~= token or not frame or not inner then
+		return
+	end
+	token += 1
+	local scale = inner:FindFirstChild("Juice") :: UIScale
+	Spring.stop(scale)
+	TweenService:Create(scale, TweenInfo.new(HIDE_SECONDS, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Scale = 0 })
+		:Play()
+	task.wait(HIDE_SECONDS + 0.05)
+	if #queue == 0 then
+		frame.Visible = false
+	end
+	playing = false
+	playNext()
+end
+
+function playNext()
 	if playing then
+		refreshStack()
 		return
 	end
 	local frame, inner, titleText, bodyText = holder, card, titleLabel, textLabel
@@ -40,9 +77,12 @@ local function playNext()
 	end
 	local entry = table.remove(queue, 1)
 	if not entry then
+		refreshStack()
 		return
 	end
 	playing = true
+	token += 1
+	local myToken = token
 
 	local style = STYLES[entry.Priority] or STYLES[1]
 	frame.Size = UDim2.fromOffset(style.Size.X, style.Size.Y)
@@ -73,24 +113,9 @@ local function playNext()
 		end
 	end)
 
+	refreshStack()
 	task.delay(style.Seconds, function()
-		if titleText.Text ~= entry.Title then
-			playing = false
-			playNext()
-			return
-		end
-		Spring.stop(scale)
-		TweenService:Create(
-			scale,
-			TweenInfo.new(HIDE_SECONDS, Enum.EasingStyle.Back, Enum.EasingDirection.In),
-			{ Scale = 0 }
-		):Play()
-		task.wait(HIDE_SECONDS + 0.05)
-		if #queue == 0 then
-			frame.Visible = false
-		end
-		playing = false
-		playNext()
+		finish(myToken)
 	end)
 end
 
@@ -137,6 +162,38 @@ function Banner.Start(screen: ScreenGui)
 		Parent = inner,
 	})
 	UIKit.create("UITextSizeConstraint", { MaxTextSize = 25, MinTextSize = 14, Parent = textLabel })
+	-- Stacked cards for waiting banners, and the skip arrow (the only clickable part).
+	for index = 2, 1, -1 do
+		ghosts[index] = UIKit.create("Frame", {
+			Name = `Waiting{index}`,
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, index * 8),
+			Size = UDim2.new(1, -index * 36, 1, 0),
+			BackgroundColor3 = colors.Panel,
+			BackgroundTransparency = 0.1 + index * 0.15,
+			Visible = false,
+			ZIndex = 0,
+			Parent = frame,
+		}, {
+			UIKit.corner(14),
+			UIKit.create("UIStroke", { Color = colors.Trim, Thickness = 1.5, Transparency = 0.4 }),
+		})
+	end
+	local button = UIKit.button({
+		Name = "Skip",
+		Text = "",
+		TextSize = 18,
+		AnchorPoint = Vector2.new(1, 1),
+		Position = UDim2.new(1, -10, 1, -10),
+		Size = UDim2.fromOffset(60, 34),
+		Visible = false,
+		ZIndex = 45,
+		Parent = frame,
+	}, function()
+		task.spawn(finish, token)
+	end)
+	UIKit.skinButton(button, "Gold")
+	skipButton = button
 	holder = frame
 	card = inner
 end

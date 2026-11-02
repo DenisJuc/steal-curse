@@ -198,7 +198,6 @@ function DiscoveryPipeline.GrantBatch(player: Player, entries: { Entry }): { Res
 
 	if codexChanged then
 		CodexService.Evaluate(player)
-		CodexService.NudgeClosest(player)
 	end
 	if equipped then
 		PedestalService.Refresh(player)
