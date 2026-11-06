@@ -51,6 +51,9 @@
         "ShrineState": {
           "$className": "RemoteEvent"
         },
+        "IncomeCollected": {
+          "$className": "RemoteEvent"
+        },
         "GetInventory": {
           "$className": "RemoteFunction"
         },

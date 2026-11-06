@@ -1,8 +1,10 @@
--- Cursed Energy (GDD 6). One 1-second tick pays every loaded player from their displayed relics:
+-- Cursed Energy (GDD 6). One 1-second tick earns every loaded player CE from their displayed relics:
 --   CE/sec = IncomeMultiplier x Rebirth x sum(relic income x pedestal multiplier)   (Economy.totalIncome)
 -- IncomeMultiplier is the "Income" additive stack (1 + global bonuses); Rebirth multiplies on top
 -- (Rebirth.incomeMultiplier). CE stays fractional internally so tiny amounts are never rounded
--- away. All spending goes through TrySpend, which is synchronous: two rapid purchases can never
+-- away. The earned CE is not paid straight to the balance: it piles up on each pedestal's collect
+-- pad (PedestalService.StoreIncome) until the owner walks onto the pad. LifetimeCE counts it when
+-- collected. All spending goes through TrySpend, which is synchronous: two rapid purchases can never
 -- both spend the same CE.
 --
 -- Offline (GDD 2.2): every tick stores the current CE/sec and time in data.Offline. On the next
@@ -32,10 +34,16 @@ local offlinePayouts: { [Player]: OfflinePayout } = {}
 local contributionsOf: (Player) -> { number } = function(_player: Player)
 	return {}
 end
+-- Where tick income goes (PedestalService.StoreIncome). Without one it is paid to CE directly.
+local storeIncome: ((Player, number) -> ())? = nil
 
 -- PedestalService provides the per-pedestal income list (avoids a require cycle).
 function EconomyService.SetIncomeProvider(provider: (Player) -> { number })
 	contributionsOf = provider
+end
+
+function EconomyService.SetIncomeStore(store: (Player, number) -> ())
+	storeIncome = store
 end
 
 -- Global income multiplier: additive Income stack × Rebirth × (SoftCap_P4 Board Fusion, once).
@@ -117,8 +125,14 @@ local function tick(player: Player, seconds: number)
 	end
 	local perSec = EconomyService.GetIncomePerSec(player)
 	local earned = perSec * seconds
-	data.CE += earned
-	data.LifetimeCE += earned
+	if storeIncome then
+		if earned > 0 then
+			storeIncome(player, earned)
+		end
+	else
+		data.CE += earned
+		data.LifetimeCE += earned
+	end
 	data.Offline.IncomePerSec = perSec
 	data.Offline.At = os.time()
 	sessionIncome[player] = (sessionIncome[player] or 0) + earned

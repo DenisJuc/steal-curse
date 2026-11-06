@@ -42,6 +42,7 @@ export type SlotState = {
 	Mutation: string?,
 	Size: string?,
 	IncomePerSec: number?,
+	Stored: number?,
 	Price: number?,
 	IsNext: boolean?,
 }
@@ -275,6 +276,99 @@ local function updateInfo(top: BasePart, state: SlotState)
 	end
 end
 
+-- The collect pad's floating amount: coin + gold number, brighter rune when CE is waiting.
+local PAD_GLOW_IDLE = 0.78
+local PAD_GLOW_READY = 0.25
+
+local function buildStoredGui(pad: BasePart): BillboardGui
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "Stored"
+	gui.Size = UDim2.new(1.6, 70, 0.6, 26)
+	gui.StudsOffset = Vector3.new(0, 2.4, 0)
+	gui.LightInfluence = 0
+	gui.MaxDistance = 60
+	gui.AlwaysOnTop = false
+
+	local row = Instance.new("Frame")
+	row.Name = "Row"
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.fromScale(1, 1)
+	row.Parent = gui
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Padding = UDim.new(0.03, 0)
+	layout.Parent = row
+
+	local coin = Instance.new("Frame")
+	coin.Name = "Coin"
+	coin.LayoutOrder = 1
+	coin.Size = UDim2.fromScale(0.2, 0.8)
+	coin.BackgroundColor3 = GOLD
+	coin.BorderSizePixel = 0
+	coin.Parent = row
+	round(coin, UDim.new(1, 0))
+	local aspect = Instance.new("UIAspectRatioConstraint")
+	aspect.DominantAxis = Enum.DominantAxis.Height
+	aspect.Parent = coin
+	local rim = Instance.new("UIStroke")
+	rim.Color = Color3.fromRGB(110, 70, 20)
+	rim.Thickness = 2
+	rim.Parent = coin
+	local hole = Instance.new("Frame")
+	hole.AnchorPoint = Vector2.new(0.5, 0.5)
+	hole.Position = UDim2.fromScale(0.5, 0.5)
+	hole.Size = UDim2.fromScale(0.3, 0.3)
+	hole.BackgroundColor3 = INK
+	hole.BorderSizePixel = 0
+	hole.Parent = coin
+
+	local amount = textLabel("Amount", row, GOLD)
+	amount.LayoutOrder = 2
+	amount.Size = UDim2.fromScale(0.62, 1)
+	amount.TextXAlignment = Enum.TextXAlignment.Left
+	amount.TextStrokeColor3 = INK
+	amount.TextStrokeTransparency = 0
+
+	gui.Parent = pad
+	return gui
+end
+
+local function showStored(pedestal: Instance, owned: boolean, stored: number)
+	local pad = pedestal:FindFirstChild("CollectPad") :: BasePart?
+	if not pad then
+		return
+	end
+	local glow = pedestal:FindFirstChild("CollectGlow") :: BasePart?
+	local trim = pedestal:FindFirstChild("CollectTrim") :: BasePart?
+	local ready = owned and stored >= 0.01
+	pad.Transparency = if owned then 0 else 1
+	pad.CanCollide = owned
+	if trim then
+		trim.Transparency = if owned then 0 else 1
+		trim.CanCollide = owned
+	end
+	if glow then
+		glow.Transparency = if not owned then 1 elseif ready then PAD_GLOW_READY else PAD_GLOW_IDLE
+	end
+	local gui = (pad:FindFirstChild("Stored") or buildStoredGui(pad)) :: BillboardGui
+	gui.Enabled = owned
+	local amount = (gui:FindFirstChild("Row") :: Frame):FindFirstChild("Amount") :: TextLabel
+	amount.Text = Format.number(stored)
+	amount.TextColor3 = if ready then GOLD else GREY
+end
+
+-- Cheap per-tick update of one pedestal's waiting CE (no rebuild of the display).
+function PedestalVisuals.SetStored(plot: Model?, slot: number, stored: number)
+	local folder = plot and plot:FindFirstChild("Pedestals")
+	local pedestal = folder and folder:FindFirstChild("Pedestal" .. slot)
+	if pedestal then
+		showStored(pedestal, true, stored)
+	end
+end
+
 function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 	local folder = plot and plot:FindFirstChild("Pedestals")
 	if not folder then
@@ -334,6 +428,7 @@ function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 		end
 
 		updateInfo(top, state)
+		showStored(pedestal, state.Owned, if state.Owned then state.Stored or 0 else 0)
 		-- Read by the owner's hold-E prompt (PedestalPrompts).
 		pedestal:SetAttribute("Owned", state.Owned)
 		pedestal:SetAttribute("RelicName", if state.Owned and state.Id then (relicLook(state)) else "")
@@ -362,6 +457,11 @@ function PedestalVisuals.Reset(plot: Model?)
 			local info = top and top:FindFirstChild("Info")
 			if info and info:IsA("BillboardGui") then
 				info.Enabled = false
+			end
+			local pad = pedestal:FindFirstChild("CollectPad")
+			local stored = pad and pad:FindFirstChild("Stored")
+			if stored and stored:IsA("BillboardGui") then
+				stored.Enabled = false
 			end
 		end
 	end

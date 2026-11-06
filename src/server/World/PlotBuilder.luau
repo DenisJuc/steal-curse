@@ -36,6 +36,48 @@ local GATE_GAP = 16
 local PATH_W = 10
 local TERRACE_H = 1.0
 
+-- Collect pad on the gate side of each pedestal: the pedestal's CE piles up there and walking onto
+-- it claims the lot (PedestalService). A dark seal plate with a warm rune inlay; the trigger is an
+-- invisible box so a player touches it the moment they step on. PedestalVisuals shows the amount.
+local COLLECT_PAD_DISTANCE = 4.4
+local PAD_STONE = Color3.fromRGB(30, 26, 36)
+
+local function buildCollectPad(model: Model, at: (number, number, number) -> CFrame, x: number, z: number)
+	local pad = BuildUtil.part(model, {
+		Name = "CollectPad",
+		Size = Vector3.new(4.8, 0.24, 2.8),
+		CFrame = at(x, FLOOR_TOP + 0.12, z),
+		Material = Enum.Material.Slate,
+		Color = PAD_STONE,
+	})
+	pad.CanTouch = false
+	BuildUtil.part(model, {
+		Name = "CollectTrim",
+		Size = Vector3.new(5.2, 0.16, 3.2),
+		CFrame = at(x, FLOOR_TOP + 0.08, z),
+		Material = Enum.Material.Metal,
+		Color = Color3.fromRGB(150, 120, 70),
+	}).CanTouch = false
+	BuildUtil.decor(BuildUtil.part(model, {
+		Name = "CollectGlow",
+		Size = Vector3.new(4.0, 0.05, 2.0),
+		CFrame = at(x, FLOOR_TOP + 0.26, z),
+		Material = Enum.Material.Neon,
+		Color = WARM,
+		Transparency = 0.75,
+	}))
+	local trigger = BuildUtil.part(model, {
+		Name = "CollectTrigger",
+		Size = Vector3.new(4.8, 5, 2.8),
+		CFrame = at(x, FLOOR_TOP + 2.6, z),
+		Transparency = 1,
+		CanCollide = false,
+		CanQuery = false,
+		CastShadow = false,
+	})
+	trigger.CanTouch = true
+end
+
 local function buildPedestal(parent: Instance, at: (number, number, number) -> CFrame, slot: number)
 	local offset = Config.Plots.PedestalOffsets[slot]
 	local x, z = offset[1], offset[2]
@@ -76,6 +118,7 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 		Color = SPIRIT,
 		Transparency = 0.45,
 	}))
+	buildCollectPad(model, at, x, z - COLLECT_PAD_DISTANCE)
 	if imported then
 		local look = MapProps.build(model, "RelicPedestal", at(x, FLOOR_TOP, z))
 		if look then

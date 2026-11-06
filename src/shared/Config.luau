@@ -954,7 +954,8 @@ Config.Plots = {
 	},
 	ResonatorOffset = { 0, 28 },
 	ShowcaseOffset = { 30, 24 },
-	SpawnOffset = { 0, -28 },
+	-- Clear of the front-row collect pads (PlotBuilder), so spawning never claims one.
+	SpawnOffset = { 0, -33 },
 }
 
 Config.Hub = {

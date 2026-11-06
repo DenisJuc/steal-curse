@@ -31,6 +31,8 @@ export type Pedestal = {
 	Uid: number?,
 	Level: number,
 	Locked: boolean,
+	-- CE waiting on the pedestal's collect pad (PedestalService).
+	Stored: number?,
 }
 
 export type Data = {

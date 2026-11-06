@@ -9,6 +9,11 @@
 -- the backpack (CosmeticEquipService). On an empty pedestal it places the floating relic; on a full
 -- one while something floats, it swaps them. Floating relics are skipped by Equip Best.
 --
+-- Collect pads: a pedestal's income is not paid straight to CE. Each tick (EconomyService) splits
+-- the earned CE over the pedestals by their share and stores it on the pedestal (saved with the
+-- data, so nothing is lost on leave). The owner walks onto the pedestal's collect pad to claim it;
+-- IncomeCollected tells their client to play the coin burst. Visitors can't collect.
+--
 -- Client intents arrive on ShrineAction (action name + arguments); every argument is validated and
 -- every handler is synchronous, so rapid clicks are processed one at a time against current CE.
 
@@ -35,6 +40,7 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local ShrineAction = Remotes:WaitForChild("ShrineAction") :: RemoteEvent
 local ShrineState = Remotes:WaitForChild("ShrineState") :: RemoteEvent
 local Notify = Remotes:WaitForChild("Notify") :: RemoteEvent
+local IncomeCollected = Remotes:WaitForChild("IncomeCollected") :: RemoteEvent
 
 local PedestalService = {}
 
@@ -78,6 +84,7 @@ local function rebuild(player: Player)
 	for slot, pedestal in data.Pedestals do
 		pedestal.Level = math.clamp(math.floor(tonumber(pedestal.Level) or 1), 1, settings.PedestalMaxLevel)
 		pedestal.Locked = pedestal.Locked == true
+		pedestal.Stored = math.max(0, Economy.safeCE(tonumber(pedestal.Stored) or 0))
 		local item = pedestal.Uid and byUid[pedestal.Uid]
 		if item and not used[item.Uid] then
 			cache[slot] = item
@@ -89,7 +96,8 @@ local function rebuild(player: Player)
 	displayed[player] = cache
 end
 
-function PedestalService.Contributions(player: Player): { number }
+-- Slot -> CE/sec before the global income multiplier.
+local function contributionsBySlot(player: Player): { [number]: number }
 	local data = DataService.Get(player)
 	local cache = displayed[player]
 	local list = {}
@@ -106,8 +114,16 @@ function PedestalService.Contributions(player: Player): { number }
 			-- board-global best-rank mult is applied once in EconomyService.GetIncomeMultiplier.
 			-- Mastery is Studio Phase 3+ only (×1 live).
 			local fusion = CollectionService.FusionIncomeMult(player, item.Id)
-			table.insert(list, relicIncome(item) * multiplier(pedestal) * fusion * mastery)
+			list[slot] = relicIncome(item) * multiplier(pedestal) * fusion * mastery
 		end
+	end
+	return list
+end
+
+function PedestalService.Contributions(player: Player): { number }
+	local list = {}
+	for _, value in contributionsBySlot(player) do
+		table.insert(list, value)
 	end
 	return list
 end
@@ -143,6 +159,7 @@ function PedestalService.Snapshot(player: Player): { [string]: any }?
 				Mutation = item and item.Mutation,
 				Size = item and item.Size,
 				IncomePerSec = if item then relicIncome(item) * mult else 0,
+				Stored = pedestal.Stored or 0,
 				MaxLevel = settings.PedestalMaxLevel,
 				UpgradeCost = if pedestal.Level < settings.PedestalMaxLevel
 					then Economy.upgradeCost(settings, pedestal.Level)
@@ -179,6 +196,88 @@ function PedestalService.Refresh(player: Player)
 	-- Hunt / Shrine Charms gate on pedestal occupancy — refresh Collection attributes.
 	if BalanceTrials.collectionEnabled() then
 		GameEvents.Fire("CollectionChanged", player)
+	end
+end
+
+-- Tick income (EconomyService): split `earned` over the pedestals by their share of the income.
+function PedestalService.StoreIncome(player: Player, earned: number)
+	local data = DataService.Get(player)
+	if not data or not displayed[player] or not (earned > 0) then
+		return
+	end
+	local shares = contributionsBySlot(player)
+	local total = 0
+	for _, value in shares do
+		total += value
+	end
+	if not (total > 0) then
+		return
+	end
+	local plot = PlotService.GetPlot(player)
+	for slot, value in shares do
+		local pedestal = data.Pedestals[slot]
+		if pedestal then
+			pedestal.Stored = Economy.safeCE((pedestal.Stored or 0) + earned * value / total)
+			PedestalVisuals.SetStored(plot, slot, pedestal.Stored)
+		end
+	end
+end
+
+-- Pays a pedestal's stored CE to its owner. Returns the amount (0 when empty).
+function PedestalService.Collect(player: Player, slot: number): number
+	local data = DataService.Get(player)
+	local pedestal = data and data.Pedestals[slot]
+	if not pedestal then
+		return 0
+	end
+	local amount = pedestal.Stored or 0
+	-- Below a hundredth there is nothing worth a burst (the HUD shows two decimals at most).
+	if amount < 0.01 then
+		return 0
+	end
+	pedestal.Stored = 0
+	-- Fired before the CE changes so the client can aim the HUD coin flight from the pad.
+	IncomeCollected:FireClient(player, slot, amount)
+	EconomyService.Add(player, amount)
+	PedestalVisuals.SetStored(PlotService.GetPlot(player), slot, 0)
+	return amount
+end
+
+-- Every pad on the server, wired once: the touching character must belong to the plot's owner.
+local lastCollect: { [Player]: { [number]: number } } = {}
+local COLLECT_GAP = 0.4
+
+local function wirePlot(plot: Model)
+	local folder = plot:FindFirstChild("Pedestals")
+	if not folder or plot:GetAttribute("CollectWired") then
+		return
+	end
+	plot:SetAttribute("CollectWired", true)
+	for _, pedestal in folder:GetChildren() do
+		local slot = pedestal:GetAttribute("Slot")
+		local trigger = pedestal:FindFirstChild("CollectTrigger")
+		if type(slot) ~= "number" or not trigger or not trigger:IsA("BasePart") then
+			continue
+		end
+		trigger.Touched:Connect(function(hit: BasePart)
+			local character = hit.Parent
+			local player = character and Players:GetPlayerFromCharacter(character)
+			if not player or plot:GetAttribute("OwnerUserId") ~= player.UserId then
+				return
+			end
+			local humanoid = character:FindFirstChildOfClass("Humanoid")
+			if not humanoid or humanoid.Health <= 0 then
+				return
+			end
+			local now = os.clock()
+			local times = lastCollect[player] or {}
+			lastCollect[player] = times
+			if now - (times[slot] or -math.huge) < COLLECT_GAP then
+				return
+			end
+			times[slot] = now
+			PedestalService.Collect(player, slot)
+		end)
 	end
 end
 
@@ -586,10 +685,15 @@ end
 
 function PedestalService.Init()
 	EconomyService.SetIncomeProvider(PedestalService.Contributions)
+	EconomyService.SetIncomeStore(PedestalService.StoreIncome)
 	RemoteGuard.Event(ShrineAction, onAction, "Shrine")
 
 	DataService.OnPlayerLoaded(function(player)
 		rebuild(player)
+		local plot = PlotService.GetPlot(player)
+		if plot then
+			wirePlot(plot)
+		end
 		PedestalService.AutoEquip(player)
 		PedestalService.Refresh(player)
 	end)
@@ -598,10 +702,18 @@ function PedestalService.Init()
 		PedestalService.Refresh(player)
 	end)
 	GameEvents.On("Rebirthed", function(player: Player)
+		-- Rebirth resets CE, so CE waiting on the pads goes with it.
+		local data = DataService.Get(player)
+		if data then
+			for _, pedestal in data.Pedestals do
+				pedestal.Stored = 0
+			end
+		end
 		PedestalService.AutoEquip(player)
 		PedestalService.Refresh(player)
 	end)
-	GameEvents.On("PlotAssigned", function(player: Player)
+	GameEvents.On("PlotAssigned", function(player: Player, plot: Model)
+		wirePlot(plot)
 		PedestalService.Refresh(player)
 	end)
 	-- Buying the pass switches Auto-equip on straight away.
@@ -622,6 +734,7 @@ function PedestalService.Init()
 	Players.PlayerRemoving:Connect(function(player)
 		displayed[player] = nil
 		keptEmpty[player] = nil
+		lastCollect[player] = nil
 	end)
 end
 

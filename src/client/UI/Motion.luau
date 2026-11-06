@@ -477,6 +477,11 @@ function Motion.markCoinSource(gui: GuiObject)
 	coinSource = { At = gui.AbsolutePosition + gui.AbsoluteSize / 2, Time = os.clock() }
 end
 
+-- Same, from a screen point (e.g. a collect pad in the world).
+function Motion.markCoinSourceAt(at: Vector2)
+	coinSource = { At = at, Time = os.clock() }
+end
+
 function Motion.coinSource(screen: ScreenGui): Vector2
 	local mark = coinSource
 	coinSource = nil
