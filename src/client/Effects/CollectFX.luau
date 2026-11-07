@@ -182,7 +182,7 @@ function CollectFX.Play(slot: number, amount: number)
 	end
 	burst(pad, haul)
 	floatingAmount(pad, amount)
-	Sounds.Play("Collect", pad)
+	-- One sound only: the coin (Rosselle: two sounds per collect was too much).
 	Sounds.Play("Coin", pad, 0.9)
 end
 
