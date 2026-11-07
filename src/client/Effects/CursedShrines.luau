@@ -15,6 +15,7 @@ local HuntFX = require(script.Parent.HuntFX)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
 local Banner = require(script.Parent.Parent.UI.Banner)
+local HudUnlocks = require(script.Parent.Parent.UI.HudUnlocks)
 local Toasts = require(script.Parent.Parent.UI.Toasts)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -267,7 +268,13 @@ local function addShrine(model: Instance)
 		Charm = if charm and charm:IsA("BasePart") then charm else nil,
 	}
 	shrines[id] = shrine
+	-- Roll-only start: shrines open with Spirit Sight (HudUnlocks "Hunt"); until then the prompt
+	-- reads "Locked" and explains itself.
+	HudUnlocks.WatchPrompt(prompt, "Hunt")
 	prompt.PromptButtonHoldBegan:Connect(function()
+		if not HudUnlocks.IsUnlocked("Hunt") then
+			return
+		end
 		startHold(shrine)
 	end)
 	-- When a hold finishes, HoldEnded can fire before Triggered: a full-length hold counts as
@@ -289,6 +296,10 @@ local function addShrine(model: Instance)
 		end)
 	end)
 	prompt.Triggered:Connect(function()
+		if not HudUnlocks.IsUnlocked("Hunt") then
+			HudUnlocks.Explain("Hunt")
+			return
+		end
 		local current = hold
 		if current and current.Id == id then
 			complete(current)

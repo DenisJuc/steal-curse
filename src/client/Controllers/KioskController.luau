@@ -2,6 +2,8 @@
 -- OpensMenu attribute, the same as pressing that HUD button. The Bounty Board floats a "claim"
 -- badge while finished bounties wait: always-on-top and visible from anywhere in the hub / home
 -- ring, hidden once you enter the wild.
+-- A kiosk whose menu is still locked by the roll-only start (HudUnlocks) shows "Locked" and,
+-- when used, explains what unlocks it instead of opening.
 
 local Players = game:GetService("Players")
 local ProximityPromptService = game:GetService("ProximityPromptService")
@@ -10,6 +12,7 @@ local RunService = game:GetService("RunService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
+local HudUnlocks = require(script.Parent.Parent.UI.HudUnlocks)
 local UIKit = require(script.Parent.Parent.UI.UIKit)
 
 local KioskController = {}
@@ -159,8 +162,17 @@ local function makeBadge(prompt: ProximityPrompt)
 end
 
 local function watchPrompt(item: Instance)
-	if item:IsA("ProximityPrompt") and item:GetAttribute("OpensMenu") == "Bounties" then
+	if not item:IsA("ProximityPrompt") then
+		return
+	end
+	local menu = item:GetAttribute("OpensMenu")
+	if menu == "Bounties" then
 		makeBadge(item)
+	end
+	-- A kiosk whose menu is still locked reads "Locked / Unlocks at 50 rolls" (the opener explains).
+	local gateId = type(menu) == "string" and HudUnlocks.MenuGate[menu]
+	if gateId then
+		HudUnlocks.WatchPrompt(item, gateId)
 	end
 end
 

@@ -69,6 +69,7 @@ local LuckTag = require(script.Parent.Effects.LuckTag)
 local SealBadge = require(script.Parent.Effects.SealBadge)
 local ZoneGateView = require(script.Parent.Effects.ZoneGateView)
 local HudUnlocks = require(script.Parent.UI.HudUnlocks)
+local NextUnlockChip = require(script.Parent.UI.NextUnlockChip)
 local CursedShrines = require(script.Parent.Effects.CursedShrines)
 local ShrineCharmPulse = require(script.Parent.Effects.ShrineCharmPulse)
 local RevealController = require(script.Parent.Controllers.RevealController)
@@ -183,6 +184,11 @@ local openers = {
 	Settings = toggleOnly(settingsPanel),
 	Rebirth = toggleOnly(rebirthPanel),
 }
+-- Roll-only start: a menu still locked in HudUnlocks explains itself ("Unlocks at 50 rolls (you:
+-- 12)") instead of opening, whether from a HUD button, a hub kiosk or a shortcut.
+for menu, open in openers do
+	openers[menu] = HudUnlocks.Guard(menu, open)
+end
 local coreLoop = BalanceTrials.coreLoopPresentation()
 local hud = HUD.Start(screen, {
 	OnShrine = openers.Shrine,
@@ -261,6 +267,7 @@ MapLightLOD.Start()
 SprintController.Start(screen, rollBar.Frame)
 Onboarding.Start(screen)
 HudUnlocks.Start(screen)
+NextUnlockChip.Start(screen, rollBar.Frame)
 local afk = AfkController.Start()
 
 if RunService:IsStudio() then

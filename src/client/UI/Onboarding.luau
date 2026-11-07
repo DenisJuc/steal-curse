@@ -56,7 +56,7 @@ local STEPS: { Step } = {
 	{
 		Target = "RollButton",
 		Side = "Above",
-		Text = `Nice! Roll {ROLLS_TO_LEARN - 1} more times. Rarer relics are worth far more.`,
+		Text = `Nice! Roll {ROLLS_TO_LEARN - 1} more times. More of the shrine opens as you roll: watch the bar above ROLL.`,
 		Done = function(player)
 			return number(player, "TotalScans") >= ROLLS_TO_LEARN
 		end,
