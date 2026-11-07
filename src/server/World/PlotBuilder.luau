@@ -41,6 +41,11 @@ local TERRACE_H = 1.0
 -- invisible box so a player touches it the moment they step on. PedestalVisuals shows the amount.
 local COLLECT_PAD_DISTANCE = 4.4
 local PAD_STONE = Color3.fromRGB(30, 26, 36)
+-- Home look test (branch test/home-studs): smooth stud floor, bone path.
+local FLOOR_PURPLE = Color3.fromRGB(52, 36, 78)
+local FLOOR_STUD_TINT = Color3.fromRGB(150, 120, 200)
+local STUD_TEXTURE = "rbxassetid://7447638591"
+local PATH_BONE = Color3.fromRGB(190, 180, 165)
 
 local function buildCollectPad(model: Model, at: (number, number, number) -> CFrame, x: number, z: number)
 	local pad = BuildUtil.part(model, {
@@ -275,14 +280,23 @@ local function buildCourtyardFloor(parent: Instance, at: (number, number, number
 	local size = Config.Plots.Size
 	local half = size / 2
 
-	-- Inner limestone courtyard (Base is the thick slate pad underneath).
-	BuildUtil.part(parent, {
+	-- Inner courtyard: smooth deep purple with a soft stud texture (Base is the slate pad underneath).
+	local floor = BuildUtil.part(parent, {
 		Name = "Floor",
 		Size = Vector3.new(size - 4, 0.22, size - 4),
 		CFrame = at(0, FLOOR_TOP - 0.05, 0),
-		Material = Enum.Material.Limestone,
-		Color = STONE,
+		Material = Enum.Material.SmoothPlastic,
+		Color = FLOOR_PURPLE,
 	})
+	local studs = Instance.new("Texture")
+	studs.Name = "Studs"
+	studs.Texture = STUD_TEXTURE
+	studs.Face = Enum.NormalId.Top
+	studs.StudsPerTileU = 2
+	studs.StudsPerTileV = 2
+	studs.Transparency = 0.25
+	studs.Color3 = FLOOR_STUD_TINT
+	studs.Parent = floor
 
 	-- Dark border frame
 	local border = 2.4
@@ -308,8 +322,8 @@ local function buildCourtyardFloor(parent: Instance, at: (number, number, number
 		Name = "Path",
 		Size = Vector3.new(PATH_W, 0.14, size - 10),
 		CFrame = at(0, FLOOR_TOP + 0.08, 2),
-		Material = Enum.Material.Cobblestone,
-		Color = STONE_DARK,
+		Material = Enum.Material.SmoothPlastic,
+		Color = PATH_BONE,
 	})
 end
 
@@ -546,6 +560,21 @@ local function buildCornerLanterns(parent: Instance, at: (number, number, number
 	buildLantern(parent, at, GATE_GAP / 2 + 2, -half + 4)
 end
 
+-- Home look test: a few Creator Store props in the free corners (nothing on paths or pads).
+local HOME_PROPS = {
+	{ "HomeShrineLantern", -32, -12 },
+	{ "HomeShrineLantern", 32, -12 },
+	{ "HomeDeadTree", -33, -33 },
+	{ "HomeBlossomTree", -30, 26 },
+}
+local function buildHomeProps(parent: Instance, at: (number, number, number) -> CFrame)
+	for _, entry in HOME_PROPS do
+		if MapProps.has(entry[1]) then
+			MapProps.build(parent, entry[1], at(entry[2], FLOOR_TOP, entry[3]))
+		end
+	end
+end
+
 function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Model
 	local size = Config.Plots.Size
 	local function at(x: number, y: number, z: number): CFrame
@@ -574,6 +603,7 @@ function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Mod
 	buildResonator(model, at, FLOOR_TOP + TERRACE_H)
 	buildShowcasePodium(model, at)
 	buildCornerLanterns(model, at)
+	buildHomeProps(model, at)
 
 	local pedestals = Instance.new("Folder")
 	pedestals.Name = "Pedestals"

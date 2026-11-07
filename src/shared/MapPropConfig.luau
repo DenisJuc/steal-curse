@@ -41,6 +41,10 @@ MapPropConfig.Props = {
 	CodexLectern       = { Size = { 4, 6, 3 },    Collide = "Box",  Fallback = "Lectern" },
 	RuneMonolith       = { Size = { 5, 12, 3 },   Collide = "Box",  Fallback = "Monolith", Light = RUNE },
 	OfferingBox        = { Size = { 5, 3.6, 4 },  Collide = "Box",  Sink = -0.4, Fallback = "Box" },
+	-- Home plot look test (Creator Store, free, no scripts): see docs/HOME_PROPS.md
+	HomeShrineLantern  = { Size = { 3, 6.5, 3 },  Collide = "Box",  Fallback = "Lantern", Light = WARM },
+	HomeDeadTree       = { Size = { 14, 11, 12 }, Collide = "Box",  Collider = { 2, 11, 2 }, Fallback = "DeadTree" },
+	HomeBlossomTree    = { Size = { 12, 18, 14 }, Collide = "Box",  Collider = { 2, 18, 2 }, Fallback = "DeadTree" },
 	-- Haunted Forest
 	DeadTree1          = { Size = { 10, 22, 10 }, Collide = "Box",  Collider = { 2.4, 22, 2.4 }, Fallback = "DeadTree" },
 	DeadTree2          = { Size = { 12, 18, 12 }, Collide = "Box",  Collider = { 2.4, 18, 2.4 }, Fallback = "DeadTree" },

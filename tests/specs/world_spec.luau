@@ -204,7 +204,7 @@ return {
 				end
 				expect.truthy(prop.Collide == "Box" or prop.Collide == "None", `{id} collide mode`)
 			end
-			expect.equal(count, 36, "prop count (the Tripo list + 7 Creator Store imports)")
+			expect.equal(count, 39, "prop count (the Tripo list + 7 Creator Store imports + 3 home look-test props)")
 			for areaId, rules in WildLayout.Scatter do
 				local known = false
 				for _, area in areas do
