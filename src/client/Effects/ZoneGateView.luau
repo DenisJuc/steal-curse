@@ -212,13 +212,21 @@ function ZoneGateView.Start()
 			end
 		end
 		if not first then
+			local cells = {}
 			for cell in opened do
-				local area, band = string.match(cell, "^(.-)|(.*)$")
+				table.insert(cells, cell)
+			end
+			local gold = Color3.fromRGB(255, 215, 120)
+			if #cells == 1 then
+				local area, band = string.match(cells[1], "^(.-)|(.*)$")
 				Banner.Show(
 					"ZONE UNLOCKED",
 					`{areaNames[area :: string] or area} {BAND_NAMES[band :: string] or band} unlocked!`,
-					Color3.fromRGB(255, 215, 120)
+					gold
 				)
+			elseif #cells > 1 then
+				-- A big jump in luck opens several at once: one banner, not a queue of them.
+				Banner.Show("ZONES UNLOCKED", `{#cells} new zones of the wild are open!`, gold)
 			end
 		end
 		first = false
@@ -230,7 +238,7 @@ function ZoneGateView.Start()
 	local Blocked = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("ZoneGateBlocked") :: RemoteEvent
 	Blocked.OnClientEvent:Connect(function(info: any)
 		if type(info) == "table" and type(info.Text) == "string" then
-			local where = if type(info.Area) == "string" then `{info.Area} {BAND_NAMES[info.Band] or ""}: ` else ""
+			local where = if type(info.Area) == "string" then `{info.Area} {BAND_NAMES[info.Band] or ""} ` else ""
 			Toasts.Show(`{where}{info.Text}`, "Error")
 		end
 	end)

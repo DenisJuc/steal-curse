@@ -317,6 +317,14 @@ function Onboarding.Start(screen: ScreenGui)
 			return
 		end
 		running = true
+		-- Which features are still locked decides the steps: wait until HudUnlocks knows.
+		local waited = 0
+		while not HudUnlocks.IsReady() and waited < 20 do
+			waited += task.wait(0.25)
+		end
+		if not running then
+			return
+		end
 		activeSteps = mainSteps()
 		-- Returning to the tips skips action steps the player has already done.
 		local first = 1
@@ -404,6 +412,10 @@ function Onboarding.Start(screen: ScreenGui)
 		arrow.Position = shape.Position + push
 		local position, size = target.AbsolutePosition, target.AbsoluteSize
 		local gap = GAP + 22
+		-- Above ROLL sits the next-unlock chip: point past it, not into it.
+		if side == "Above" and string.find(target.Name, "Roll", 1, true) then
+			gap += 28
+		end
 		local point = if side == "Right"
 			then Vector2.new(position.X + size.X + gap, position.Y + size.Y / 2)
 			elseif side == "Below" then Vector2.new(position.X + size.X / 2, position.Y + size.Y + gap)

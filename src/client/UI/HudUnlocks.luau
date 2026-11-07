@@ -155,6 +155,11 @@ HudUnlocks.MenuGate = {
 	Rebirth = "Journal",
 } :: { [string]: string }
 
+-- True once the saved stats have been judged (locks are known).
+function HudUnlocks.IsReady(): boolean
+	return started
+end
+
 function HudUnlocks.IsUnlocked(gateId: string?): boolean
 	if not started or not gateId or not gateById[gateId] then
 		return true

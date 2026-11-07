@@ -18,7 +18,19 @@ local DataService = require(script.Parent.DataService)
 local GameEvents = require(script.Parent.GameEvents)
 local MultiplierService = require(script.Parent.MultiplierService)
 
-local Blocked = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("ZoneGateBlocked") :: RemoteEvent
+-- Declared in default.project.json; created here too when a live Rojo session predates it.
+local remotes = ReplicatedStorage:WaitForChild("Remotes")
+local function blockedRemote(): RemoteEvent
+	local existing = remotes:FindFirstChild("ZoneGateBlocked")
+	if existing and existing:IsA("RemoteEvent") then
+		return existing
+	end
+	local created = Instance.new("RemoteEvent")
+	created.Name = "ZoneGateBlocked"
+	created.Parent = remotes
+	return created
+end
+local Blocked = blockedRemote()
 
 local ZoneGateService = {}
 
@@ -132,7 +144,7 @@ local function check(player: Player)
 			Luck = luck,
 			Area = areaNames[area] or area,
 			Band = band,
-			Text = `Needs x{Format.number(required)} LUCK  (you: x{Format.number(luck)})`,
+			Text = `needs x{Format.number(required)} LUCK (you: x{Format.number(luck)})`,
 		})
 	end
 end
