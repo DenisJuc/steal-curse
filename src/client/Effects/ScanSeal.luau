@@ -2,6 +2,9 @@
 -- roll). Reuses the premade MeteorSpawn circle and PurpleSpikeBurst from ReplicatedStorage.VFX:
 -- the circle snaps open, pulses its waves and closes again in about 0.6 s; Rare and better add
 -- the spike burst and take the tier's color, and Huge / Titanic finds open a wider circle.
+-- Common, Uncommon and Rare (Normal size) get the light seal instead: one reused spike burst at
+-- the chest (no circle, lifetimes clipped) and a name pop over the head in the tier's colour,
+-- all gone within 0.9 s. Epic and rarer, Huge and Titanic keep the full seal above.
 -- Visual only, never delays scans or rewards. Hunt batches are skipped (SealBurst plays those).
 
 local Players = game:GetService("Players")
@@ -50,6 +53,14 @@ local CIRCLE_EMIT = { Smoke = 4, Wave0 = 3, Wave1 = 3, Wave2 = 2, Wave3 = 2 }
 local BURST_EMIT = { Main = 10, Flare = 8, Spikes = 14 }
 
 local lastPlayed = -math.huge
+
+-- Light seal (Common..Rare): one burst kept parked and re-emitted, plus a name pop.
+local LIGHT_EMIT = { Main = 5, Flare = 4, Spikes = 7 }
+local LIGHT_LIFETIME = 0.55 -- particle lifetimes are clipped to this so nothing outlives the pop
+local POP_SECONDS = 0.85
+local lightBurst: Instance? = nil
+local lightPop: BillboardGui? = nil
+local popToken = 0
 
 local function vfx(name: string): Instance?
 	local folder = ReplicatedStorage:FindFirstChild("VFX")
@@ -107,6 +118,131 @@ local function emit(root: Instance, counts: { [string]: number }, factor: number
 	end
 end
 
+-- The reused burst: cloned once, scripts stripped, lifetimes clipped, parked out of sight.
+local function getLightBurst(): Instance?
+	if lightBurst and lightBurst.Parent then
+		return lightBurst
+	end
+	local source = vfx(BURST_NAME)
+	if not source then
+		return nil
+	end
+	local burst = source:Clone()
+	arm(burst, nil)
+	for _, item in burst:GetDescendants() do
+		if item:IsA("ParticleEmitter") then
+			item.Enabled = false
+			local life = item.Lifetime
+			item.Lifetime = NumberRange.new(math.min(life.Min, LIGHT_LIFETIME), math.min(life.Max, LIGHT_LIFETIME))
+		elseif item:IsA("Beam") or item:IsA("PointLight") or item:IsA("Trail") then
+			item.Enabled = false
+		end
+	end
+	burst.Name = "ScanSealLight"
+	burst.Parent = workspace
+	lightBurst = burst
+	return burst
+end
+
+local function getPop(): BillboardGui
+	if lightPop and lightPop.Parent then
+		return lightPop
+	end
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "ScanSealPop"
+	gui.Size = UDim2.fromOffset(220, 40)
+	gui.StudsOffset = Vector3.new(0, 4.2, 0)
+	gui.LightInfluence = 0
+	gui.AlwaysOnTop = true
+	gui.Enabled = false
+	local label = Instance.new("TextLabel")
+	label.Name = "Name"
+	label.AnchorPoint = Vector2.new(0.5, 0.5)
+	label.Position = UDim2.fromScale(0.5, 0.5)
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.TextStrokeTransparency = 0
+	label.Parent = gui
+	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+	lightPop = gui
+	return gui
+end
+
+local function popName(text: string, color: Color3)
+	local character = Players.LocalPlayer.Character
+	local head = character and character:FindFirstChild("Head")
+	if not head then
+		return
+	end
+	popToken += 1
+	local token = popToken
+	local gui = getPop()
+	local label = gui:FindFirstChild("Name") :: TextLabel
+	gui.Adornee = head
+	label.Text = text
+	label.TextColor3 = color
+	label.TextStrokeColor3 = color:Lerp(Color3.new(0, 0, 0), 0.8)
+	gui.Enabled = true
+	local start = os.clock()
+	local connection: RBXScriptConnection
+	connection = RunService.RenderStepped:Connect(function()
+		local t = os.clock() - start
+		if token ~= popToken then
+			connection:Disconnect()
+			return
+		end
+		if t >= POP_SECONDS then
+			connection:Disconnect()
+			gui.Enabled = false
+			return
+		end
+		-- Punch in (0.12 s overshoot), hold, then rise and fade over the last 0.35 s.
+		local scale = if t < 0.12 then 0.4 + (t / 0.12) * 0.75 elseif t < 0.22 then 1.15 - (t - 0.12) / 0.1 * 0.15 else 1
+		local fade = math.clamp((t - (POP_SECONDS - 0.35)) / 0.35, 0, 1)
+		label.Size = UDim2.fromScale(scale, scale)
+		label.Position = UDim2.fromScale(0.5, 0.5 - fade * 0.6)
+		label.TextTransparency = fade
+		label.TextStrokeTransparency = fade
+	end)
+end
+
+-- Common, Uncommon and Rare: one quick burst plus the name pop, under 1 s, nothing to wait for.
+local function playLight(relicId: string, mutation: string?, tier: number, low: boolean)
+	local relic = RelicConfig.ById[relicId]
+	local color = tierColor(tier)
+	local name = if relic then relic.Name else relicId
+	if mutation then
+		name = `{mutation} {name}`
+	end
+	popName(name, color)
+	if low and tier < RARE then
+		return
+	end
+	local at = feet()
+	local burst = getLightBurst()
+	if not at or not burst then
+		return
+	end
+	local tint = PURPLE:Lerp(color, if tier >= RARE then 0.65 else 0.35)
+	local cf = CFrame.new(at + Vector3.new(0, CHEST_LIFT, 0))
+	if burst:IsA("Model") then
+		burst:PivotTo(cf)
+	elseif burst:IsA("BasePart") then
+		burst.CFrame = cf
+	end
+	for _, item in burst:GetDescendants() do
+		if item:IsA("ParticleEmitter") then
+			item.Color = ColorSequence.new(tint)
+		end
+	end
+	emit(burst, LIGHT_EMIT, (if tier >= RARE then 1 else 0.6) * (if low then 0.5 else 1))
+	if tier >= RARE then
+		Sounds.PlayReveal("Seal", nil, 1.1)
+	end
+end
+
 local function setBeams(root: Instance, on: boolean)
 	for _, item in root:GetDescendants() do
 		if item:IsA("Beam") or item:IsA("PointLight") then
@@ -116,14 +252,16 @@ local function setBeams(root: Instance, on: boolean)
 end
 
 -- Plays the seal for one landed find. `sizeId` is "Huge" / "Titanic" or nil.
-function ScanSeal.Play(relicId: string, sizeId: string?)
+function ScanSeal.Play(relicId: string, sizeId: string?, mutation: string?)
 	local tier = tierOf(relicId)
 	local low = Settings.LowEffects()
-	if low and tier < RARE and sizeId == nil then
-		return
-	end
 	local now = os.clock()
 	if now - lastPlayed < MIN_GAP or workspace:FindFirstChild(HUNT_FOLDER) then
+		return
+	end
+	if tier < EPIC and sizeId == nil then
+		lastPlayed = now
+		playLight(relicId, mutation, tier, low)
 		return
 	end
 	local circleSrc = vfx(CIRCLE_NAME)
@@ -234,7 +372,7 @@ function ScanSeal.Start()
 			return
 		end
 		local bestId: string? = nil
-		local bestRank, bestSize = -1, nil
+		local bestRank, bestSize, bestMutation = -1, nil, nil
 		for _, result in results do
 			if type(result) == "table" and type(result.Id) == "string" then
 				if result.Source == "Capture" then
@@ -246,11 +384,12 @@ function ScanSeal.Start()
 				if rank > bestRank then
 					bestRank, bestId = rank, result.Id
 					bestSize = if sized > 0 then sizeId else nil
+					bestMutation = if type(result.Mutation) == "string" then result.Mutation else nil
 				end
 			end
 		end
 		if bestId then
-			ScanSeal.Play(bestId, bestSize)
+			ScanSeal.Play(bestId, bestSize, bestMutation)
 		end
 	end)
 end

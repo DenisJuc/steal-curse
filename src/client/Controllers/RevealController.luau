@@ -642,7 +642,11 @@ local function onResults(results: { any }, hunt: boolean)
 			if RewardPresentation.isOrdinaryDupe(result, tier) then
 				continue
 			end
-			-- One soft projection per batch for notable Small finds (e.g. Rare).
+			-- Common..Rare (Normal size) get ScanSeal's light seal (burst + name pop) instead.
+			if index < MEDIUM_INDEX and not sizeId then
+				continue
+			end
+			-- One soft projection per batch for notable Small finds (Epic repeats).
 			if smallShown == 0 and os.clock() >= holdUntil then
 				RelicProjection.Spawn(result.Id, result.Mutation, "Small", Config.Reveal.SmallSeconds, low, sizeId)
 				Sounds.PlayReveal("RevealSmall")
