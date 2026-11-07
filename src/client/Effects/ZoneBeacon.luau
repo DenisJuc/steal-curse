@@ -2,11 +2,13 @@
 --   a tall beam of the event's colour over its area, seen from anywhere (also over the town veil),
 --   a warning toast and chat line a minute before, a banner when it starts and a line when it ends.
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TextChatService = game:GetService("TextChatService")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local ZoneGates = require(ReplicatedStorage.Shared.ZoneGates)
 local Format = require(ReplicatedStorage.Shared.Format)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local Sounds = require(script.Parent.Parent.Sounds)
@@ -108,6 +110,25 @@ local function buildBeam(event: Event): Part?
 	return part
 end
 
+-- " (locked for you: needs x25 LUCK)" when the player's zone gates keep them out of the whole
+-- area (its Edge is locked), else "".
+local function lockedNote(areaId: string): string
+	local luck = Players.LocalPlayer:GetAttribute("GateLuck")
+	if type(luck) ~= "number" then
+		return ""
+	end
+	local ctx: ZoneGates.Context = {
+		Areas = Config.Areas,
+		World = Config.World,
+		Bands = Config.HuntStreak,
+		Gates = Config.ZoneGates,
+	}
+	if ZoneGates.allowedCell(ctx, luck, areaId, "Edge") then
+		return ""
+	end
+	return ` (locked for you: needs x{Format.number(ZoneGates.required(ctx, areaId, "Edge"))} LUCK)`
+end
+
 function ZoneBeacon.Start()
 	local beam: Part? = nil
 	local shownId: string? = nil
@@ -135,8 +156,13 @@ function ZoneBeacon.Start()
 		local area = areaOf(event.Area)
 		local where = if area then area.Name else event.Area
 		local color = rgb(event.Color)
-		Banner.Show(string.upper(event.Name), `{where}: {event.Effect} for {Format.duration(Config.ZoneEvents.Duration)}`, color, 2)
-		chat(`{event.Name} over the {where}! {event.Effect} on captures there.`, color)
+		local locked = lockedNote(event.Area)
+		if locked ~= "" then
+			Banner.Show(string.upper(event.Name), `{where}{locked}`, color, 2)
+		else
+			Banner.Show(string.upper(event.Name), `{where}: {event.Effect} for {Format.duration(Config.ZoneEvents.Duration)}`, color, 2)
+		end
+		chat(`{event.Name} over the {where}! {event.Effect} on captures there.{locked}`, color)
 		Sounds.Play("EventStart")
 	end
 
@@ -149,7 +175,7 @@ function ZoneBeacon.Start()
 		warnedId = event.Id
 		local area = areaOf(event.Area)
 		local where = if area then area.Name else event.Area
-		local text = `A {event.Name} gathers over the {where} in {Format.duration(Config.ZoneEvents.Warning)}...`
+		local text = `A {event.Name} gathers over the {where} in {Format.duration(Config.ZoneEvents.Warning)}...{lockedNote(event.Area)}`
 		Toasts.Show(text, "Debug")
 		chat(text, rgb(event.Color))
 	end

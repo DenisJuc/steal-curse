@@ -62,7 +62,7 @@ local STEPS: { Step } = {
 	{
 		Target = "RollButton",
 		Side = "Above",
-		Text = `Nice! Roll {ROLLS_TO_LEARN - 1} more times. More of the shrine opens as you roll: watch the bar above ROLL.`,
+		Text = `Nice! Roll {ROLLS_TO_LEARN - 1} more times. The bar above ROLL shows what opens next.`,
 		Done = function(player)
 			return number(player, "TotalScans") >= ROLLS_TO_LEARN
 		end,

@@ -78,7 +78,8 @@ local function sign(at: Vector3, border: ZoneGates.Border, parent: Instance)
 	anchor.CanTouch = false
 	anchor.Transparency = 1
 	anchor.Size = Vector3.new(1, 1, 1)
-	anchor.CFrame = CFrame.new(at + Vector3.new(0, 7, 0))
+	-- Well above head height so it reads over characters and the HUD bubble.
+	anchor.CFrame = CFrame.new(at + Vector3.new(0, 12, 0))
 	local gui = Instance.new("BillboardGui")
 	gui.Size = UDim2.fromOffset(280, 90)
 	gui.MaxDistance = 140
@@ -112,8 +113,8 @@ local function sign(at: Vector3, border: ZoneGates.Border, parent: Instance)
 	post.CanTouch = false
 	post.Material = Enum.Material.Neon
 	post.Color = LINE_COLOR
-	post.Size = Vector3.new(0.5, 5, 0.5)
-	post.CFrame = CFrame.new(at + Vector3.new(0, 2.5, 0))
+	post.Size = Vector3.new(0.5, 9, 0.5)
+	post.CFrame = CFrame.new(at + Vector3.new(0, 4.5, 0))
 	post.Parent = parent
 	anchor.Parent = parent
 end
