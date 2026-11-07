@@ -1,9 +1,12 @@
 -- First-run tutorial (GDD 15.1 onboarding), in the style of the big RNG games: each step points
 -- an arrow at one thing and waits until the player has actually done it (press ROLL, turn on
 -- Auto Roll, open the Backpack, Equip Best, open Pedestals, buy an upgrade), then a few short
--- tips with a Next button. Shown while the "Hints" setting is On; finishing or skipping turns it
--- Off (saved), and turning it back On in Settings replays it. New players start with Auto Roll
--- off (DataTemplate), so the first rolls are theirs.
+-- tips with a Next button. Shown while the "Hints" setting is On. It only covers what a new player
+-- has (ROLL, Auto Roll, Backpack, Upgrades): steps for a feature still locked by the roll-only start
+-- (Gate = a HudUnlocks gate) wait until that feature unlocks at its milestone, then show once
+-- right after its unlock banner. Finishing sets Hints to "Unlocks" (those later tips still come);
+-- Skip sets it Off (only the banners). Turning it back On in Settings replays it. New players
+-- start with Auto Roll off (DataTemplate), so the first rolls are theirs.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,6 +14,7 @@ local RunService = game:GetService("RunService")
 
 local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Settings = require(script.Parent.Parent.Settings)
+local HudUnlocks = require(script.Parent.HudUnlocks)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
@@ -28,6 +32,8 @@ type Step = {
 	Done: ((Player) -> boolean)?,
 	Fallback: { Target: string, Side: Side, Text: string }?,
 	Skip: boolean?,
+	-- HudUnlocks gate: shown only once this feature is unlocked (at its unlock, or in a replay).
+	Gate: string?,
 }
 
 local STEP_SECONDS = 9
@@ -88,6 +94,7 @@ local STEPS: { Step } = {
 	},
 	{
 		Target = "ShrineButton",
+		Gate = "Pedestals",
 		Side = "Right",
 		Text = "Your relics earn Cursed Energy (CE). Open Pedestals to spend it.",
 		Done = function(player)
@@ -98,6 +105,7 @@ local STEPS: { Step } = {
 	},
 	{
 		Target = "ShrineMenu/Upgrade",
+		Gate = "Pedestals",
 		Side = "Below",
 		Text = "Upgrade a pedestal: it earns more CE every second. Save up if you can't afford it yet.",
 		Done = function()
@@ -117,22 +125,26 @@ local STEPS: { Step } = {
 	},
 	{
 		Target = "GiftButton",
+		Gate = "Gifts",
 		Side = "Left",
 		Text = "Free gifts unlock while you play, even when you're AFK. Claim them here.",
 	},
 	{
 		Target = "CodexButton",
+		Gate = "Codex",
 		Side = "Right",
 		Text = "The Codex tracks every relic you find. Milestones give permanent Luck and income.",
 	},
 	{
 		Target = "CollectionButton",
+		Gate = "Codex",
 		Side = "Right",
 		Text = "Fusion: collect 3 copies of one relic, open Collection, tap it, and Fuse.",
 		Skip = BalanceTrials.coreLoopPresentation(),
 	},
 	{
 		Target = "SpiritSight",
+		Gate = "Hunt",
 		Side = "Left",
 		Text = "Spirit Sight lets you hunt your own signals in the wild. Each bind gives a relic plus bonus finds.",
 	},
@@ -155,12 +167,19 @@ local ARROWS: { [Side]: { Text: string, Anchor: Vector2, Position: UDim2 } } = {
 function Onboarding.Start(screen: ScreenGui)
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
-	local activeSteps = {}
-	for _, step in STEPS do
-		if not step.Skip then
-			table.insert(activeSteps, step)
+	local activeSteps: { Step } = {}
+	-- Steps for features unlocked from here on wait their turn (one tip at a time).
+	local waitingTips: { Step } = {}
+	local function mainSteps(): { Step }
+		local list = {}
+		for _, step in STEPS do
+			if not step.Skip and (not step.Gate or HudUnlocks.IsUnlocked(step.Gate)) then
+				table.insert(list, step)
+			end
 		end
+		return list
 	end
+	activeSteps = mainSteps()
 
 	local bubble = UIKit.create("Frame", {
 		Name = "HintBubble",
@@ -224,10 +243,22 @@ function Onboarding.Start(screen: ScreenGui)
 	local token = 0
 	local running = false
 
+	local startTips: () -> ()
+	-- Done with the steps: the tutorial leaves unlock tips on; tips just wait for the next unlock.
 	local function finish()
 		running = false
 		token += 1
 		bubble.Visible = false
+		player:SetAttribute("TutorialTarget", nil)
+		if Settings.Get("Hints") == "On" then
+			Settings.Set("Hints", "Unlocks")
+		end
+		task.defer(startTips)
+	end
+	-- Skip: no more tutorial or tips (the unlock banners still play).
+	local function skip()
+		table.clear(waitingTips)
+		finish()
 		Settings.Set("Hints", "Off")
 	end
 
@@ -249,7 +280,7 @@ function Onboarding.Start(screen: ScreenGui)
 		Size = UDim2.fromOffset(64, 28),
 		ZIndex = 26,
 		Parent = bubble,
-	}, finish)
+	}, skip)
 	UIKit.skinButton(skipButton, "Dark")
 
 	local showStep: (number) -> ()
@@ -286,6 +317,7 @@ function Onboarding.Start(screen: ScreenGui)
 			return
 		end
 		running = true
+		activeSteps = mainSteps()
 		-- Returning to the tips skips action steps the player has already done.
 		local first = 1
 		while first <= #activeSteps and activeSteps[first].Done and (activeSteps[first].Done :: any)(player) do
@@ -391,6 +423,30 @@ function Onboarding.Start(screen: ScreenGui)
 		bubble.Visible = true
 	end)
 
+	-- Unlock tips: shown one feature at a time, after the main tutorial, only while Hints is not Off.
+	function startTips()
+		if running or #waitingTips == 0 or Settings.Get("Hints") == "Off" then
+			return
+		end
+		running = true
+		activeSteps = table.clone(waitingTips)
+		table.clear(waitingTips)
+		showStep(1)
+	end
+	HudUnlocks.Unlocked:Connect(function(gateId: string, announced: boolean)
+		-- Join-time and "everything unlocked" opens are silent: veterans get no tips.
+		if not announced or Settings.Get("Hints") == "Off" then
+			return
+		end
+		for _, step in STEPS do
+			if step.Gate == gateId and not step.Skip then
+				table.insert(waitingTips, step)
+			end
+		end
+		-- After the unlock banner has had its moment; during the tutorial they follow its last step.
+		task.delay(2.5, startTips)
+	end)
+
 	-- Wait for the saved value before deciding, so returning players never see a flash of tips.
 	task.spawn(function()
 		local waited = 0
@@ -400,7 +456,7 @@ function Onboarding.Start(screen: ScreenGui)
 		Settings.Watch("Hints", function(value)
 			if value == "On" then
 				begin()
-			elseif running then
+			elseif value == "Off" and running then
 				running = false
 				bubble.Visible = false
 			end

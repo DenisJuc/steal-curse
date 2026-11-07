@@ -26,6 +26,9 @@ local unlockedState: { [string]: boolean } = {}
 local latest = { Scans = 0, Discovered = 0, CoreLuck = 0 }
 local changedEvent = Instance.new("BindableEvent")
 HudUnlocks.Changed = changedEvent.Event
+-- (gateId, announced): announced = opened by its milestone now (not on join / unlock-all).
+local unlockedEvent = Instance.new("BindableEvent")
+HudUnlocks.Unlocked = unlockedEvent.Event
 
 -- Everything unlocks at this many lifetime rolls (~5 minutes of Auto Roll at 4 s a roll).
 local ALL_SCANS = 75
@@ -324,6 +327,7 @@ function HudUnlocks.Start(screen: ScreenGui)
 		if announce then
 			Banner.Show(gate.Title, gate.Text, BANNER_COLOR)
 		end
+		unlockedEvent:Fire(gate.Id, announce)
 	end
 
 	local ready = false

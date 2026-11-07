@@ -79,4 +79,14 @@ return {
 			expect.equal(report.BestMutated and report.BestMutated.Mutation, "Golden", "best mutated")
 		end,
 	},
+	{
+		Name = "Hints: Unlocks (shown as Tips) is valid; old On/Off saves stay valid",
+		Run = function()
+			expect.equal(ClientSettings.sanitize("Hints", "Unlocks"), "Unlocks", "unlock tips")
+			expect.equal(ClientSettings.sanitize("Hints", "On"), "On", "on")
+			expect.equal(ClientSettings.sanitize("Hints", "Off"), "Off", "off")
+			expect.equal(ClientSettings.display("Hints", "Unlocks"), "Tips", "label")
+			expect.equal(ClientSettings.defaults().Hints, "On", "new players get the tutorial")
+		end,
+	},
 }

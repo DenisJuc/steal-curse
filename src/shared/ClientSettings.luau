@@ -99,8 +99,10 @@ ClientSettings.Schema = {
 	{
 		Key = "Hints",
 		Label = "Beginner hints",
-		Help = "Turn on to replay the first-minute tips.",
-		Options = { "On", "Off" },
+		-- On: the first-minute tutorial (replays when turned on). Unlocks ("Tips"): after it, one
+		-- pointer when each feature unlocks. Off: nothing (Skip sets this).
+		Help = "On replays the first-minute tips. Tips points out each new feature as it unlocks.",
+		Options = { "On", "Unlocks", "Off" },
 		Default = "On",
 	},
 } :: { Setting }
@@ -185,6 +187,9 @@ end
 function ClientSettings.display(key: string, value: Value): string
 	if key == "Sound" then
 		return `{value}%`
+	end
+	if key == "Hints" and value == "Unlocks" then
+		return "Tips"
 	end
 	return tostring(value)
 end
