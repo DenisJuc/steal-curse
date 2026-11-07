@@ -145,7 +145,7 @@ local function getLightBurst(): Instance?
 end
 
 local function getPop(): BillboardGui
-	if lightPop and lightPop.Parent then
+	if lightPop then
 		return lightPop
 	end
 	local gui = Instance.new("BillboardGui")
@@ -153,7 +153,7 @@ local function getPop(): BillboardGui
 	gui.Size = UDim2.fromOffset(220, 40)
 	gui.StudsOffset = Vector3.new(0, 4.2, 0)
 	gui.LightInfluence = 0
-	gui.AlwaysOnTop = true
+	gui.AlwaysOnTop = false
 	gui.Enabled = false
 	local label = Instance.new("TextLabel")
 	label.Name = "Name"
@@ -165,7 +165,6 @@ local function getPop(): BillboardGui
 	label.TextScaled = true
 	label.TextStrokeTransparency = 0
 	label.Parent = gui
-	gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
 	lightPop = gui
 	return gui
 end
@@ -180,6 +179,14 @@ local function popName(text: string, color: Color3)
 	local token = popToken
 	local gui = getPop()
 	local label = gui:FindFirstChild("Name") :: TextLabel
+	-- Made on this client only, so nobody else sees it; it lives on the head (a new head gets a new one).
+	if gui.Parent ~= head then
+		gui:Destroy()
+		lightPop = nil
+		gui = getPop()
+		label = gui:FindFirstChild("Name") :: TextLabel
+		gui.Parent = head
+	end
 	gui.Adornee = head
 	label.Text = text
 	label.TextColor3 = color
