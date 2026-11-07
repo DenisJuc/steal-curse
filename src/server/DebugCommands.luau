@@ -16,6 +16,7 @@
 --   /forceroll <tier|relicId> [mutation]   grant an exact relic, e.g. /forceroll cosmic abyssal
 --   /simroll [count]   simulate rolls with your current context and compare with the math (Output)
 --   /setluck <x>       extra debug luck multiplier; /setluck reset
+--   /setlastingluck <x>   pretend this Lasting Luck (seal ladder + zone gates); /setlastingluck reset
 --   /luckrank <n>      set Core Luck rank 0..100
 --   /skill <node> <n>  set any skill rank, e.g. /skill mutationresonance 3
 --   /grantshowcase <id|all>          unlock a Showcase (level 1), e.g. /grantshowcase crimsonthrone
@@ -346,6 +347,21 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				RollService.SetDebugLuck(player, value)
 			end
 			reply(player, describeLuck(player))
+		end,
+
+		setlastingluck = function(player, args)
+			local argument = args[1]
+			if argument == "reset" then
+				MultiplierService.SetLastingOverride(player, nil)
+			else
+				local value = tonumber(argument)
+				if not value or value < 1 then
+					reply(player, "Usage: /setlastingluck <x at least 1> or /setlastingluck reset")
+					return
+				end
+				MultiplierService.SetLastingOverride(player, value)
+			end
+			reply(player, `Lasting Luck x{Format.number(MultiplierService.GetLasting(player))}`)
 		end,
 
 		luckrank = function(player, args)

@@ -5,6 +5,10 @@
 --   "Additive" kinds (Income): total = 1 + sum of every source bonus (GDD 6.2: global income
 --   bonuses add together, then apply once, so they can't compound by accident).
 
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
 local GameEvents = require(script.Parent.GameEvents)
 
 local MultiplierService = {}
@@ -56,10 +60,41 @@ function MultiplierService.Breakdown(player: Player, kind: string): { { Name: st
 	return list
 end
 
+-- Lasting Luck (Config.LastingLuck): the product of the permanent Luck sources only. Derived, never
+-- saved; mirrored as the "LastingLuck" attribute. A Studio debug override replaces it.
+local lastingOverride: { [Player]: number } = {}
+
+function MultiplierService.GetLasting(player: Player): number
+	local override = lastingOverride[player]
+	if override then
+		return override
+	end
+	local total = 1
+	for _, source in sources.Luck or {} do
+		if Config.LastingLuck.Sources[source.Name] then
+			total *= source.Get(player)
+		end
+	end
+	return total
+end
+
+-- Debug: pretend this Lasting Luck (nil clears it).
+function MultiplierService.SetLastingOverride(player: Player, value: number?)
+	lastingOverride[player] = value
+	MultiplierService.Refresh(player)
+end
+
+Players.PlayerRemoving:Connect(function(player)
+	lastingOverride[player] = nil
+end)
+
 -- Call after anything that changes a source value (skill rank, debug override...).
 function MultiplierService.Refresh(player: Player)
 	for kind in modes do
 		player:SetAttribute(`{kind}Multiplier`, MultiplierService.Get(player, kind))
+	end
+	if modes.Luck then
+		player:SetAttribute("LastingLuck", MultiplierService.GetLasting(player))
 	end
 	GameEvents.Fire("MultipliersChanged", player)
 end

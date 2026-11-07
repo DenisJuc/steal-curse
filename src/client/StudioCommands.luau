@@ -46,6 +46,7 @@ local HELP = {
 	"/forceroll &lt;tier|relicId&gt; [mutation] - e.g. /forceroll cosmic abyssal",
 	"/simroll [count] - simulate rolls with your current settings (no relics granted)",
 	"/setluck &lt;x&gt; - extra luck multiplier, e.g. /setluck 1e10; /setluck reset",
+	"/setlastingluck &lt;x&gt; - pretend Lasting Luck (seals + zone gates); /setlastingluck reset",
 	"/luckrank &lt;0-100&gt; - set your Core Luck rank",
 	"/skill &lt;node&gt; &lt;rank&gt; - set any skill rank, e.g. /skill scanspeed 12",
 	"/grantshowcase &lt;id|all&gt; - unlock a Showcase, e.g. /grantshowcase crimsonthrone",

@@ -975,4 +975,51 @@ Config.Hub = {
 	},
 }
 
+-- Lasting Luck: the luck multiplier from permanent sources only (MultiplierService source names).
+-- Potions, zone events, Server Luck, Lightning Luck, friends and debug luck are left out. It is
+-- derived (never saved) and mirrored as the "LastingLuck" attribute. It drives the Seal ladder and
+-- the zone luck gates. Approved for playtest 2026-11-07; tune after playtest.
+Config.LastingLuck = {
+	Sources = { CoreLuck = true, Rebirth = true, Pass = true, Codex = true, Showcase = true },
+}
+
+-- Seal ladder (cosmetic only): a rank by Lasting Luck, shown in the luck tag and as a seal disc on
+-- the character's back. Color {r,g,b}; Glow 0..1 (Neon + light); Particle = one subtle emitter.
+Config.SealLadder = {
+	{ Name = "Paper Charm", Luck = 1, Color = { 235, 228, 210 }, Glow = 0 },
+	{ Name = "Ink Seal", Luck = 3, Color = { 30, 28, 34 }, Glow = 0 },
+	{ Name = "Rope Seal", Luck = 5, Color = { 196, 160, 110 }, Glow = 0 },
+	{ Name = "Iron Seal", Luck = 10, Color = { 120, 124, 132 }, Glow = 0.1 },
+	{ Name = "Bronze Seal", Luck = 15, Color = { 205, 127, 50 }, Glow = 0.2 },
+	{ Name = "Jade Seal", Luck = 25, Color = { 80, 200, 130 }, Glow = 0.35 },
+	{ Name = "Silver Seal", Luck = 40, Color = { 215, 225, 240 }, Glow = 0.45 },
+	{ Name = "Gold Seal", Luck = 75, Color = { 255, 205, 70 }, Glow = 0.6 },
+	{ Name = "Spirit Seal", Luck = 120, Color = { 110, 190, 255 }, Glow = 0.75, Particle = true },
+	{ Name = "Blood Seal", Luck = 200, Color = { 220, 40, 50 }, Glow = 0.85, Particle = true },
+	{ Name = "Void Seal", Luck = 350, Color = { 120, 50, 200 }, Glow = 0.9, Particle = true },
+	{ Name = "Eternal Seal", Luck = 600, Color = { 255, 245, 200 }, Glow = 1, Particle = true },
+}
+
+-- Zone luck gates: Lasting Luck needed for each (area, depth band). Bands use
+-- Config.HuntStreak.EdgeUntil/DeepUntil; the town is always open. The server pushes a player out
+-- of a locked cell to the nearest open spot; the client draws a seal line and sign on locked
+-- borders. Approved for playtest 2026-11-07; tune after playtest.
+Config.ZoneGates = {
+	Enabled = true,
+	Required = {
+		HauntedForest = { Edge = 1, Deep = 3, Heart = 10 },
+		AbandonedVillage = { Edge = 5, Deep = 15, Heart = 40 },
+		AncientRuins = { Edge = 25, Deep = 75, Heart = 200 },
+	},
+	-- How far inside the open cell a pushed player lands, and how often the server checks.
+	PushInside = 4,
+	CheckSeconds = 0.25,
+	-- Pushed farther than this (spawned/teleported inside a locked cell): sent to the Forest Edge
+	-- entrance instead of the nearest spot.
+	StuckDistance = 120,
+	-- Seconds between "Needs xN LUCK" messages for one player.
+	MessageGap = 2.5,
+	LineColor = { 255, 90, 110 },
+}
+
 return Config
