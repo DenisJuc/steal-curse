@@ -15,6 +15,9 @@ local LuckTag = {}
 
 local NAME = "LuckTag"
 local WIDTH, HEIGHT = 170, 34
+-- The gui is taller than the tag: the "+x" pop rises in the room above (a BillboardGui clips).
+local GUI_HEIGHT = 84
+local BASE_LIFT = (GUI_HEIGHT - HEIGHT) / 2 / GUI_HEIGHT -- keeps the tag where a 34 px gui would be
 local TITLE_HEIGHT = 22 -- PlayerTitles label height, so the tag can sit above it
 local MAX_DISTANCE = 80
 local COLOR = Color3.fromRGB(120, 255, 150)
@@ -29,10 +32,17 @@ local function luckOf(player: Player): number?
 	return if type(value) == "number" and value == value then value else nil
 end
 
+-- The pop's bottom edge sits on the tag's top edge and rises from there.
+local POP_START = UDim2.new(0.5, 0, 1, -HEIGHT)
+local function popSize(scale: number): UDim2
+	return UDim2.new(0.7 * scale, 0, 0, 30 * scale)
+end
+
 local function make(head: BasePart): Entry
 	local gui = Instance.new("BillboardGui")
 	gui.Name = NAME
-	gui.Size = UDim2.fromOffset(WIDTH, HEIGHT)
+	gui.Size = UDim2.fromOffset(WIDTH, GUI_HEIGHT)
+	gui.SizeOffset = Vector2.new(0, BASE_LIFT)
 	gui.StudsOffset = Vector3.new(0, 2.6, 0)
 	gui.MaxDistance = MAX_DISTANCE
 	gui.LightInfluence = 0
@@ -42,8 +52,8 @@ local function make(head: BasePart): Entry
 	local label = Instance.new("TextLabel")
 	label.Name = "Luck"
 	label.AnchorPoint = Vector2.new(0.5, 0.5)
-	label.Position = UDim2.fromScale(0.5, 0.5)
-	label.Size = UDim2.fromScale(1, 1)
+	label.Position = UDim2.new(0.5, 0, 1, -HEIGHT / 2)
+	label.Size = UDim2.new(1, 0, 0, HEIGHT)
 	label.BackgroundTransparency = 1
 	label.Font = Enum.Font.FredokaOne
 	label.TextScaled = true
@@ -54,8 +64,8 @@ local function make(head: BasePart): Entry
 	local pop = Instance.new("TextLabel")
 	pop.Name = "Gain"
 	pop.AnchorPoint = Vector2.new(0.5, 1)
-	pop.Position = UDim2.fromScale(0.5, 0)
-	pop.Size = UDim2.fromScale(0.7, 0.8)
+	pop.Position = POP_START
+	pop.Size = popSize(0.8)
 	pop.BackgroundTransparency = 1
 	pop.Font = Enum.Font.FredokaOne
 	pop.TextScaled = true
@@ -74,24 +84,24 @@ local function popGain(entry: Entry, gain: number)
 	local token = entry.PopToken
 	local pop = entry.Pop
 	pop.Text = `+x{Format.number(gain)}`
-	pop.Position = UDim2.fromScale(0.5, 0)
-	pop.Size = UDim2.fromScale(0.35, 0.4)
+	pop.Position = POP_START
+	pop.Size = popSize(0.4)
 	pop.TextTransparency = 0
 	pop.TextStrokeTransparency = 0
 	-- Scale punch: overshoot fast, settle, then rise and fade; 0.6 s in all.
 	TweenService:Create(pop, TweenInfo.new(0.12, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Size = UDim2.fromScale(0.85, 0.95),
+		Size = popSize(1.15),
 	}):Play()
 	local label = entry.Label
-	label.Size = UDim2.fromScale(1.15, 1.15)
+	label.Size = UDim2.new(1.15, 0, 0, HEIGHT * 1.15)
 	TweenService:Create(label, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = UDim2.fromScale(1, 1),
+		Size = UDim2.new(1, 0, 0, HEIGHT),
 	}):Play()
 	task.delay(0.12, function()
 		if entry.PopToken ~= token then
 			return
 		end
-		TweenService:Create(pop, TweenInfo.new(0.1), { Size = UDim2.fromScale(0.7, 0.8) }):Play()
+		TweenService:Create(pop, TweenInfo.new(0.1), { Size = popSize(1) }):Play()
 	end)
 	task.delay(0.3, function()
 		if entry.PopToken ~= token then
@@ -99,7 +109,7 @@ local function popGain(entry: Entry, gain: number)
 		end
 		local fade = TweenInfo.new(POP_SECONDS - 0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 		TweenService:Create(pop, fade, {
-			Position = UDim2.fromScale(0.5, -0.6),
+			Position = UDim2.new(0.5, 0, 0, 30),
 			TextTransparency = 1,
 			TextStrokeTransparency = 1,
 		}):Play()
@@ -142,7 +152,8 @@ function LuckTag.Start()
 			assert(entry, "luck tag entry")
 			-- Above the earned title when there is one (both centre 2.6 studs over the head).
 			local title = player:GetAttribute("Title")
-			local lift = if type(title) == "string" and title ~= "" then (HEIGHT + TITLE_HEIGHT) / 2 / HEIGHT else 0
+			local lift = BASE_LIFT
+				+ (if type(title) == "string" and title ~= "" then (HEIGHT + TITLE_HEIGHT) / 2 / GUI_HEIGHT else 0)
 			if entry.Gui.SizeOffset.Y ~= lift then
 				entry.Gui.SizeOffset = Vector2.new(0, lift)
 			end
