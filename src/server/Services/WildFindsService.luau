@@ -157,7 +157,7 @@ function WildFindsService.Strike(player: Player, at: Vector3?): Vector3?
 	local cfg = Config.WildFinds.Strike
 	local ground = at
 	if not ground then
-		local point = SignalService.RandomPoint(position, cfg.Distance[1], cfg.Distance[2], state.Rng)
+		local point = SignalService.RandomPoint(position, cfg.Distance[1], cfg.Distance[2], state.Rng, player)
 		ground = point and point.Position
 	end
 	if not ground then
@@ -186,7 +186,7 @@ function WildFindsService.SpawnOffering(player: Player, at: Vector3?): Vector3?
 	local cfg = Config.WildFinds.Offering
 	local ground = at
 	if not ground then
-		local point = SignalService.RandomPoint(position, cfg.Distance[1], cfg.Distance[2], state.Rng)
+		local point = SignalService.RandomPoint(position, cfg.Distance[1], cfg.Distance[2], state.Rng, player)
 		ground = point and point.Position
 	end
 	if not ground then
@@ -256,10 +256,10 @@ local function showLostOne(player: Player, lost: LostOne)
 end
 
 -- A spot `range` studs from `from`, preferring ones farther from the player (it leads you on).
-local function leadOn(state: State, from: Vector3, player: Vector3, range: { number }): Vector3?
+local function leadOn(owner: Player, state: State, from: Vector3, player: Vector3, range: { number }): Vector3?
 	local best, bestDistance = nil, -1
 	for _ = 1, 6 do
-		local point = SignalService.RandomPoint(from, range[1], range[2], state.Rng)
+		local point = SignalService.RandomPoint(from, range[1], range[2], state.Rng, owner)
 		if point then
 			local distance = flatDistance(point.Position, player)
 			if distance > bestDistance then
@@ -281,7 +281,7 @@ function WildFindsService.SpawnLostOne(player: Player, options: LostOneOptions?)
 		return nil
 	end
 	local cfg = Config.WildFinds.LostOne
-	local point = SignalService.RandomPoint(position, cfg.StartDistance[1], cfg.StartDistance[2], state.Rng)
+	local point = SignalService.RandomPoint(position, cfg.StartDistance[1], cfg.StartDistance[2], state.Rng, player)
 	if not point then
 		return nil
 	end
@@ -322,7 +322,7 @@ local function stepLostOne(player: Player, state: State, position: Vector3)
 		return
 	end
 	if lost.Blinks < cfg.Hops then
-		local spot = leadOn(state, lost.Position, position, cfg.HopDistance)
+		local spot = leadOn(player, state, lost.Position, position, cfg.HopDistance)
 		if not spot then
 			endLostOne(player, state, "Left")
 			return

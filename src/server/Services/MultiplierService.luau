@@ -84,6 +84,10 @@ function MultiplierService.SetLastingOverride(player: Player, value: number?)
 	MultiplierService.Refresh(player)
 end
 
+function MultiplierService.HasLastingOverride(player: Player): boolean
+	return lastingOverride[player] ~= nil
+end
+
 Players.PlayerRemoving:Connect(function(player)
 	lastingOverride[player] = nil
 end)

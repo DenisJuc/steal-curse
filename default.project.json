@@ -27,6 +27,9 @@
         "SignalsUpdated": {
           "$className": "RemoteEvent"
         },
+        "ZoneGateBlocked": {
+          "$className": "RemoteEvent"
+        },
         "BeginBind": {
           "$className": "RemoteEvent"
         },

@@ -13,6 +13,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local SpiritTypes = require(ReplicatedStorage.Shared.SpiritTypes)
 local DataService = require(script.Parent.DataService)
+local ZoneGateService = require(script.Parent.ZoneGateService)
 
 local SignalsUpdated = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("SignalsUpdated") :: RemoteEvent
 
@@ -109,10 +110,12 @@ end
 
 local function anchorOf(player: Player): Vector3
 	local position = rootPosition(player) or homePosition(player)
-	if WorldLayout.inWild(Config.World, position.X, position.Z) then
-		return Vector3.new(position.X, 0, position.Z)
+	local x, z = position.X, position.Z
+	if not WorldLayout.inWild(Config.World, x, z) then
+		x, z = WorldLayout.wildEntry(Config.World, x, z, Config.Travel.WildDepth)
 	end
-	local x, z = WorldLayout.wildEntry(Config.World, position.X, position.Z, Config.Travel.WildDepth)
+	-- Zone gates: gather signals in the nearest wild cell this player may enter.
+	x, z = ZoneGateService.OpenWildNear(player, x, z)
 	return Vector3.new(x, 0, z)
 end
 
@@ -120,7 +123,7 @@ local function flatDistance(a: Vector3, b: Vector3): number
 	return Vector2.new(a.X - b.X, a.Z - b.Z).Magnitude
 end
 
-local function pickPosition(state: State, anchor: Vector3): Vector3?
+local function pickPosition(player: Player, state: State, anchor: Vector3): Vector3?
 	local hover = Vector3.new(0, Config.Signals.HoverHeight, 0)
 	local signals = Config.Signals
 	local spaced, inBand = {}, {}
@@ -128,6 +131,9 @@ local function pickPosition(state: State, anchor: Vector3): Vector3?
 	for _, point in spawnPoints do
 		local distance = flatDistance(point.Position, anchor)
 		if distance > signals.NearMax * 2 then
+			continue
+		end
+		if not ZoneGateService.Allowed(player, point.Position.X, point.Position.Z) then
 			continue
 		end
 		local position = point.Position + hover
@@ -194,7 +200,7 @@ local function relocate(player: Player, state: State)
 	local anchor = anchorOf(player)
 	state.Area = areaOf(anchor)
 	for _, signal in moving do
-		signal.Position = pickPosition(state, anchor) or signal.Position
+		signal.Position = pickPosition(player, state, anchor) or signal.Position
 		signal.Type = spiritTypeAt(state, signal.Position)
 		signal.StruckUntil = nil
 		state.Signals[signal.Id] = signal
@@ -239,7 +245,7 @@ function SignalService.Init(points: { SpawnPoint })
 		}
 		states[player] = state
 		for _ = 1, Config.Signals.StartCount do
-			local position = pickPosition(state, anchor)
+			local position = pickPosition(player, state, anchor)
 			if position then
 				addSignal(state, position)
 			end
@@ -285,7 +291,7 @@ function SignalService.Init(points: { SpawnPoint })
 				if state.RegenAt and now >= state.RegenAt then
 					state.RegenAt = nil
 					local anchor = anchorOf(player)
-					local position = pickPosition(state, anchor)
+					local position = pickPosition(player, state, anchor)
 					if position then
 						addSignal(state, position)
 						state.Area = areaOf(anchor)
@@ -329,9 +335,19 @@ function SignalService.Consume(player: Player, signalId: number): boolean
 end
 
 -- A random signal spot between minDistance and maxDistance (flat) from `from`, or nil.
-function SignalService.RandomPoint(from: Vector3, minDistance: number, maxDistance: number, rng: Random): SpawnPoint?
+-- With `player`, only spots that player's zone gates allow.
+function SignalService.RandomPoint(
+	from: Vector3,
+	minDistance: number,
+	maxDistance: number,
+	rng: Random,
+	player: Player?
+): SpawnPoint?
 	local pool = {}
 	for _, point in spawnPoints do
+		if player and not ZoneGateService.Allowed(player, point.Position.X, point.Position.Z) then
+			continue
+		end
 		local distance = flatDistance(point.Position, from)
 		if distance >= minDistance and distance <= maxDistance then
 			table.insert(pool, point)
@@ -398,7 +414,7 @@ function SignalService.FillToMax(player: Player)
 	end
 	local anchor = anchorOf(player)
 	while countOf(state) < Config.Signals.MaxCount do
-		local position = pickPosition(state, anchor)
+		local position = pickPosition(player, state, anchor)
 		if not position then
 			break
 		end

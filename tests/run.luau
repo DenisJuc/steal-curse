@@ -43,6 +43,7 @@ local suites = {
 	{ Name = "curse", Tests = require("./specs/curse_spec") },
 	{ Name = "bounties", Tests = require("./specs/bounties_spec") },
 	{ Name = "seal_ladder", Tests = require("./specs/seal_ladder_spec") },
+	{ Name = "zone_gates", Tests = require("./specs/zone_gates_spec") },
 }
 
 local passed, failed = 0, 0

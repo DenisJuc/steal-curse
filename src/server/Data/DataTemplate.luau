@@ -53,6 +53,9 @@ export type Data = {
 	},
 	-- Rebirths done (Shared/Rebirth): permanent income and luck multipliers.
 	Rebirths: number,
+	-- Highest Lasting Luck reached (zone gates use max(current, this) so a Rebirth never locks a
+	-- zone again). 0 = not set yet; filled with the current Lasting Luck on load. Never decreases.
+	PeakLastingLuck: number,
 	-- Codex discovery keyed by BASE relic id (mutations never create separate entries).
 	Discovered: { [string]: number },
 	-- Mutations seen per base relic id (item-detail flags, prestige titles): [id][mutation] = time.
@@ -188,6 +191,7 @@ DataTemplate.Template = {
 		At = 0,
 	},
 	Rebirths = 0,
+	PeakLastingLuck = 0,
 	Discovered = {},
 	CodexMutations = {},
 	CodexSizes = {},

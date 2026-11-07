@@ -1395,7 +1395,7 @@ function CollectionService.TryFreeSignal(player: Player)
 	if not root or not root:IsA("BasePart") then
 		return
 	end
-	local point = SignalService.RandomPoint(root.Position, 40, 120, Random.new())
+	local point = SignalService.RandomPoint(root.Position, 40, 120, Random.new(), player)
 	if point and SignalService.SpawnAt(player, point.Position) then
 		state.FreeSignalAt = now + CollectionConfig.FreeSignalEverySeconds
 		Notify:FireClient(player, "Binder Free Signal nearby.", "Jade")

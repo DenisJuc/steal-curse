@@ -11,6 +11,7 @@ local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local CurseService = require(script.Parent.CurseService)
 local PlotService = require(script.Parent.PlotService)
 local RemoteGuard = require(script.Parent.RemoteGuard)
+local ZoneGateService = require(script.Parent.ZoneGateService)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local Teleport = Remotes:WaitForChild("Teleport") :: RemoteEvent
@@ -42,6 +43,8 @@ local function destination(player: Player, character: Model, root: BasePart, whe
 			return nil, "You are already in the wild."
 		end
 		local x, z = WorldLayout.wildEntry(Config.World, here.X, here.Z, Config.Travel.WildDepth)
+		-- Zone gates: the nearest wild spot this player may enter (Forest Edge for a new player).
+		x, z = ZoneGateService.OpenWildNear(player, x, z)
 		local position = Vector3.new(x, groundAt(x, z, { character }) + 4, z)
 		local outward = Vector3.new(x * 2, position.Y, z * 2)
 		return CFrame.lookAt(position, outward), nil
@@ -55,6 +58,9 @@ local function destination(player: Player, character: Model, root: BasePart, whe
 		local sx, sz = WildLayout.shrinePosition(shrine)
 		local inward = Vector3.new(-sx, 0, -sz).Unit
 		local spot = Vector3.new(sx, 0, sz) + inward * (WildLayout.ShrineSize / 2 + 5)
+		if not ZoneGateService.Allowed(player, spot.X, spot.Z) then
+			return nil, "That shrine's zone is locked for your luck."
+		end
 		local position = Vector3.new(spot.X, groundAt(spot.X, spot.Z, { character }) + 4, spot.Z)
 		return CFrame.lookAt(position, Vector3.new(sx, position.Y, sz)), nil
 	end

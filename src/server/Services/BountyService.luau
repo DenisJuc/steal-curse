@@ -14,6 +14,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local WildLayout = require(ReplicatedStorage.Shared.WildLayout)
 local DataService = require(script.Parent.DataService)
+local ZoneGateService = require(script.Parent.ZoneGateService)
 local EconomyService = require(script.Parent.EconomyService)
 local GameEvents = require(script.Parent.GameEvents)
 local ItemService = require(script.Parent.ItemService)
@@ -35,14 +36,27 @@ local function today(): number
 	return Bounties.dayOf(os.time())
 end
 
--- Bounties that can't be done any more (every shrine cleansed).
-local function excluded(data: any): { [string]: boolean }
+-- Bounties that can't be done (every shrine cleansed, or a zone this player's luck gates lock).
+local function excluded(data: any, player: Player): { [string]: boolean }
+	local list = {}
+	-- Cleanse a shrine: needs one not yet cleansed in a zone this player may enter.
+	local open = false
 	for _, shrine in WildLayout.CursedShrines do
-		if not data.Cleansed[shrine.Id] then
-			return {}
+		local x, z = WildLayout.shrinePosition(shrine)
+		if not data.Cleansed[shrine.Id] and ZoneGateService.Allowed(player, x, z) then
+			open = true
+			break
 		end
 	end
-	return { Shrine1 = true }
+	if not open then
+		list.Shrine1 = true
+	end
+	for _, def in OPTIONS.Pool do
+		if not ZoneGateService.Reachable(player, def.Filter) then
+			list[def.Id] = true
+		end
+	end
+	return list
 end
 
 local function ceFor(player: Player, minutes: number): number
@@ -101,9 +115,11 @@ local function entryView(player: Player, entry: { Id: string, Progress: number, 
 	if not def then
 		return nil
 	end
+	-- Picked before a zone was locked for this player (or the pool ran out): say what opens it.
+	local reachable, need = ZoneGateService.Reachable(player, def.Filter)
 	return {
 		Id = def.Id,
-		Text = def.Text,
+		Text = if reachable or not need then def.Text else `{def.Text} (needs x{Format.number(need)} LUCK)`,
 		Difficulty = def.Difficulty,
 		Progress = math.min(entry.Progress, def.Goal),
 		Goal = def.Goal,
@@ -153,7 +169,7 @@ local function refresh(player: Player): boolean
 	if not data then
 		return false
 	end
-	return Bounties.refresh(data.Bounties, OPTIONS, player.UserId, today(), excluded(data))
+	return Bounties.refresh(data.Bounties, OPTIONS, player.UserId, today(), excluded(data, player))
 end
 
 -- Counts one game event for `player`'s bounties.
@@ -216,7 +232,7 @@ local function onAction(player: Player, action: any, argument: any)
 	if action == "Claim" then
 		message = claim(player, data, argument)
 	elseif action == "Reroll" then
-		if type(argument) == "number" and Bounties.reroll(data.Bounties, OPTIONS, player.UserId, argument, excluded(data)) then
+		if type(argument) == "number" and Bounties.reroll(data.Bounties, OPTIONS, player.UserId, argument, excluded(data, player)) then
 			DataService.RequestSave(player)
 			message = "Bounty rerolled."
 		else
