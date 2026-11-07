@@ -2,8 +2,9 @@
 -- counter and Settings. Every other HUD entry stays hidden until a natural milestone, then
 -- appears with one short banner. Purely client-side display: no new save fields. It reads stats
 -- the server already saves and mirrors (TotalScans, DiscoveredCount, Rebirths, Skill_CoreLuck)
--- plus this session's play time, so veterans (75+ lifetime rolls, a rebirth, or the tutorial
--- finished/skipped) see everything as before, with no banners.
+-- so veterans (75+ lifetime rolls or a rebirth) see everything as before, with no banners.
+-- Finishing or skipping the tutorial does NOT unlock everything: a new player keeps the
+-- roll-only start and earns each entry at its milestone.
 -- An entry the tutorial points at (the "TutorialTarget" attribute Onboarding sets locally)
 -- unlocks right then, so an arrow never points at nothing. Unlocks never re-lock in a session.
 -- Other code keeps toggling these entries' Visible (Spirit Sight hiding the HUD, the Collection
@@ -13,15 +14,12 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local Settings = require(script.Parent.Parent.Settings)
 local Banner = require(script.Parent.Banner)
 
 local HudUnlocks = {}
 
--- Everything unlocks at this many lifetime rolls (~5 minutes of Auto Roll at 4 s a roll) or
--- after this long in one session, whichever comes first.
+-- Everything unlocks at this many lifetime rolls (~5 minutes of Auto Roll at 4 s a roll).
 local ALL_SCANS = 75
-local ALL_SECONDS = 5 * 60
 local BANNER_COLOR = Color3.fromRGB(255, 215, 120)
 
 type Stats = { Scans: number, Discovered: number, CoreLuck: number }
@@ -111,14 +109,11 @@ local function loaded(player: Player): boolean
 end
 
 local function isVeteran(player: Player): boolean
-	return number(player, "TotalScans") >= ALL_SCANS
-		or number(player, "Rebirths") > 0
-		or Settings.Get("Hints") == "Off"
+	return number(player, "TotalScans") >= ALL_SCANS or number(player, "Rebirths") > 0
 end
 
 function HudUnlocks.Start(screen: ScreenGui)
 	local player = Players.LocalPlayer
-	local started = os.clock()
 	local unlocked: { [string]: boolean } = {}
 	-- Per held object: the Visible other code wants (restored on unlock).
 	local wanted: { [GuiObject]: boolean } = {}
@@ -200,7 +195,7 @@ function HudUnlocks.Start(screen: ScreenGui)
 		-- The first look after load is silent: returning players get their entries without banners.
 		local announce = ready
 		ready = true
-		local all = isVeteran(player) or os.clock() - started >= ALL_SECONDS
+		local all = isVeteran(player)
 		local stats: Stats = {
 			Scans = number(player, "TotalScans"),
 			Discovered = number(player, "DiscoveredCount"),
@@ -216,7 +211,7 @@ function HudUnlocks.Start(screen: ScreenGui)
 			if pointed or gate.When(stats) then
 				unlock(gate, announce)
 			elseif all then
-				-- Time's up or tutorial done: open the rest with one banner, not a burst of them.
+				-- 75 rolls or a rebirth: open the rest with one banner, not a burst of them.
 				unlock(gate, false)
 				rest += 1
 			end
