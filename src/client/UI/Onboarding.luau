@@ -343,6 +343,10 @@ function Onboarding.Start(screen: ScreenGui)
 				return
 			end
 		end
+		-- HudUnlocks shows a still-locked HUD entry as soon as the tutorial points at it.
+		if player:GetAttribute("TutorialTarget") ~= step.Target then
+			player:SetAttribute("TutorialTarget", step.Target)
+		end
 		local target = find(step.Target)
 		local side, text = step.Side, step.Text
 		if not target and step.Fallback then
