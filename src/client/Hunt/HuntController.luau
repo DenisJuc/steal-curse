@@ -20,6 +20,7 @@ local HuntFX = require(script.Parent.Parent.Effects.HuntFX)
 local SealBurst = require(script.Parent.Parent.Effects.SealBurst)
 local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
 local SpiritTags = require(script.Parent.SpiritTags)
+local HudUnlocks = require(script.Parent.Parent.UI.HudUnlocks)
 local HuntHUD = require(script.Parent.Parent.UI.HuntHUD)
 local HuntRolls = require(script.Parent.Parent.UI.HuntRolls)
 local RollReel = require(script.Parent.Parent.UI.RollReel)
@@ -208,6 +209,13 @@ local function setSight(on: boolean)
 	if state ~= "Idle" or os.clock() < sealViewUntil then
 		return
 	end
+	-- Still locked by the roll-only start (F works even while its button is hidden): explain instead.
+	if on and (not HudUnlocks.IsReady() or not HudUnlocks.IsUnlocked("Hunt")) then
+		if HudUnlocks.IsReady() then
+			HudUnlocks.Explain("Hunt")
+		end
+		return
+	end
 	SpiritSight.SetEnabled(on)
 	hud.SetSightMode(on)
 	options.SetManagementVisible(not on)
@@ -232,6 +240,11 @@ local function pulse()
 	end
 	lastPulse = os.clock()
 	SpiritSight.Pulse(rootPart)
+end
+
+-- os.clock() of the last pulse (0 if none yet), for the spirit hunt tutorial.
+function HuntController.LastPulse(): number
+	return lastPulse
 end
 
 local function onBindConfirmed()

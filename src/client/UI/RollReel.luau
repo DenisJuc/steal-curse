@@ -219,7 +219,13 @@ function RollReel.Start(screen: ScreenGui, anchor: GuiObject?)
 	if anchor then
 		RunService.RenderStepped:Connect(function()
 			local offset = anchor.AbsolutePosition - screen.AbsolutePosition
-			holder.Position = UDim2.fromOffset(offset.X + anchor.AbsoluteSize.X / 2, offset.Y - LIFT)
+			-- "ReelLift" (screen pixels): extra room the tutorial asks for when its bubble sits right
+			-- above ROLL, so the result card shows above the bubble instead of under it.
+			local lift = screen:GetAttribute("ReelLift")
+			holder.Position = UDim2.fromOffset(
+				offset.X + anchor.AbsoluteSize.X / 2,
+				offset.Y - LIFT - (if type(lift) == "number" then lift else 0)
+			)
 		end)
 	end
 

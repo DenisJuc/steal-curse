@@ -9,10 +9,17 @@
 -- start with Auto Roll off (DataTemplate), so the first rolls are theirs.
 
 --
--- Layout: the bubble grows to fit its text (never cut off). Steps with Clear = "RollReel" sit
--- above the roll reel so the first rolls' results stay visible. Spirit Sight's unlock starts a
--- short sealing tutorial (see, find, hold to bind); before that, a player's first walk into the
--- wild gets one tip: no hunting yet, look for Lost Ones and offering boxes meanwhile.
+-- Layout: the bubble grows to fit its text (never cut off). The first roll steps sit right above
+-- ROLL and lift the roll reel above the bubble (screen attribute "ReelLift"), so each roll's result
+-- stays visible. World steps (collect coins, go to the wild, find a spirit) put the bubble at the
+-- top and lay glowing arrows on the ground (Effects/GroundGuide). Before Spirit Sight, a player's
+-- first walk into the wild gets one tip: no hunting yet, look for Lost Ones and offering boxes.
+--
+-- Spirit hunt tutorial: when Spirit Sight unlocks (at its milestone, not on join) everything stops
+-- for it: menus close, the HUD except travel and the hunt buttons is hidden (rolling carries on in
+-- the background) and it walks through: go to the wild (ground arrows), fast travel exists, F for
+-- Spirit Sight, Q to pulse, arrows to the nearest spirit, hold to bind. It plays even with Hints
+-- off; Skip ends just this tutorial. Whatever tutorial was showing comes back afterwards.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,8 +27,13 @@ local RunService = game:GetService("RunService")
 local TextService = game:GetService("TextService")
 
 local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
+local Config = require(ReplicatedStorage.Shared.Config)
+local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
+local ZoneGates = require(ReplicatedStorage.Shared.ZoneGates)
 local Ambience = require(script.Parent.Parent.Effects.Ambience)
+local GroundGuide = require(script.Parent.Parent.Effects.GroundGuide)
 local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
+local HuntController = require(script.Parent.Parent.Hunt.HuntController)
 local Settings = require(script.Parent.Parent.Settings)
 local HudUnlocks = require(script.Parent.HudUnlocks)
 local Icons = require(script.Parent.Icons)
@@ -49,6 +61,14 @@ type Step = {
 	Clear: string?,
 	-- Shown only when Trigger fires (never in the main run), e.g. "WildEntry".
 	Trigger: string?,
+	-- Bubble right above its target, with the roll reel lifted above the bubble.
+	LiftReel: boolean?,
+	-- Done when the target button is pressed (see `pressed`).
+	Press: boolean?,
+	-- Ground arrows lead to this spot while the step shows (nil from the getter hides them).
+	Guide: (() -> Vector3?)?,
+	-- Part of the spirit hunt tutorial (only runs when Spirit Sight unlocks).
+	Hunt: boolean?,
 }
 
 local STEP_SECONDS = 9
@@ -62,6 +82,15 @@ local BUBBLE_CHROME = 20 + 34
 local TEXT_SIZE = 18
 -- Wild weight (Ambience) that counts as being out in the wild.
 local WILD_AT = 0.6
+
+-- Invisible anchor at the top center: world steps point their bubble down from here.
+local TOP = "TutorialTopAnchor"
+local ZONE_CONTEXT: ZoneGates.Context = {
+	Areas = Config.Areas,
+	World = Config.World,
+	Bands = Config.HuntStreak,
+	Gates = Config.ZoneGates,
+}
 
 -- The main screen, for Done checks that look at the HUD (set by Start).
 local screenRef: ScreenGui? = nil
@@ -87,6 +116,85 @@ end
 
 -- Values captured when a step starts, for steps that wait for a change.
 local startScans = 0
+local startCE = 0
+local stepClock = 0
+-- Set when the step's target button (Press steps) was pressed since the step started.
+local pressed = false
+
+local function rootPosition(): Vector3?
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	return if root and root:IsA("BasePart") then root.Position else nil
+end
+
+local function inWild(): boolean
+	local position = rootPosition()
+	return position ~= nil and WorldLayout.inWild(Config.World, position.X, position.Z)
+end
+
+local function menuShown(name: string): boolean
+	local ui = Players.LocalPlayer:FindFirstChildOfClass("PlayerGui")
+	local menu = ui and ui:FindFirstChild(name, true)
+	return menu ~= nil and menu:IsA("GuiObject") and menu.Visible
+end
+
+-- The collect pad to walk to: one of your pedestals with coins waiting (brightest glow), nearest.
+local function collectPad(): Vector3?
+	local position = rootPosition()
+	local map = workspace:FindFirstChild("Map")
+	local plots = map and map:FindFirstChild("Plots")
+	if not position or not plots then
+		return nil
+	end
+	local best: Vector3?, bestScore = nil, math.huge
+	for _, plot in plots:GetChildren() do
+		if plot:GetAttribute("OwnerUserId") ~= Players.LocalPlayer.UserId then
+			continue
+		end
+		local folder = plot:FindFirstChild("Pedestals")
+		if not folder then
+			continue
+		end
+		for _, pedestal in folder:GetChildren() do
+			local pad = pedestal:FindFirstChild("CollectPad")
+			local glow = pedestal:FindFirstChild("CollectGlow")
+			local trigger = pedestal:FindFirstChild("CollectTrigger")
+			if not (pad and pad:IsA("BasePart") and pad.Transparency < 1 and trigger and trigger:IsA("BasePart")) then
+				continue
+			end
+			-- Ready pads glow brighter (lower transparency): prefer those, then the nearest.
+			local glowT = if glow and glow:IsA("BasePart") then glow.Transparency else 1
+			local score = glowT * 1000 + (trigger.Position - position).Magnitude
+			if score < bestScore then
+				best, bestScore = trigger.Position, score
+			end
+		end
+	end
+	return best
+end
+
+-- Nearest open wild spot (zone gates respected), refreshed once a second.
+local wildCache: Vector3? = nil
+local wildCachedAt = 0
+local function wildSpot(): Vector3?
+	if wildCache and os.clock() - wildCachedAt < 1 then
+		return wildCache
+	end
+	local position = rootPosition()
+	if not position then
+		return nil
+	end
+	local x, z = WorldLayout.wildEntry(Config.World, position.X, position.Z, Config.Travel.WildDepth)
+	local luck = Players.LocalPlayer:GetAttribute("GateLuck")
+	x, z = ZoneGates.nearestAllowed(ZONE_CONTEXT, if type(luck) == "number" then luck else 1, x, z, 8, true)
+	wildCache, wildCachedAt = Vector3.new(x, position.Y, z), os.clock()
+	return wildCache
+end
+
+local function nearestSpirit(): Vector3?
+	local _, position = HuntController.GetNearestSignalAny()
+	return position
+end
 -- Set when CE goes down (something was bought) since the step started.
 local spent = false
 
@@ -94,7 +202,7 @@ local STEPS: { Step } = {
 	{
 		Target = "RollButton",
 		Side = "Above",
-		Clear = "RollReel",
+		LiftReel = true,
 		Text = "Tap ROLL to seal your first cursed relic!",
 		Done = function(player)
 			return number(player, "TotalScans") >= startScans + 1
@@ -103,7 +211,7 @@ local STEPS: { Step } = {
 	{
 		Target = "RollButton",
 		Side = "Above",
-		Clear = "RollReel",
+		LiftReel = true,
 		Text = function(player)
 			local left = math.max(1, ROLLS_TO_LEARN - number(player, "TotalScans"))
 			local rolls = if left == 1 then "1 more time" else `{left} more times`
@@ -115,10 +223,8 @@ local STEPS: { Step } = {
 	},
 	{
 		Target = "AutoRoll",
-		-- Beside the switch: above it would cover the ROLL button, to the right the Upgrades button;
-		-- left of the Backpack button so it doesn't hide that either.
+		-- Beside the switch: above it would cover the ROLL button (covering Backpack is fine).
 		Side = "Left",
-		Clear = "BackpackButtonSlot",
 		Text = "Now let it roll for you: turn on Auto Roll.",
 		Done = function(player)
 			return player:GetAttribute("AutoRoll") ~= false
@@ -137,8 +243,29 @@ local STEPS: { Step } = {
 	{
 		Target = "RelicsMenu/EquipBest",
 		Side = "Above",
-		Text = "Equip Best swaps your best relics onto your pedestals. Use it after a great find.",
+		Text = "Equip Best swaps your best relics onto your pedestals. Tap it now!",
+		Press = true,
+		Done = function()
+			return pressed
+		end,
 		Fallback = { Target = "BackpackButton", Side = "Above", Text = "Open your Backpack and press Equip Best." },
+	},
+	{
+		Target = "RelicsMenu/EquipBest",
+		Side = "Above",
+		Text = "Nice! Tap anywhere outside the menu to close it.",
+		Done = function()
+			return not menuShown("RelicsMenu")
+		end,
+	},
+	{
+		Target = TOP,
+		Side = "Below",
+		Text = "Your pedestals fill up with coins (CE). Follow the arrows and walk over the glowing pad to collect them!",
+		Guide = collectPad,
+		Done = function(player)
+			return number(player, "CE") > startCE + 0.001
+		end,
 	},
 	{
 		Target = "ShrineButton",
@@ -182,6 +309,9 @@ local STEPS: { Step } = {
 		Gate = "Codex",
 		Side = "Right",
 		Text = "The Codex tracks every relic you find. Milestones give permanent Luck and income.",
+		Done = function()
+			return menuShown("CodexMenu")
+		end,
 	},
 	{
 		Target = "CollectionButton",
@@ -190,42 +320,6 @@ local STEPS: { Step } = {
 		Text = "Fusion: collect 3 copies of one relic, open Collection, tap it, and Fuse.",
 		Skip = BalanceTrials.coreLoopPresentation(),
 	},
-	-- Sealing tutorial: plays when Spirit Sight unlocks (see, find, hold to bind, done).
-	{
-		Target = "SpiritSight",
-		Gate = "Hunt",
-		Side = "Left",
-		Text = "You can seal curses now! Go out into the wild and turn on Spirit Sight to see them.",
-		Done = function()
-			return SpiritSight.IsEnabled()
-		end,
-	},
-	{
-		Target = "Pulse",
-		Gate = "Hunt",
-		Side = "Left",
-		Text = "Pulse to sense the curses around you, then walk up to a glowing signal.",
-		Done = function()
-			return hudShown("Bind")
-		end,
-		Fallback = { Target = "SpiritSight", Side = "Left", Text = "Turn Spirit Sight back on to keep sealing." },
-	},
-	{
-		Target = "Bind",
-		Gate = "Hunt",
-		Side = "Left",
-		Text = "Hold Bind to seal it. Keep holding until the chains close!",
-		Done = function()
-			return sealed
-		end,
-		Fallback = { Target = "Pulse", Side = "Left", Text = "Get close to a signal: the Bind button appears." },
-	},
-	{
-		Target = "SpiritSight",
-		Gate = "Hunt",
-		Side = "Left",
-		Text = "Sealed! Every seal gives that relic plus bonus finds. Leave Sight to go back to your shrine.",
-	},
 	-- First walk into the wild before Spirit Sight: no hunting yet, but there is plenty to find.
 	{
 		Target = "NextUnlockChip",
@@ -233,6 +327,83 @@ local STEPS: { Step } = {
 		Side = "Below",
 		Text = "The spirits here stay hidden until Spirit Sight unlocks. For now, follow the Lost Ones and listen for chiming offering boxes!",
 	},
+}
+
+-- Spirit hunt tutorial (see the header): plays once when Spirit Sight unlocks.
+local HUNT_STEPS: { Step } = {
+	{
+		Hunt = true,
+		Target = TOP,
+		Side = "Below",
+		Text = "Spirit Sight unlocked! You can hunt spirits now. Follow the arrows to the wild.",
+		Guide = wildSpot,
+		Done = function()
+			return inWild()
+		end,
+	},
+	{
+		Hunt = true,
+		Target = "TravelBar",
+		Side = "Below",
+		Text = "Tip: these buttons are fast travel. They take you Home, to the Hub, the Wild or a Shrine instantly.",
+	},
+	{
+		Hunt = true,
+		Target = "SpiritSight",
+		Side = "Left",
+		Text = "Press F to enter the spirit world.",
+		Done = function()
+			return SpiritSight.IsEnabled()
+		end,
+	},
+	{
+		Hunt = true,
+		Target = "Pulse",
+		Side = "Left",
+		Text = "Press Q to pulse: it shows where the spirits are hiding.",
+		Done = function()
+			return HuntController.LastPulse() > stepClock
+		end,
+		Fallback = { Target = "SpiritSight", Side = "Left", Text = "Press F to go back into the spirit world." },
+	},
+	{
+		Hunt = true,
+		Target = TOP,
+		Side = "Below",
+		Text = function()
+			return if SpiritSight.IsEnabled()
+				then "Follow the arrows to the nearest spirit."
+				else "Press F to go back into the spirit world, then follow the arrows."
+		end,
+		Guide = nearestSpirit,
+		Done = function()
+			return hudShown("Bind")
+		end,
+	},
+	{
+		Hunt = true,
+		Target = "Bind",
+		Side = "Left",
+		Text = "Hold E (or the Bind button) to seal it. Keep holding until the chains close!",
+		Guide = nearestSpirit,
+		Done = function()
+			return sealed
+		end,
+		Fallback = { Target = TOP, Side = "Below", Text = "Get closer to the spirit: the Bind button appears." },
+	},
+	{
+		Hunt = true,
+		Target = TOP,
+		Side = "Below",
+		Text = "Sealed! Every seal gives that relic plus bonus rolls. Press F to leave the spirit world.",
+	},
+}
+-- Direct children of the main screen that stay up during the spirit hunt tutorial.
+local HUNT_KEEP = {
+	HintBubble = true,
+	TravelBar = true,
+	HuntButtons = true,
+	[TOP] = true,
 }
 
 local ANCHORS: { [Side]: Vector2 } = {
@@ -259,7 +430,12 @@ function Onboarding.Start(screen: ScreenGui)
 	local function mainSteps(): { Step }
 		local list = {}
 		for _, step in STEPS do
-			if not step.Skip and not step.Trigger and (not step.Gate or HudUnlocks.IsUnlocked(step.Gate)) then
+			if
+				not step.Skip
+				and not step.Trigger
+				and not step.Hunt
+				and (not step.Gate or HudUnlocks.IsUnlocked(step.Gate))
+			then
 				table.insert(list, step)
 			end
 		end
@@ -267,6 +443,15 @@ function Onboarding.Start(screen: ScreenGui)
 	end
 	activeSteps = mainSteps()
 
+	UIKit.create("Frame", {
+		Name = TOP,
+		AnchorPoint = Vector2.new(0.5, 0),
+		-- Below the unlock banner (top center) so the two never overlap.
+		Position = UDim2.new(0.5, 0, 0, 190),
+		Size = UDim2.fromOffset(1, 1),
+		BackgroundTransparency = 1,
+		Parent = screen,
+	})
 	local bubble = UIKit.create("Frame", {
 		Name = "HintBubble",
 		Size = UDim2.fromOffset(BUBBLE_WIDTH, BUBBLE_MIN_HEIGHT),
@@ -347,6 +532,9 @@ function Onboarding.Start(screen: ScreenGui)
 	local index = 0
 	local token = 0
 	local running = false
+	-- "main" (tutorial and unlock tips) or "hunt" (the spirit hunt tutorial).
+	local mode = "main"
+	local endHunt: () -> ()
 
 	local startTips: () -> ()
 	-- Done with the steps: the tutorial leaves unlock tips on; tips just wait for the next unlock.
@@ -354,6 +542,8 @@ function Onboarding.Start(screen: ScreenGui)
 		running = false
 		token += 1
 		bubble.Visible = false
+		screen:SetAttribute("ReelLift", nil)
+		GroundGuide.SetTarget(nil)
 		player:SetAttribute("TutorialTarget", nil)
 		if Settings.Get("Hints") == "On" then
 			Settings.Set("Hints", "Unlocks")
@@ -385,13 +575,23 @@ function Onboarding.Start(screen: ScreenGui)
 		Size = UDim2.fromOffset(64, 28),
 		ZIndex = 26,
 		Parent = bubble,
-	}, skip)
+	}, function()
+		if mode == "hunt" then
+			endHunt()
+		else
+			skip()
+		end
+	end)
 	UIKit.skinButton(skipButton, "Dark")
 
 	local showStep: (number) -> ()
 	function showStep(stepIndex: number)
 		if stepIndex > #activeSteps then
-			finish()
+			if mode == "hunt" then
+				endHunt()
+			else
+				finish()
+			end
 			return
 		end
 		index = stepIndex
@@ -400,7 +600,14 @@ function Onboarding.Start(screen: ScreenGui)
 		local step = activeSteps[stepIndex]
 		spent = false
 		sealed = false
+		pressed = false
 		startScans = number(player, "TotalScans")
+		startCE = number(player, "CE")
+		stepClock = os.clock()
+		GroundGuide.SetTarget(step.Guide)
+		if not step.LiftReel then
+			screen:SetAttribute("ReelLift", nil)
+		end
 		stepLabel.Text = `{stepIndex}/{#activeSteps}`
 		-- Action steps wait for the action (Skip leaves the tutorial); tips have Next.
 		nextButton.Visible = step.Done == nil
@@ -471,6 +678,8 @@ function Onboarding.Start(screen: ScreenGui)
 		return false
 	end
 
+	local pressHooked: GuiButton? = nil
+	local pressConnection: RBXScriptConnection? = nil
 	local checkElapsed = 0
 	RunService.RenderStepped:Connect(function(dt)
 		if not running then
@@ -494,7 +703,7 @@ function Onboarding.Start(screen: ScreenGui)
 			player:SetAttribute("TutorialTarget", step.Target)
 		end
 		local target = find(step.Target)
-		local side, text = step.Side, (if type(step.Text) == "function" then step.Text(player) else step.Text) :: string
+		local side, text = step.Side, (if type(step.Text) == "function" then (step.Text :: any)(player) else step.Text) :: string
 		if not target and step.Fallback then
 			target = find(step.Fallback.Target)
 			side, text = step.Fallback.Side, step.Fallback.Text
@@ -502,12 +711,25 @@ function Onboarding.Start(screen: ScreenGui)
 		local inMenu = string.find(step.Target, "/", 1, true) ~= nil and target ~= nil and find(step.Target) ~= nil
 		if not target or (menuOpen() and not inMenu) then
 			bubble.Visible = false
+			screen:SetAttribute("ReelLift", nil)
 			return
+		end
+		-- Press steps: listen to the target button itself (once per button instance).
+		if step.Press and target:IsA("GuiButton") and pressHooked ~= target then
+			pressHooked = target
+			if pressConnection then
+				pressConnection:Disconnect()
+			end
+			pressConnection = target.Activated:Connect(function()
+				pressed = true
+			end)
 		end
 		setText(text)
 		bubble.AnchorPoint = ANCHORS[side]
 		local shape = ARROWS[side]
 		arrow.Text = shape.Text
+		-- Top-anchored world steps point at nothing on screen: no arrow.
+		arrow.Visible = target.Name ~= TOP
 		arrow.AnchorPoint = shape.Anchor
 		-- The arrow bobs toward the target.
 		local bob = math.sin(os.clock() * 6) * 5
@@ -539,9 +761,19 @@ function Onboarding.Start(screen: ScreenGui)
 		local shiftX = math.clamp(left, 8, math.max(8, screenSize.X - bubbleSize.X - 8)) - left
 		local shiftY = math.clamp(top, 8, math.max(8, screenSize.Y - bubbleSize.Y - 8)) - top
 		bubble.Position = UDim2.fromOffset(point.X + shiftX, point.Y + shiftY)
-		-- The arrow stays level with the target when the bubble had to slide.
-		arrow.Position -= UDim2.fromOffset(shiftX, shiftY)
+		-- The arrow stays level with the target when the bubble had to slide. Its offsets are inside
+		-- the bubble's UIScale, so screen pixels are divided by that scale.
+		local scale = math.max(bubbleSize.X / BUBBLE_WIDTH, 0.01)
+		arrow.Position -= UDim2.fromOffset(shiftX / scale, shiftY / scale)
 		bubble.Visible = true
+		-- Roll steps: lift the reel so its bottom clears the bubble's top.
+		local reel = step.LiftReel and screen:FindFirstChild("RollReel")
+		if reel and reel:IsA("GuiObject") then
+			local current = screen:GetAttribute("ReelLift")
+			local reelBottom = reel.AbsolutePosition.Y + reel.AbsoluteSize.Y + (if type(current) == "number" then current else 0)
+			local bubbleTop = point.Y + shiftY - bubble.AnchorPoint.Y * bubbleSize.Y
+			screen:SetAttribute("ReelLift", math.max(0, reelBottom - (bubbleTop - 6)))
+		end
 	end)
 
 	-- Unlock tips: shown one feature at a time, after the main tutorial, only while Hints is not Off.
@@ -554,13 +786,82 @@ function Onboarding.Start(screen: ScreenGui)
 		table.clear(waitingTips)
 		showStep(1)
 	end
+	-- Spirit hunt tutorial: hides everything but travel and the hunt buttons, and remembers what
+	-- other code wanted visible meanwhile so it can be put back afterwards.
+	local huntHidden: { [GuiObject]: boolean } = {}
+	local huntConnections: { RBXScriptConnection } = {}
+	local savedRun: { Steps: { Step }, Index: number, Running: boolean }? = nil
+	local function startHunt()
+		if mode == "hunt" then
+			return
+		end
+		savedRun = { Steps = activeSteps, Index = index, Running = running }
+		mode = "hunt"
+		token += 1
+		for _, child in screen:GetChildren() do
+			if not child:IsA("GuiObject") or HUNT_KEEP[child.Name] then
+				continue
+			end
+			local gui = child :: GuiObject
+			-- Open menus close for good; the HUD comes back as it was.
+			huntHidden[gui] = gui.Visible and not gui:GetAttribute("Modal")
+			gui.Visible = false
+			table.insert(
+				huntConnections,
+				gui:GetPropertyChangedSignal("Visible"):Connect(function()
+					if mode == "hunt" and gui.Visible then
+						huntHidden[gui] = not gui:GetAttribute("Modal")
+						gui.Visible = false
+					end
+				end)
+			)
+		end
+		running = true
+		activeSteps = table.clone(HUNT_STEPS)
+		showStep(1)
+	end
+	function endHunt()
+		if mode ~= "hunt" then
+			return
+		end
+		mode = "main"
+		for _, connection in huntConnections do
+			connection:Disconnect()
+		end
+		table.clear(huntConnections)
+		for gui, visible in huntHidden do
+			if gui.Parent then
+				gui.Visible = visible
+			end
+		end
+		table.clear(huntHidden)
+		GroundGuide.SetTarget(nil)
+		local saved = savedRun
+		savedRun = nil
+		if saved and saved.Running and saved.Steps[saved.Index] and not saved.Steps[saved.Index].Hunt then
+			activeSteps = saved.Steps
+			showStep(saved.Index)
+		else
+			running = false
+			token += 1
+			bubble.Visible = false
+			player:SetAttribute("TutorialTarget", nil)
+			task.defer(startTips)
+		end
+	end
+
 	HudUnlocks.Unlocked:Connect(function(gateId: string, announced: boolean)
+		-- Spirit Sight's own unlock stops everything for the hunt tutorial (even with Hints off).
+		if gateId == "Hunt" and announced then
+			task.delay(2.5, startHunt)
+			return
+		end
 		-- Join-time and "everything unlocked" opens are silent: veterans get no tips.
 		if not announced or Settings.Get("Hints") == "Off" then
 			return
 		end
 		for _, step in STEPS do
-			if step.Gate == gateId and not step.Skip then
+			if step.Gate == gateId and not step.Skip and not step.Hunt then
 				table.insert(waitingTips, step)
 			end
 		end
@@ -616,7 +917,7 @@ function Onboarding.Start(screen: ScreenGui)
 		Settings.Watch("Hints", function(value)
 			if value == "On" then
 				begin()
-			elseif value == "Off" and running then
+			elseif value == "Off" and running and mode ~= "hunt" then
 				running = false
 				bubble.Visible = false
 			end
