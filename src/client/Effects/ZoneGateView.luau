@@ -37,6 +37,8 @@ local BAND_NAMES = { Edge = "Edge", Deep = "Deep", Heart = "Heart" }
 local WALL_HEIGHT = 14
 local WALL_DEPTH = 6
 local WALL_THICKNESS = 1
+-- The neon sheet that makes the wall visible: faint enough to see the zone through it.
+local WALL_GLOW_TRANSPARENCY = 0.9
 -- Seconds between "needs xN LUCK" messages from bumping a wall.
 local BUMP_GAP = Config.ZoneGates.MessageGap
 
@@ -103,6 +105,21 @@ local function wallPart(a: Vector3, b: Vector3, border: ZoneGates.Border, parent
 		end
 	end)
 	wall.Parent = parent
+	-- ForceField alone is almost invisible in the dark wild (players hit an unseen barrier), so a
+	-- thin translucent neon sheet makes the wall read as a red seal barrier.
+	local glow = Instance.new("Part")
+	glow.Name = "SealWallGlow"
+	glow.Anchored = true
+	glow.CanCollide = false
+	glow.CanQuery = false
+	glow.CanTouch = false
+	glow.CastShadow = false
+	glow.Material = Enum.Material.Neon
+	glow.Color = LINE_COLOR
+	glow.Transparency = WALL_GLOW_TRANSPARENCY
+	glow.Size = Vector3.new(0.2, wall.Size.Y, wall.Size.Z)
+	glow.CFrame = wall.CFrame
+	glow.Parent = parent
 end
 
 local function segmentPart(a: Vector3, b: Vector3, parent: Instance)

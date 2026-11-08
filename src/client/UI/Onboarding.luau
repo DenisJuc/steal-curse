@@ -37,13 +37,15 @@ type Side = "Right" | "Below" | "Above" | "Left"
 type Step = {
 	Target: string,
 	Side: Side,
-	Text: string,
+	-- A function is re-read every frame (e.g. a live countdown).
+	Text: string | (Player) -> string,
 	Done: ((Player) -> boolean)?,
 	Fallback: { Target: string, Side: Side, Text: string }?,
 	Skip: boolean?,
 	-- HudUnlocks gate: shown only once this feature is unlocked (at its unlock, or in a replay).
 	Gate: string?,
-	-- A descendant name the bubble must stay clear of (placed above it), e.g. the roll reel.
+	-- A descendant name the bubble must stay clear of: placed above it for Side Above (e.g. the
+	-- roll reel), left of it for Side Left (e.g. the Backpack button beside Auto Roll).
 	Clear: string?,
 	-- Shown only when Trigger fires (never in the main run), e.g. "WildEntry".
 	Trigger: string?,
@@ -53,7 +55,8 @@ local STEP_SECONDS = 9
 local GAP = 16
 local ROLLS_TO_LEARN = 3
 local BUBBLE_WIDTH = 320
-local BUBBLE_MIN_HEIGHT = 104
+-- One line of text plus the Next/Skip row; longer tips grow (setText).
+local BUBBLE_MIN_HEIGHT = 72
 -- Padding (10 top + 10 bottom) plus the Next/Skip row under the text.
 local BUBBLE_CHROME = 20 + 34
 local TEXT_SIZE = 18
@@ -101,15 +104,21 @@ local STEPS: { Step } = {
 		Target = "RollButton",
 		Side = "Above",
 		Clear = "RollReel",
-		Text = `Nice! Roll {ROLLS_TO_LEARN - 1} more times. The bar at the top shows what opens next.`,
+		Text = function(player)
+			local left = math.max(1, ROLLS_TO_LEARN - number(player, "TotalScans"))
+			local rolls = if left == 1 then "1 more time" else `{left} more times`
+			return `Nice! Roll {rolls}. The bar at the top shows what opens next.`
+		end,
 		Done = function(player)
 			return number(player, "TotalScans") >= ROLLS_TO_LEARN
 		end,
 	},
 	{
 		Target = "AutoRoll",
-		-- Beside the switch: above it would cover the ROLL button, to the right the Upgrades button.
+		-- Beside the switch: above it would cover the ROLL button, to the right the Upgrades button;
+		-- left of the Backpack button so it doesn't hide that either.
 		Side = "Left",
+		Clear = "BackpackButtonSlot",
 		Text = "Now let it roll for you: turn on Auto Roll.",
 		Done = function(player)
 			return player:GetAttribute("AutoRoll") ~= false
@@ -485,7 +494,7 @@ function Onboarding.Start(screen: ScreenGui)
 			player:SetAttribute("TutorialTarget", step.Target)
 		end
 		local target = find(step.Target)
-		local side, text = step.Side, step.Text
+		local side, text = step.Side, (if type(step.Text) == "function" then step.Text(player) else step.Text) :: string
 		if not target and step.Fallback then
 			target = find(step.Fallback.Target)
 			side, text = step.Fallback.Side, step.Fallback.Text
@@ -518,6 +527,8 @@ function Onboarding.Start(screen: ScreenGui)
 		local clear = step.Clear and target == find(step.Target) and screen:FindFirstChild(step.Clear, true)
 		if side == "Above" and clear and clear:IsA("GuiObject") then
 			point = Vector2.new(point.X, math.min(point.Y, clear.AbsolutePosition.Y - (GAP + 22)))
+		elseif side == "Left" and clear and clear:IsA("GuiObject") then
+			point = Vector2.new(math.min(point.X, clear.AbsolutePosition.X - GAP), point.Y)
 		end
 		-- Keep the whole bubble on screen (a target near an edge would push it off).
 		local bubbleSize = bubble.AbsoluteSize

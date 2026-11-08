@@ -189,11 +189,24 @@ end
 export type NextUnlock = { Id: string, Label: string, Remaining: number, Unit: string, Progress: number }
 
 -- The locked entry closest to opening (by progress), or nil once everything is open.
+-- The goal the next-unlock chip is counting down (see Next).
+local shownNextId: string? = nil
+
 function HudUnlocks.Next(): NextUnlock?
 	if not started then
 		return nil
 	end
+	-- Stay on the goal already shown until it opens, so the chip counts down one goal steadily
+	-- instead of flipping between e.g. Pedestals (rolls) and Codex (discoveries) as progress crosses.
 	local best: NextUnlock? = nil
+	for _, gate in GATES do
+		if gate.Id == shownNextId and not unlockedState[gate.Id] then
+			local rule = gate.Rule
+			local have = (latest :: any)[rule.Stat] or 0
+			local remaining = math.max(1, math.ceil(rule.At - have))
+			return { Id = gate.Id, Label = gate.Label, Remaining = remaining, Unit = unitOf(rule.Stat, remaining), Progress = math.clamp(have / rule.At, 0, 1) }
+		end
+	end
 	for _, gate in GATES do
 		if unlockedState[gate.Id] then
 			continue
@@ -206,6 +219,7 @@ function HudUnlocks.Next(): NextUnlock?
 			best = { Id = gate.Id, Label = gate.Label, Remaining = remaining, Unit = unitOf(rule.Stat, remaining), Progress = progress }
 		end
 	end
+	shownNextId = best and best.Id
 	return best
 end
 
