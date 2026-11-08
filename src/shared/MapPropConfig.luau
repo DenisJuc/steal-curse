@@ -10,6 +10,10 @@
 --             is stood back on the ground.
 --   Collide:  "Box" = an invisible box collider of Collider size (default Size), "None" = walk through.
 --   Light:    optional warm/cold glow (PointLight, switched off by distance on the client).
+--   Posts:    for a gate whose own box would seal its doorway ("None"): where its two posts and the
+--             lower crossbeam are, at the configured Size, so a builder can give just those solid
+--             colliders. Inner/Outer = post edges from the center line, Depth = post depth, Beam =
+--             height of the crossbeam's underside (the doorway clearance), BeamH = its thickness.
 -- Pure, so Lune can test it.
 
 local MapPropConfig = {}
@@ -24,6 +28,7 @@ export type Prop = {
 	Tilt: number?,
 	Fallback: string,
 	Light: Light?,
+	Posts: { Inner: number, Outer: number, Depth: number, Beam: number, BeamH: number }?,
 }
 
 local WARM: Light = { Color = { 255, 170, 90 }, Range = 16, Brightness = 1.4, Height = 0.8 }
@@ -33,7 +38,10 @@ local RUNE: Light = { Color = { 150, 120, 255 }, Range = 14, Brightness = 1.2, H
 -- stylua: ignore
 MapPropConfig.Props = {
 	-- Shrine town
-	ShrineGate         = { Size = { 22, 18, 3 },  Collide = "None", Fallback = "Gate" },
+	-- Posts measured from ShrineGate.rbxm's collision mesh at height 18 (posts x 4.7..7.3 at the
+	-- feet, lower crossbeam from 11.9 up): a 9.4-stud doorway between them.
+	ShrineGate         = { Size = { 22, 18, 3 },  Collide = "None", Fallback = "Gate",
+		Posts = { Inner = 4.7, Outer = 7.3, Depth = 2.6, Beam = 11.9, BeamH = 1.6 } },
 	HubTemple          = { Size = { 26, 40, 26 }, Collide = "Box",  Fallback = "Temple", Light = WARM },
 	StoneLantern       = { Size = { 3, 7, 3 },    Collide = "Box",  Fallback = "Lantern", Light = WARM },
 	RelicPedestal      = { Size = { 7.5, 4.6, 7.5 }, Collide = "Box", Fallback = "Pedestal" },
@@ -41,6 +49,9 @@ MapPropConfig.Props = {
 	CodexLectern       = { Size = { 4, 6, 3 },    Collide = "Box",  Fallback = "Lectern" },
 	RuneMonolith       = { Size = { 5, 12, 3 },   Collide = "Box",  Fallback = "Monolith", Light = RUNE },
 	OfferingBox        = { Size = { 5, 3.6, 4 },  Collide = "Box",  Sink = -0.4, Fallback = "Box" },
+	-- Home plot: sakura with falling petals (Creator Store, free, no scripts; CREDITS.md). Trunk-only
+	-- collider so the canopy never blocks anyone.
+	HomeBlossomTree    = { Size = { 12, 18, 14 }, Collide = "Box",  Collider = { 2, 18, 2 }, Fallback = "DeadTree" },
 	-- Haunted Forest
 	DeadTree1          = { Size = { 10, 22, 10 }, Collide = "Box",  Collider = { 2.4, 22, 2.4 }, Fallback = "DeadTree" },
 	DeadTree2          = { Size = { 12, 18, 12 }, Collide = "Box",  Collider = { 2.4, 18, 2.4 }, Fallback = "DeadTree" },
