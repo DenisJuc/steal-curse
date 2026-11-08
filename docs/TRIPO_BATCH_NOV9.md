@@ -6,8 +6,9 @@
 ## Settings (same as every earlier batch)
 - Tripo website (credits are on the website account; the API key has 0), **Text to 3D**, model **H3.0**.
 - Style **Cartoon/Stylized**, textured, about **9k triangles** (Roblox limit 20k; lower is better on phones). Never mix presets inside the batch.
-- Every prompt ends with the fixed style line:
-  `single object, stylized low-poly game asset, clean hand-painted texture, no base, no text`
+- **Use the prompts in `work/models/tripo_batch2.json`, not the table below.** They end with the full style line the Nov 7 models (Fox Mask, Black Blade, Steal Ball, bangle, pendant) were approved with:
+  `single object, stylized low-poly game asset, clean hand-painted texture, no base, no text, chunky exaggerated proportions, muted dark palette with one glowing accent color, soft worn edges`
+  The table's descriptions are the older, shorter wording; keep them only as a reference for what each relic is. (Checked 2026-11-08: the file covers all 40 missing relics.)
 - Blades, staffs and other thin objects already carry `thick blade, oversized hilt, chunky silhouette` in their description (thin meshes read badly at Roblox camera distance).
 - No logos, lettering or official emblems (ROSTER naming rule).
 - Download **GLB**.
@@ -23,7 +24,7 @@
 
 If both sit well next to the existing models (size, saturation, edge wear), run the rest in order below. If not, change the prompt ending once, re-test the same two, and keep that ending for all 40.
 
-Credit cost: check the balance after the 2 tests and multiply. Earlier estimate in this project: about 40 credits per model (the throne remodel), so 40 relics would be about 1,600 if that holds. Not verified.
+Credit cost: H3.0 textured = 40 credits per model (seen on the generate page Oct 30 and Nov 7; H3.1 is 55 and a page reload resets the picker to H3.1, so re-pick H3.0). Free Retry x3 per model costs 0. 2 tests = 80; all 40 = 1,600 of the 3,000 Pro credits. About 15 credits were left on Nov 8, so nothing can run before the Nov 9 reset.
 
 ## The 40 prompts (Common first: seen most often)
 
