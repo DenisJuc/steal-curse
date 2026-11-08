@@ -223,10 +223,15 @@ local function fillGround(terrain: Terrain, rng: Random, seed: number, shape: Wi
 	local hubX, hubZ, hubFX, hubFZ = WorldLayout.hubFrame(Config.Plots)
 	local plazaSize = Config.Hub.PlazaSize
 	local hubCenter = Vector3.new(hubX, -GROUND_DEPTH / 2, hubZ)
+	local hubFacing = CFrame.lookAt(hubCenter, hubCenter + Vector3.new(hubFX, 0, hubFZ))
+	terrain:FillBlock(hubFacing, Vector3.new(plazaSize[1] + 8, GROUND_DEPTH + 0.5, plazaSize[2] + 8), Enum.Material.Slate)
+	-- Clear the top voxels under the plaza slab (like the plots): the smoothed terrain surface sits
+	-- at the slab's own height and flickers through its tiles otherwise.
+	local clearCenter = Vector3.new(hubX, 2, hubZ)
 	terrain:FillBlock(
-		CFrame.lookAt(hubCenter, hubCenter + Vector3.new(hubFX, 0, hubFZ)),
-		Vector3.new(plazaSize[1] + 8, GROUND_DEPTH + 0.5, plazaSize[2] + 8),
-		Enum.Material.Slate
+		CFrame.lookAt(clearCenter, clearCenter + Vector3.new(hubFX, 0, hubFZ)),
+		Vector3.new(plazaSize[1] - 2, 12, plazaSize[2] - 2),
+		Enum.Material.Air
 	)
 	-- Grass decoration pokes through the thin plot floors, so plots stand on bare slate.
 	local plots = Config.Plots

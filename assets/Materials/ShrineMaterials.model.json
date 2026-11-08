@@ -1,0 +1,57 @@
+{
+  "className": "Folder",
+  "children": [
+    {
+      "name": "ShrineSlateTile",
+      "className": "MaterialVariant",
+      "properties": {
+        "BaseMaterial": "Slate",
+        "MaterialPattern": "Regular",
+        "StudsPerTile": 10.0,
+        "ColorMap": "rbxassetid://74171316012307",
+        "NormalMap": "rbxassetid://134941765510078",
+        "RoughnessMap": "rbxassetid://134530736676803",
+        "MetalnessMap": "rbxassetid://137532272084613"
+      }
+    },
+    {
+      "name": "ShrineMossWall",
+      "className": "MaterialVariant",
+      "properties": {
+        "BaseMaterial": "Brick",
+        "MaterialPattern": "Regular",
+        "StudsPerTile": 10.0,
+        "ColorMap": "rbxassetid://139868891448908",
+        "NormalMap": "rbxassetid://124704092231114",
+        "RoughnessMap": "rbxassetid://76766392045394",
+        "MetalnessMap": "rbxassetid://74227982075325"
+      }
+    },
+    {
+      "name": "ShrineLacquerWood",
+      "className": "MaterialVariant",
+      "properties": {
+        "BaseMaterial": "Wood",
+        "MaterialPattern": "Regular",
+        "StudsPerTile": 10.0,
+        "ColorMap": "rbxassetid://111010052490276",
+        "NormalMap": "rbxassetid://88706529184685",
+        "RoughnessMap": "rbxassetid://136495218728906",
+        "MetalnessMap": "rbxassetid://73042402309348"
+      }
+    },
+    {
+      "name": "ShrineFlagstone",
+      "className": "MaterialVariant",
+      "properties": {
+        "BaseMaterial": "Cobblestone",
+        "MaterialPattern": "Organic",
+        "StudsPerTile": 10.0,
+        "ColorMap": "rbxassetid://136848712596291",
+        "NormalMap": "rbxassetid://136462110145986",
+        "RoughnessMap": "rbxassetid://127127945233561",
+        "MetalnessMap": "rbxassetid://119105991832572"
+      }
+    }
+  ]
+}

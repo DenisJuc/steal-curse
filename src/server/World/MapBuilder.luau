@@ -9,6 +9,7 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local HubBuilder = require(script.Parent.HubBuilder)
 local PlotBuilder = require(script.Parent.PlotBuilder)
+local ShrineMaterialsBuilder = require(script.Parent.ShrineMaterialsBuilder)
 local WildBuilder = require(script.Parent.WildBuilder)
 
 local MapBuilder = {}
@@ -109,12 +110,16 @@ function MapBuilder.Build(): Map
 		plots[index] = PlotBuilder.Build(index, cframe, plotFolder)
 	end
 
+	-- Generated shrine materials on the courtyards, walls, paths, plaza, kiosks and Seal Shrines.
+	local hub = folder:FindFirstChild("Hub")
+	local dressed = ShrineMaterialsBuilder.Apply(plotFolder) + (if hub then ShrineMaterialsBuilder.Apply(hub) else 0)
+
 	local started = os.clock()
 	local wild = WildBuilder.Build(folder)
 
 	-- Plot relic displays are added later per player; this measures the static map.
 	local partCount = countParts(folder)
-	local summary = `{partCount} parts, {wild.PropCount} wild props, {#wild.SpawnPoints} signal spots,`
+	local summary = `{partCount} parts ({dressed} with shrine materials), {wild.PropCount} wild props, {#wild.SpawnPoints} signal spots,`
 		.. ` wild built in {string.format("%.1f", os.clock() - started)} s`
 	if partCount > Config.World.PartBudget then
 		warn(`[Map] {summary}: over the budget of {Config.World.PartBudget}; consider StreamingEnabled.`)
