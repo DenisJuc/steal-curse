@@ -216,6 +216,34 @@ local function buildShowcasePodium(parent: Instance, at: (number, number, number
 	model.Parent = parent
 end
 
+-- Invisible solid boxes for the imported gate's posts and lower crossbeam (the gate prop itself is
+-- walk-through, since its own box would seal the doorway). Each post box runs on out to the wall
+-- wing so no gap is left beside it; the doorway between the posts stays open.
+local function buildGateColliders(model: Model, at: (number, number, number) -> CFrame, z: number)
+	local posts = MapPropConfig.Props.ShrineGate.Posts
+	if not posts then
+		return
+	end
+	local outer = math.max(posts.Outer, GATE_GAP / 2)
+	local width = outer - posts.Inner
+	local top = posts.Beam + posts.BeamH
+	local boxes = {
+		{ "PostCollider", Vector3.new(width, top, posts.Depth), at(-(posts.Inner + width / 2), FLOOR_TOP + top / 2, z) },
+		{ "PostCollider", Vector3.new(width, top, posts.Depth), at(posts.Inner + width / 2, FLOOR_TOP + top / 2, z) },
+		{ "BeamCollider", Vector3.new(posts.Inner * 2, posts.BeamH, posts.Depth), at(0, FLOOR_TOP + posts.Beam + posts.BeamH / 2, z) },
+	}
+	for _, box in boxes do
+		BuildUtil.part(model, {
+			Name = box[1],
+			Size = box[2],
+			CFrame = box[3],
+			Transparency = 1,
+			CastShadow = false,
+			CanTouch = false,
+		})
+	end
+end
+
 local function buildGate(parent: Instance, at: (number, number, number) -> CFrame)
 	local half = Config.Plots.Size / 2
 	local z = -half + 0.7
@@ -224,6 +252,7 @@ local function buildGate(parent: Instance, at: (number, number, number) -> CFram
 
 	if MapProps.has("ShrineGate") then
 		MapProps.build(model, "ShrineGate", at(0, FLOOR_TOP, z))
+		buildGateColliders(model, at, z)
 		local _, height, depth = MapPropConfig.size("ShrineGate")
 		local sign = BuildUtil.part(model, {
 			Name = "OwnerSign",
@@ -546,6 +575,17 @@ local function buildCornerLanterns(parent: Instance, at: (number, number, number
 	buildLantern(parent, at, GATE_GAP / 2 + 2, -half + 4)
 end
 
+-- Sakura in the free back-left corner, mirroring the Showcase podium across the path: clear of the
+-- binding circle, the terrace and its rails, the pedestals and the wall pillars. Built only when the
+-- model is imported (a primitive fallback tree would look wrong in the chamber).
+local BLOSSOM_TREE = { -30, 26 }
+
+local function buildBlossomTree(parent: Instance, at: (number, number, number) -> CFrame)
+	if MapProps.has("HomeBlossomTree") then
+		MapProps.build(parent, "HomeBlossomTree", at(BLOSSOM_TREE[1], FLOOR_TOP, BLOSSOM_TREE[2]))
+	end
+end
+
 function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Model
 	local size = Config.Plots.Size
 	local function at(x: number, y: number, z: number): CFrame
@@ -574,6 +614,7 @@ function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Mod
 	buildResonator(model, at, FLOOR_TOP + TERRACE_H)
 	buildShowcasePodium(model, at)
 	buildCornerLanterns(model, at)
+	buildBlossomTree(model, at)
 
 	local pedestals = Instance.new("Folder")
 	pedestals.Name = "Pedestals"

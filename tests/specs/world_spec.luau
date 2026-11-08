@@ -204,7 +204,7 @@ return {
 				end
 				expect.truthy(prop.Collide == "Box" or prop.Collide == "None", `{id} collide mode`)
 			end
-			expect.equal(count, 36, "prop count (the Tripo list + 7 Creator Store imports)")
+			expect.equal(count, 37, "prop count (the Tripo list + 8 Creator Store imports)")
 			for areaId, rules in WildLayout.Scatter do
 				local known = false
 				for _, area in areas do
@@ -216,6 +216,21 @@ return {
 					expect.truthy(rule.Density > 0, `{rule.Prop} density`)
 				end
 			end
+		end,
+	},
+	{
+		Name = "shrine gate posts are solid but leave a walkable doorway",
+		Run = function()
+			local gate = MapPropConfig.Props.ShrineGate
+			local posts = gate.Posts
+			expect.truthy(posts ~= nil, "ShrineGate has post data")
+			assert(posts, "ShrineGate.Posts")
+			-- A character is about 2 studs wide and 5 tall, and jumps about 7 studs.
+			expect.truthy(posts.Inner * 2 >= 8, `doorway {posts.Inner * 2} studs wide`)
+			expect.truthy(posts.Beam >= 11, `crossbeam clearance {posts.Beam} studs`)
+			expect.truthy(posts.Outer > posts.Inner and posts.Outer <= gate.Size[1] / 2, "posts inside the gate")
+			expect.truthy(posts.Beam + posts.BeamH <= gate.Size[2], "beam under the gate top")
+			expect.truthy(posts.Depth > 0 and posts.Depth <= gate.Size[3], "post depth")
 		end,
 	},
 	{
