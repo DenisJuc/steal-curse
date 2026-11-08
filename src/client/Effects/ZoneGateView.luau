@@ -3,6 +3,10 @@
 -- on the ground and big "NEEDS xN LUCK" signs, built only on this client, so other players see
 -- their own gates. When gate luck opens a cell its line flashes and sinks away and one banner says
 -- "Abandoned Village Deep unlocked!" (none on join). The server's push-back message shows here.
+-- Each line also raises a seal wall: a shimmering, solid barrier (local to this player, so it only
+-- stops the players it applies to) that you walk into instead of being teleported back. Bumping it
+-- says what it needs. The server's push-back stays as the authority (spawns, teleports, exploits);
+-- with the wall in place a player walking normally never reaches it.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,6 +32,13 @@ local SEGMENT = 10
 local SIGN_EVERY = 110
 local LINE_COLOR = Color3.fromRGB(GATES.LineColor[1], GATES.LineColor[2], GATES.LineColor[3])
 local BAND_NAMES = { Edge = "Edge", Deep = "Deep", Heart = "Heart" }
+-- Seal wall: height above the line, depth below it (so dips in the ground leave no gap under it),
+-- and thickness. Taller than a jump.
+local WALL_HEIGHT = 14
+local WALL_DEPTH = 6
+local WALL_THICKNESS = 1
+-- Seconds between "needs xN LUCK" messages from bumping a wall.
+local BUMP_GAP = Config.ZoneGates.MessageGap
 
 local areaNames: { [string]: string } = {}
 for _, area in Config.Areas do
@@ -50,6 +61,48 @@ local function groundY(x: number, z: number, folder: Instance): number
 	params.FilterDescendantsInstances = ignore
 	local hit = workspace:Raycast(Vector3.new(x, 200, z), Vector3.new(0, -400, 0), params)
 	return if hit then hit.Position.Y else 0
+end
+
+local lastBump = 0
+
+-- Bumping a wall says what the zone needs (the server's message only comes on a push-back).
+local function bumped(border: ZoneGates.Border)
+	local now = os.clock()
+	if now - lastBump < BUMP_GAP then
+		return
+	end
+	lastBump = now
+	local luck = Players.LocalPlayer:GetAttribute("GateLuck")
+	local have = if type(luck) == "number" then ` (you: x{Format.number(luck)})` else ""
+	Toasts.Show(
+		`{areaNames[border.Area] or border.Area} {BAND_NAMES[border.Band]} needs x{Format.number(border.Required)} LUCK{have}`,
+		"Error"
+	)
+end
+
+local function wallPart(a: Vector3, b: Vector3, border: ZoneGates.Border, parent: Instance)
+	local length = (b - a).Magnitude
+	local wall = Instance.new("Part")
+	wall.Name = "SealWall"
+	wall.Anchored = true
+	wall.CanCollide = true
+	-- Not queryable: the camera, ground raycasts and VFX placement look straight through it.
+	wall.CanQuery = false
+	wall.CanTouch = true
+	wall.CastShadow = false
+	wall.Material = Enum.Material.ForceField
+	wall.Color = LINE_COLOR
+	wall.Transparency = 0
+	-- Long enough to overlap its neighbours so corners leave no gap.
+	wall.Size = Vector3.new(WALL_THICKNESS, WALL_HEIGHT + WALL_DEPTH, length + 1.5)
+	wall.CFrame = CFrame.lookAt((a + b) / 2, b) * CFrame.new(0, (WALL_HEIGHT - WALL_DEPTH) / 2, 0)
+	wall.Touched:Connect(function(hit)
+		local character = Players.LocalPlayer.Character
+		if character and hit:IsDescendantOf(character) then
+			bumped(border)
+		end
+	end)
+	wall.Parent = parent
 end
 
 local function segmentPart(a: Vector3, b: Vector3, parent: Instance)
@@ -147,6 +200,7 @@ local function build(border: ZoneGates.Border, root: Instance): Model
 	local nextSign = SIGN_EVERY / 2
 	for i = 1, #points - 1 do
 		segmentPart(points[i], points[i + 1], model)
+		wallPart(points[i], points[i + 1], border, model)
 		walked += (points[i + 1] - points[i]).Magnitude
 		if walked >= nextSign then
 			sign(points[i + 1], border, model)
@@ -160,6 +214,10 @@ end
 local function dissolve(model: Model)
 	local info = TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	for _, item in model:GetDescendants() do
+		if item:IsA("BasePart") then
+			-- Open at once: the wall stops blocking before it finishes fading.
+			item.CanCollide = false
+		end
 		if item:IsA("BasePart") and item.Transparency < 1 then
 			item.Color = Color3.fromRGB(255, 240, 170)
 			TweenService:Create(item, info, {
