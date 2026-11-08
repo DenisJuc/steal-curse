@@ -25,7 +25,6 @@ local HuntFX = require(script.Parent.HuntFX)
 local SpiritSight = require(script.Parent.SpiritSight)
 local Settings = require(script.Parent.Parent.Settings)
 local Sounds = require(script.Parent.Parent.Sounds)
-local HudUnlocks = require(script.Parent.Parent.UI.HudUnlocks)
 local Toasts = require(script.Parent.Parent.UI.Toasts)
 local HuntModels = require(script.Parent.HuntModels)
 
@@ -322,12 +321,9 @@ local function spawnBox(id: number, ground: Vector3, expiresAt: number)
 	prompt.MaxActivationDistance = Config.WildFinds.Offering.ClaimRange
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = body
-	HudUnlocks.WatchPrompt(prompt, "Hunt")
+	-- Open from the start: offering boxes and Lost Ones are what a new player finds in the wild
+	-- before Spirit Sight unlocks hunting (the tutorial says so on their first walk out).
 	prompt.Triggered:Connect(function()
-		if not HudUnlocks.IsUnlocked("Hunt") then
-			HudUnlocks.Explain("Hunt")
-			return
-		end
 		prompt.Enabled = false
 		WildFindAction:FireServer("Claim", id)
 		task.delay(2, function()

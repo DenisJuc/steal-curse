@@ -267,7 +267,7 @@ MapLightLOD.Start()
 SprintController.Start(screen, rollBar.Frame)
 Onboarding.Start(screen)
 HudUnlocks.Start(screen)
-NextUnlockChip.Start(screen, rollBar.Frame)
+NextUnlockChip.Start(screen)
 local afk = AfkController.Start()
 
 if RunService:IsStudio() then

@@ -8,11 +8,20 @@
 -- Skip sets it Off (only the banners). Turning it back On in Settings replays it. New players
 -- start with Auto Roll off (DataTemplate), so the first rolls are theirs.
 
+--
+-- Layout: the bubble grows to fit its text (never cut off). Steps with Clear = "RollReel" sit
+-- above the roll reel so the first rolls' results stay visible. Spirit Sight's unlock starts a
+-- short sealing tutorial (see, find, hold to bind); before that, a player's first walk into the
+-- wild gets one tip: no hunting yet, look for Lost Ones and offering boxes meanwhile.
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local TextService = game:GetService("TextService")
 
 local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
+local Ambience = require(script.Parent.Parent.Effects.Ambience)
+local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
 local Settings = require(script.Parent.Parent.Settings)
 local HudUnlocks = require(script.Parent.HudUnlocks)
 local Icons = require(script.Parent.Icons)
@@ -34,11 +43,39 @@ type Step = {
 	Skip: boolean?,
 	-- HudUnlocks gate: shown only once this feature is unlocked (at its unlock, or in a replay).
 	Gate: string?,
+	-- A descendant name the bubble must stay clear of (placed above it), e.g. the roll reel.
+	Clear: string?,
+	-- Shown only when Trigger fires (never in the main run), e.g. "WildEntry".
+	Trigger: string?,
 }
 
 local STEP_SECONDS = 9
 local GAP = 16
 local ROLLS_TO_LEARN = 3
+local BUBBLE_WIDTH = 320
+local BUBBLE_MIN_HEIGHT = 104
+-- Padding (10 top + 10 bottom) plus the Next/Skip row under the text.
+local BUBBLE_CHROME = 20 + 34
+local TEXT_SIZE = 18
+-- Wild weight (Ambience) that counts as being out in the wild.
+local WILD_AT = 0.6
+
+-- The main screen, for Done checks that look at the HUD (set by Start).
+local screenRef: ScreenGui? = nil
+-- Set when a bind finished since the step started (BindResult).
+local sealed = false
+
+local function hudShown(name: string): boolean
+	local screen = screenRef
+	local object = screen and screen:FindFirstChild(name, true)
+	while object and object ~= screen do
+		if object:IsA("GuiObject") and not object.Visible then
+			return false
+		end
+		object = object.Parent
+	end
+	return object ~= nil
+end
 
 local function number(player: Player, name: string): number
 	local value = player:GetAttribute(name)
@@ -54,6 +91,7 @@ local STEPS: { Step } = {
 	{
 		Target = "RollButton",
 		Side = "Above",
+		Clear = "RollReel",
 		Text = "Tap ROLL to seal your first cursed relic!",
 		Done = function(player)
 			return number(player, "TotalScans") >= startScans + 1
@@ -62,7 +100,8 @@ local STEPS: { Step } = {
 	{
 		Target = "RollButton",
 		Side = "Above",
-		Text = `Nice! Roll {ROLLS_TO_LEARN - 1} more times. The bar above ROLL shows what opens next.`,
+		Clear = "RollReel",
+		Text = `Nice! Roll {ROLLS_TO_LEARN - 1} more times. The bar at the top shows what opens next.`,
 		Done = function(player)
 			return number(player, "TotalScans") >= ROLLS_TO_LEARN
 		end,
@@ -142,11 +181,48 @@ local STEPS: { Step } = {
 		Text = "Fusion: collect 3 copies of one relic, open Collection, tap it, and Fuse.",
 		Skip = BalanceTrials.coreLoopPresentation(),
 	},
+	-- Sealing tutorial: plays when Spirit Sight unlocks (see, find, hold to bind, done).
 	{
 		Target = "SpiritSight",
 		Gate = "Hunt",
 		Side = "Left",
-		Text = "Spirit Sight lets you hunt your own signals in the wild. Each bind gives a relic plus bonus finds.",
+		Text = "You can seal curses now! Go out into the wild and turn on Spirit Sight to see them.",
+		Done = function()
+			return SpiritSight.IsEnabled()
+		end,
+	},
+	{
+		Target = "Pulse",
+		Gate = "Hunt",
+		Side = "Left",
+		Text = "Pulse to sense the curses around you, then walk up to a glowing signal.",
+		Done = function()
+			return hudShown("Bind")
+		end,
+		Fallback = { Target = "SpiritSight", Side = "Left", Text = "Turn Spirit Sight back on to keep sealing." },
+	},
+	{
+		Target = "Bind",
+		Gate = "Hunt",
+		Side = "Left",
+		Text = "Hold Bind to seal it. Keep holding until the chains close!",
+		Done = function()
+			return sealed
+		end,
+		Fallback = { Target = "Pulse", Side = "Left", Text = "Get close to a signal: the Bind button appears." },
+	},
+	{
+		Target = "SpiritSight",
+		Gate = "Hunt",
+		Side = "Left",
+		Text = "Sealed! Every seal gives that relic plus bonus finds. Leave Sight to go back to your shrine.",
+	},
+	-- First walk into the wild before Spirit Sight: no hunting yet, but there is plenty to find.
+	{
+		Target = "NextUnlockChip",
+		Trigger = "WildEntry",
+		Side = "Below",
+		Text = "The spirits here stay hidden until Spirit Sight unlocks. For now, follow the Lost Ones and listen for chiming offering boxes!",
 	},
 }
 
@@ -167,13 +243,14 @@ local ARROWS: { [Side]: { Text: string, Anchor: Vector2, Position: UDim2 } } = {
 function Onboarding.Start(screen: ScreenGui)
 	local player = Players.LocalPlayer
 	local colors = UIKit.Colors
+	screenRef = screen
 	local activeSteps: { Step } = {}
 	-- Steps for features unlocked from here on wait their turn (one tip at a time).
 	local waitingTips: { Step } = {}
 	local function mainSteps(): { Step }
 		local list = {}
 		for _, step in STEPS do
-			if not step.Skip and (not step.Gate or HudUnlocks.IsUnlocked(step.Gate)) then
+			if not step.Skip and not step.Trigger and (not step.Gate or HudUnlocks.IsUnlocked(step.Gate)) then
 				table.insert(list, step)
 			end
 		end
@@ -183,7 +260,7 @@ function Onboarding.Start(screen: ScreenGui)
 
 	local bubble = UIKit.create("Frame", {
 		Name = "HintBubble",
-		Size = UDim2.fromOffset(320, 104),
+		Size = UDim2.fromOffset(BUBBLE_WIDTH, BUBBLE_MIN_HEIGHT),
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.03,
 		Visible = false,
@@ -202,7 +279,7 @@ function Onboarding.Start(screen: ScreenGui)
 		infoIcon.ZIndex = 27
 	end
 	local textLabel = UIKit.label({
-		TextSize = 18,
+		TextSize = TEXT_SIZE,
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Top,
 		Size = UDim2.new(1, 0, 1, -34),
@@ -238,6 +315,25 @@ function Onboarding.Start(screen: ScreenGui)
 		end
 		lastCE = ce
 	end)
+	local bindResult = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("BindResult") :: RemoteEvent
+	bindResult.OnClientEvent:Connect(function(result)
+		if type(result) == "table" and result.Ok then
+			sealed = true
+		end
+	end)
+
+	-- Grow the bubble to its text so long tips are never cut off (offsets are pre-UIScale, like
+	-- the bubble's own size, so the scaler keeps them in step).
+	local fittedText = ""
+	local function setText(text: string)
+		if text == fittedText then
+			return
+		end
+		fittedText = text
+		textLabel.Text = text
+		local bounds = TextService:GetTextSize(text, TEXT_SIZE, textLabel.Font, Vector2.new(BUBBLE_WIDTH - 20, 1000))
+		bubble.Size = UDim2.fromOffset(BUBBLE_WIDTH, math.max(BUBBLE_MIN_HEIGHT, math.ceil(bounds.Y) + BUBBLE_CHROME + 4))
+	end
 
 	local index = 0
 	local token = 0
@@ -294,6 +390,7 @@ function Onboarding.Start(screen: ScreenGui)
 		local myToken = token
 		local step = activeSteps[stepIndex]
 		spent = false
+		sealed = false
 		startScans = number(player, "TotalScans")
 		stepLabel.Text = `{stepIndex}/{#activeSteps}`
 		-- Action steps wait for the action (Skip leaves the tutorial); tips have Next.
@@ -398,7 +495,7 @@ function Onboarding.Start(screen: ScreenGui)
 			bubble.Visible = false
 			return
 		end
-		textLabel.Text = text
+		setText(text)
 		bubble.AnchorPoint = ANCHORS[side]
 		local shape = ARROWS[side]
 		arrow.Text = shape.Text
@@ -412,15 +509,16 @@ function Onboarding.Start(screen: ScreenGui)
 		arrow.Position = shape.Position + push
 		local position, size = target.AbsolutePosition, target.AbsoluteSize
 		local gap = GAP + 22
-		-- Above ROLL sits the next-unlock chip: point past it, not into it.
-		if side == "Above" and string.find(target.Name, "Roll", 1, true) then
-			gap += 28
-		end
 		local point = if side == "Right"
 			then Vector2.new(position.X + size.X + gap, position.Y + size.Y / 2)
 			elseif side == "Below" then Vector2.new(position.X + size.X / 2, position.Y + size.Y + gap)
 			elseif side == "Above" then Vector2.new(position.X + size.X / 2, position.Y - gap)
 			else Vector2.new(position.X - gap, position.Y + size.Y / 2)
+		-- Stay above a frame the player must see (the roll reel shows what each roll found).
+		local clear = step.Clear and target == find(step.Target) and screen:FindFirstChild(step.Clear, true)
+		if side == "Above" and clear and clear:IsA("GuiObject") then
+			point = Vector2.new(point.X, math.min(point.Y, clear.AbsolutePosition.Y - (GAP + 22)))
+		end
 		-- Keep the whole bubble on screen (a target near an edge would push it off).
 		local bubbleSize = bubble.AbsoluteSize
 		local screenSize = screen.AbsoluteSize
@@ -457,6 +555,45 @@ function Onboarding.Start(screen: ScreenGui)
 		end
 		-- After the unlock banner has had its moment; during the tutorial they follow its last step.
 		task.delay(2.5, startTips)
+	end)
+
+	-- Event tips (Trigger): they matter now, so they cut in front of the step showing, which
+	-- comes back once the tip is read.
+	local triggered: { [string]: boolean } = {}
+	local function fire(trigger: string)
+		if triggered[trigger] or Settings.Get("Hints") == "Off" then
+			return
+		end
+		triggered[trigger] = true
+		local tips = {}
+		for _, step in STEPS do
+			if step.Trigger == trigger then
+				table.insert(tips, step)
+			end
+		end
+		if running and activeSteps[index] then
+			for offset, step in tips do
+				table.insert(activeSteps, index + offset - 1, step)
+			end
+			showStep(index)
+		else
+			for _, step in tips do
+				table.insert(waitingTips, step)
+			end
+			startTips()
+		end
+	end
+	-- First walk into the wild while Spirit Sight is still locked (once a session).
+	task.spawn(function()
+		while not triggered.WildEntry do
+			task.wait(1)
+			if HudUnlocks.IsReady() and not HudUnlocks.IsUnlocked("Hunt") and Ambience.WildWeight() >= WILD_AT then
+				fire("WildEntry")
+			elseif HudUnlocks.IsReady() and HudUnlocks.IsUnlocked("Hunt") then
+				-- Spirit Sight is open: the sealing tutorial covers the wild from here.
+				break
+			end
+		end
 	end)
 
 	-- Wait for the saved value before deciding, so returning players never see a flash of tips.

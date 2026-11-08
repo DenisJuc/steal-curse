@@ -1,9 +1,10 @@
--- "Next unlock" chip just above the ROLL bar: "Pedestals unlock in 4 rolls" with a thin progress
--- bar, from HudUnlocks.Next(). It explains the roll-only start: more of the shrine is always on its
+-- "Next unlock" chip at the top center: "Pedestals unlock in 4 rolls" with a thin progress bar,
+-- from HudUnlocks.Next(). It explains the roll-only start: more of the shrine is always on its
 -- way. Updates with every check (each roll), moves on when an entry unlocks (HudUnlocks plays the
--- banner) and disappears once everything is open. Sits in the gap under the roll reel.
+-- banner) and disappears once everything is open. It used to sit above ROLL, where it crowded the
+-- roll reel and the tutorial bubble; up top it is clear of both. The discovery feed starts under
+-- it (the screen's "TopChipHeight" attribute), and it steps aside while a menu is open.
 
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local HudUnlocks = require(script.Parent.HudUnlocks)
@@ -11,14 +12,15 @@ local UIKit = require(script.Parent.UIKit)
 
 local NextUnlockChip = {}
 
-local WIDTH, HEIGHT = 270, 24
-local GAP = 3
+local WIDTH, HEIGHT = 300, 30
+local TOP = 8
 
-function NextUnlockChip.Start(screen: ScreenGui, anchor: GuiObject)
+function NextUnlockChip.Start(screen: ScreenGui)
 	local colors = UIKit.Colors
 	local chip = UIKit.create("Frame", {
 		Name = "NextUnlockChip",
-		AnchorPoint = Vector2.new(0.5, 1),
+		AnchorPoint = Vector2.new(0.5, 0),
+		Position = UDim2.new(0.5, 0, 0, TOP),
 		Size = UDim2.fromOffset(WIDTH, HEIGHT),
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.15,
@@ -50,23 +52,32 @@ function NextUnlockChip.Start(screen: ScreenGui, anchor: GuiObject)
 		Name = "Text",
 		Position = UDim2.fromOffset(0, 1),
 		Size = UDim2.new(1, 0, 1, -6),
-		TextSize = 15,
+		TextSize = 17,
 		TextColor3 = Color3.fromRGB(245, 235, 210),
 		TextXAlignment = Enum.TextXAlignment.Center,
 		Parent = chip,
 	})
 
-	RunService.RenderStepped:Connect(function()
-		local offset = anchor.AbsolutePosition - screen.AbsolutePosition
-		chip.Position = UDim2.fromOffset(offset.X + anchor.AbsoluteSize.X / 2, offset.Y - GAP)
+	local menuOpen = false
+	local hasNext = false
+	local function place()
+		chip.Visible = hasNext and not menuOpen
+		-- Room the discovery feed leaves at the top for the chip, in screen pixels (after UIScale).
+		screen:SetAttribute("TopChipHeight", if chip.Visible then TOP + chip.AbsoluteSize.Y + 6 else 0)
+	end
+	chip:GetPropertyChangedSignal("AbsoluteSize"):Connect(place)
+	UIKit.watchMenus(screen, function(open: boolean)
+		menuOpen = open
+		place()
 	end)
 
 	local shownId: string? = nil
 	local function refresh()
 		local nextUnlock = HudUnlocks.Next()
 		if not nextUnlock then
-			chip.Visible = false
+			hasNext = false
 			shownId = nil
+			place()
 			return
 		end
 		local verb = if string.sub(nextUnlock.Label, -1) == "s" then "unlock" else "unlocks"
@@ -80,7 +91,8 @@ function NextUnlockChip.Start(screen: ScreenGui, anchor: GuiObject)
 			shownId = nextUnlock.Id
 		end
 		TweenService:Create(fill, TweenInfo.new(0.25), { Size = UDim2.fromScale(nextUnlock.Progress, 1) }):Play()
-		chip.Visible = true
+		hasNext = true
+		place()
 	end
 	HudUnlocks.Changed:Connect(refresh)
 end

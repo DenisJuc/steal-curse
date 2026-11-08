@@ -217,6 +217,13 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 		}),
 	})
 	UIKit.scaler(list)
+	-- Starts under the next-unlock chip while it shows (NextUnlockChip).
+	local function follow()
+		local top = screen:GetAttribute("TopChipHeight")
+		list.Position = UDim2.new(0.5, 0, 0, if type(top) == "number" and top > 0 then top else 8)
+	end
+	screen:GetAttributeChangedSignal("TopChipHeight"):Connect(follow)
+	follow()
 	UIKit.watchCompact(function(compact: boolean)
 		maxLines = if compact then Config.Feed.CompactMaxLines else Config.Feed.MaxLines
 		list.Size = UDim2.fromOffset(340, (LINE_HEIGHT + 6) * maxLines)

@@ -20,7 +20,7 @@ local Toasts = require(script.Parent.Toasts)
 local HudUnlocks = {}
 
 -- Shared state (set by Start): which gates are open, the latest stats, and a change signal for the
--- chip above ROLL and locked world prompts. Before Start everything counts as unlocked.
+-- next-unlock chip (top center) and locked world prompts. Before Start everything counts as unlocked.
 local started = false
 local unlockedState: { [string]: boolean } = {}
 local latest = { Scans = 0, Discovered = 0, CoreLuck = 0 }
