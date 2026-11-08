@@ -234,6 +234,7 @@ function CollectionPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible:
 		TextColor3 = colors.SubText,
 		Parent = boardDetail,
 	})
+	local statusLabel: TextLabel -- created further down; forward-declared for the board button
 	local boardDetailAction: "upgrade" | "gotoFuse" | "pursue" | "retire" = "upgrade"
 	local retireConfirmId: string? = nil
 	local boardUpgradeBtn = UIKit.button({
@@ -341,7 +342,7 @@ function CollectionPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible:
 		refresh()
 	end)
 
-	local statusLabel = UIKit.label({
+	statusLabel = UIKit.label({
 		Name = "Status",
 		Size = UDim2.new(1, 0, 0, 36),
 		Text = "",

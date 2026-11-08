@@ -1240,6 +1240,8 @@ function CollectionService.TrySalvage(player: Player, relicId: string, mutationI
 	return true, `Salvaged for {amount} Essence.`
 end
 
+local buildAscendHint: (Player, any) -> any? -- defined below; forward-declared for CraftAttune
+
 function CollectionService.CraftAttune(player: Player): (boolean, string)
 	if not enabled() then
 		return false, "Collection prototype is off."
@@ -1454,7 +1456,7 @@ function CollectionService.ShrinePulseSeconds(player: Player): number
 	return base
 end
 
-local function buildAscendHint(player: Player, state: any): any?
+function buildAscendHint(player: Player, state: any): any?
 	local data = DataService.Get(player)
 	if not data then
 		return nil
