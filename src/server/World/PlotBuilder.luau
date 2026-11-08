@@ -32,6 +32,8 @@ local CIRCLE_CENTER = { 0, -12 }
 
 local FLOOR_TOP = 1.2
 local WALL_H = 8
+-- Front wall (the street side) is a low fence so the relics show from Shrine Street.
+local FRONT_H = 3
 local GATE_GAP = 16
 local PATH_W = 10
 local TERRACE_H = 1.0
@@ -356,8 +358,8 @@ local function buildWalls(parent: Instance, at: (number, number, number) -> CFra
 		{ Vector3.new(t, WALL_H, size), at(-half + t / 2, FLOOR_TOP + WALL_H / 2, 0) },
 		{ Vector3.new(t, WALL_H, size), at(half - t / 2, FLOOR_TOP + WALL_H / 2, 0) },
 		-- Front wings (gate gap in the middle)
-		{ Vector3.new(wing, WALL_H, t), at(-(GATE_GAP / 2 + wing / 2), FLOOR_TOP + WALL_H / 2, -half + t / 2) },
-		{ Vector3.new(wing, WALL_H, t), at(GATE_GAP / 2 + wing / 2, FLOOR_TOP + WALL_H / 2, -half + t / 2) },
+		{ Vector3.new(wing, FRONT_H, t), at(-(GATE_GAP / 2 + wing / 2), FLOOR_TOP + FRONT_H / 2, -half + t / 2) },
+		{ Vector3.new(wing, FRONT_H, t), at(GATE_GAP / 2 + wing / 2, FLOOR_TOP + FRONT_H / 2, -half + t / 2) },
 	}
 	for _, wall in walls do
 		BuildUtil.part(parent, {
@@ -375,8 +377,8 @@ local function buildWalls(parent: Instance, at: (number, number, number) -> CFra
 		{ Vector3.new(size, capH, t + 0.25), at(0, FLOOR_TOP + WALL_H + capH / 2, half - t / 2) },
 		{ Vector3.new(t + 0.25, capH, size), at(-half + t / 2, FLOOR_TOP + WALL_H + capH / 2, 0) },
 		{ Vector3.new(t + 0.25, capH, size), at(half - t / 2, FLOOR_TOP + WALL_H + capH / 2, 0) },
-		{ Vector3.new(wing, capH, t + 0.25), at(-(GATE_GAP / 2 + wing / 2), FLOOR_TOP + WALL_H + capH / 2, -half + t / 2) },
-		{ Vector3.new(wing, capH, t + 0.25), at(GATE_GAP / 2 + wing / 2, FLOOR_TOP + WALL_H + capH / 2, -half + t / 2) },
+		{ Vector3.new(wing, capH, t + 0.25), at(-(GATE_GAP / 2 + wing / 2), FLOOR_TOP + FRONT_H + capH / 2, -half + t / 2) },
+		{ Vector3.new(wing, capH, t + 0.25), at(GATE_GAP / 2 + wing / 2, FLOOR_TOP + FRONT_H + capH / 2, -half + t / 2) },
 	}
 	for _, cap in caps do
 		BuildUtil.part(parent, {

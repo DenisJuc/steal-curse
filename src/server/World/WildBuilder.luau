@@ -118,6 +118,8 @@ local SPATIAL_CELL = 16
 -- Bridge bottom height: its 1-stud walkway collider then sits level with the banks (y = 0).
 local BRIDGE_BASE = -0.5
 local TOWN_PATH = Enum.Material.Cobblestone
+-- Smoothed terrain puts the flat town surface (street, plaza, lawns) this high (measured in Studio).
+local TOWN_SURFACE = 2.2
 local PATH_GLOW = Color3.fromRGB(190, 140, 255)
 -- Landmarks a spirit pulse outlines through the fog (client SpiritSight).
 local LANDMARK_TAG = "Landmark"
@@ -218,11 +220,12 @@ local function fillGround(terrain: Terrain, rng: Random, seed: number, shape: Wi
 		end
 		task.wait()
 	end
-	local hubX, hubZ = WorldLayout.hubPosition(Config.Plots)
-	terrain:FillCylinder(
-		CFrame.new(hubX, -GROUND_DEPTH / 2, hubZ),
-		GROUND_DEPTH + 0.5,
-		Config.Hub.PlazaRadius + 4,
+	local hubX, hubZ, hubFX, hubFZ = WorldLayout.hubFrame(Config.Plots)
+	local plazaSize = Config.Hub.PlazaSize
+	local hubCenter = Vector3.new(hubX, -GROUND_DEPTH / 2, hubZ)
+	terrain:FillBlock(
+		CFrame.lookAt(hubCenter, hubCenter + Vector3.new(hubFX, 0, hubFZ)),
+		Vector3.new(plazaSize[1] + 8, GROUND_DEPTH + 0.5, plazaSize[2] + 8),
 		Enum.Material.Slate
 	)
 	-- Grass decoration pokes through the thin plot floors, so plots stand on bare slate.
@@ -283,19 +286,109 @@ local function glowPair(folder: Instance, point: Vector3, side: Vector3)
 	end
 end
 
+-- Brighter street lanterns: Shrine Street is lit, the wild is not.
+local function brighten(model: Model?, light: { Range: number, Brightness: number })
+	if not model then
+		return
+	end
+	for _, descendant in model:GetDescendants() do
+		if descendant:IsA("PointLight") then
+			descendant.Range = light.Range
+			descendant.Brightness = light.Brightness
+		end
+	end
+end
+
+-- Town dressing on the open ground beside the plot rows: bamboo, sakura, rocks, ferns and lilies
+-- on a jittered grid, clear of plots, the plaza, the street and every town path.
+local DRESSING = {
+	{ Prop = "BambooGrove", Weight = 4 },
+	{ Prop = "BambooGrove2", Weight = 4 },
+	{ Prop = "HomeBlossomTree", Weight = 2 },
+	{ Prop = "MossyRocks", Weight = 3 },
+	{ Prop = "FernBush", Weight = 4 },
+	{ Prop = "SpiderLilyPatch", Weight = 3 },
+	{ Prop = "StoneLantern", Weight = 1 },
+}
+local DRESSING_SPACING = 17
+local DRESSING_CHANCE = 0.42
+
+local function segmentDistance(x: number, z: number, a: { number }, b: { number }): number
+	local abx, abz = b[1] - a[1], b[2] - a[2]
+	local t = math.clamp(((x - a[1]) * abx + (z - a[2]) * abz) / (abx * abx + abz * abz), 0, 1)
+	local px, pz = a[1] + abx * t, a[2] + abz * t
+	return math.sqrt((x - px) ^ 2 + (z - pz) ^ 2)
+end
+
+local function dressTown(folder: Instance, paths: { [string]: { { number } } })
+	local world = Config.World
+	local plots = Config.Plots
+	local street = plots.Street
+	local rng = Random.new(2611)
+	local total = 0
+	for _, entry in DRESSING do
+		total += entry.Weight
+	end
+	local plaza = WorldLayout.plazaBox(plots, Config.Hub.PlazaSize)
+	local limit = math.ceil(world.WildInner / DRESSING_SPACING)
+	for i = -limit, limit do
+		for j = -limit, limit do
+			local x = i * DRESSING_SPACING + rng:NextNumber(-5, 5)
+			local z = j * DRESSING_SPACING + rng:NextNumber(-5, 5)
+			if rng:NextNumber() > DRESSING_CHANCE or math.sqrt(x * x + z * z) > world.WildInner - 12 then
+				continue
+			end
+			local along, across = WorldLayout.toStreet(street, x, z)
+			if math.abs(across) < street.HalfWidth + 8 and along > street.HubAt then
+				continue
+			end
+			if WorldLayout.distanceToBox(x, z, plaza) < 10 then
+				continue
+			end
+			local clear = true
+			for index = 1, plots.Count do
+				if WorldLayout.distanceToBox(x, z, WorldLayout.plotBox(plots, index)) < 7 then
+					clear = false
+					break
+				end
+			end
+			for _, points in paths do
+				for k = 1, #points - 1 do
+					clear = clear and segmentDistance(x, z, points[k], points[k + 1]) > PATH_WIDTH / 2 + 8
+				end
+			end
+			if not clear then
+				continue
+			end
+			local pick = rng:NextNumber() * total
+			local prop = DRESSING[#DRESSING].Prop
+			for _, entry in DRESSING do
+				pick -= entry.Weight
+				if pick <= 0 then
+					prop = entry.Prop
+					break
+				end
+			end
+			MapProps.build(folder, prop, CFrame.new(x, TOWN_SURFACE, z) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0), rng:NextNumber(0.85, 1.15), rng)
+		end
+	end
+end
+
 -- Shrine Street: the paved avenue from the hub plaza to the wild gate, stone lanterns along both
--- curbs and a torii where it leaves the plaza; town paths from the plaza to the other areas.
+-- curbs, a torii where it leaves the plaza and the Spirit Lane inlay down the middle; town paths
+-- from the plaza to the other areas, then dressing on the open ground.
 local function buildTown(terrain: Terrain, folder: Instance)
 	local world = Config.World
 	local plots = Config.Plots
 	local street = plots.Street
-	local plaza = Config.Hub.PlazaRadius
-	local nearEnd = { WorldLayout.fromStreet(street, street.HubAt, 0) }
+	local plazaSize = Config.Hub.PlazaSize
+	local startAt = WorldLayout.streetStart(plots, plazaSize)
+	local nearEnd = { WorldLayout.fromStreet(street, startAt, 0) }
 	local farEnd = { WorldLayout.fromStreet(street, world.WildInner, 0) }
 	segment(terrain, nearEnd, farEnd, street.HalfWidth * 2, TOWN_PATH)
 	local dx, dz, nx, nz = WorldLayout.streetAxes(street)
 	local along = Vector3.new(dx, 0, dz)
-	for distance = street.HubAt + plaza + 8, world.WildInner - 14, street.LanternSpacing do
+	for distance = startAt + 8, world.WildInner - 14, street.LanternSpacing do
 		-- Keep plot entrances clear.
 		local blocking = false
 		for index = 1, plots.Count, 2 do
@@ -306,15 +399,41 @@ local function buildTown(terrain: Terrain, folder: Instance)
 		end
 		for _, side in { -1, 1 } do
 			local x, z = WorldLayout.fromStreet(street, distance, side * (street.HalfWidth - 2))
-			local position = Vector3.new(x, 0, z)
-			MapProps.build(folder, "StoneLantern", CFrame.lookAt(position, position + Vector3.new(-nx * side, 0, -nz * side)))
+			local position = Vector3.new(x, TOWN_SURFACE, z)
+			brighten(MapProps.build(folder, "StoneLantern", CFrame.lookAt(position, position + Vector3.new(-nx * side, 0, -nz * side))), street.LanternLight)
 		end
 	end
-	local gx, gz = WorldLayout.fromStreet(street, street.HubAt + plaza + 2, 0)
-	local gate = Vector3.new(gx, 0, gz)
+	local gx, gz = WorldLayout.fromStreet(street, startAt + 2, 0)
+	local gate = Vector3.new(gx, TOWN_SURFACE, gz)
 	MapProps.build(folder, "ShrineGate", CFrame.lookAt(gate, gate + along))
 
-	local paths = WorldLayout.townPaths(plots, world, Config.Areas, plaza)
+	-- Spirit Lane: glowing diamond tiles down the center line (the street is faster to walk).
+	for distance = startAt + 6, world.WildInner - 2, 9 do
+		local x, z = WorldLayout.fromStreet(street, distance, 0)
+		local center = Vector3.new(x, TOWN_SURFACE + 0.06, z)
+		BuildUtil.decor(BuildUtil.part(folder, {
+			Name = "SpiritLane",
+			Size = Vector3.new(2.2, 0.16, 2.2),
+			CFrame = CFrame.lookAt(center, center + along) * CFrame.Angles(0, math.rad(45), 0),
+			Material = Enum.Material.Neon,
+			Color = PATH_GLOW,
+			Transparency = 0.25,
+		}))
+	end
+	for _, side in { -1, 1 } do
+		local x, z = WorldLayout.fromStreet(street, (startAt + world.WildInner) / 2, side * 3.2)
+		local center = Vector3.new(x, TOWN_SURFACE + 0.04, z)
+		BuildUtil.decor(BuildUtil.part(folder, {
+			Name = "SpiritLaneLine",
+			Size = Vector3.new(0.35, 0.12, world.WildInner - startAt - 4),
+			CFrame = CFrame.lookAt(center, center + along),
+			Material = Enum.Material.Neon,
+			Color = PATH_GLOW,
+			Transparency = 0.45,
+		}))
+	end
+
+	local paths = WorldLayout.townPaths(plots, world, Config.Areas, plazaSize)
 	for _, area in Config.Areas do
 		local points = paths[area.Id]
 		if math.abs(area.AngleDegrees - street.AngleDegrees) < 1e-6 then
@@ -323,7 +442,7 @@ local function buildTown(terrain: Terrain, folder: Instance)
 		for index = 1, #points - 1 do
 			local a, b = points[index], points[index + 1]
 			segment(terrain, a, b, PATH_WIDTH, TOWN_PATH)
-			local from, to = Vector3.new(a[1], 0.3, a[2]), Vector3.new(b[1], 0.3, b[2])
+			local from, to = Vector3.new(a[1], TOWN_SURFACE + 0.3, a[2]), Vector3.new(b[1], TOWN_SURFACE + 0.3, b[2])
 			local direction = (to - from).Unit
 			local side = Vector3.new(-direction.Z, 0, direction.X) * (PATH_WIDTH / 2 + 1)
 			for distance = 8, (to - from).Magnitude, 16 do
@@ -331,6 +450,7 @@ local function buildTown(terrain: Terrain, folder: Instance)
 			end
 		end
 	end
+	dressTown(folder, paths)
 end
 
 local function buildPaths(terrain: Terrain, folder: Instance)

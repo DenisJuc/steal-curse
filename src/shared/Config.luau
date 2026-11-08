@@ -786,11 +786,11 @@ Config.World = {
 	PartBudget = 12000,
 	-- Default Roblox walk speed (studs/s), used by the travel-time tests.
 	WalkSpeed = 16,
-	-- Every plot must reach the street's wild gate within this many seconds of walking. Walking
-	-- the street past every base is the point of the layout; the Wild button is the shortcut.
-	MaxTravelSeconds = 30,
-	-- From the hub plaza to the street's wild gate.
-	MaxHubTravelSeconds = 36,
+	-- Every plot must reach the street's wild gate within this many seconds of walking (out of
+	-- the plot at WalkSpeed, then down the street at the Spirit Lane speed).
+	MaxTravelSeconds = 20,
+	-- From the hub plaza's front edge to the street's wild gate, on the Spirit Lane.
+	MaxHubTravelSeconds = 20,
 }
 
 -- AngleDegrees: the middle of each area's slice of the ring, and where its path runs out of town.
@@ -955,13 +955,16 @@ Config.Plots = {
 	Street = {
 		AngleDegrees = 22.5,
 		HalfWidth = 20,
-		HubAt = -232,
+		HubAt = -228,
 		FirstPlotAt = -124,
 		PlotSpacing = 108,
 		-- Plot center distance from the street's center line (HalfWidth + Size / 2).
 		RowOffset = 70,
-		-- Stone lanterns along both curbs, this far apart.
+		-- Stone lanterns along both curbs, this far apart, and their light.
 		LanternSpacing = 27,
+		LanternLight = { Range = 26, Brightness = 2.4 },
+		-- Spirit Lane: on the paved street you walk Multiplier x faster and sprint costs no stamina.
+		Lane = { Multiplier = 1.75 },
 		-- Town paths from the hub plaza to the other wild areas: optional bends, as
 		-- {along, across} street coordinates (across is positive on the odd-plot side).
 		Bends = { AncientRuins = { { -200, -190 } } },
@@ -983,21 +986,27 @@ Config.Plots = {
 	SpawnOffset = { 0, -33 },
 }
 
+-- Hub plaza at the near end of Shrine Street. Hub space: X across the street, -Z toward the
+-- street (the temple stands at the origin). 2026-11-08: a wide rectangle instead of the old
+-- 46-stud circle, kiosks in two rows facing each other across an open middle.
 Config.Hub = {
-	PlazaRadius = 46,
-	LanternCount = 8,
-	-- Hub kiosks open a menu through a proximity prompt. Angle in degrees, Radius from the center.
-	-- Prop: optional map prop standing beside the counter (MapPropConfig).
-	KioskRadius = 31,
+	-- Width (X) and depth (Z) of the paved plaza.
+	PlazaSize = { 190, 84 },
+	-- Stone lanterns around the plaza edge, about this far apart.
+	LanternSpacing = 22,
+	-- Hub kiosks open a menu through a proximity prompt. At = {x, z} in hub space; each counter
+	-- faces the plaza's middle line. Prop: optional map prop beside the counter (MapPropConfig).
 	Kiosks = {
-		{ Menu = "Codex", Label = "Codex Archive", AngleDegrees = 30, Prop = "CodexLectern" },
-		{ Menu = "Skills", Label = "Rune Monolith", AngleDegrees = 90, Prop = "RuneMonolith" },
-		{ Menu = "Luck", Label = "Fortune Shrine", AngleDegrees = 150, Prop = "OfferingBox" },
-		{ Menu = "Relics", Label = "Relic Keeper", AngleDegrees = 210 },
-		{ Menu = "Journal", Label = "Journal Board", AngleDegrees = 330 },
-		{ Menu = "Bounties", Label = "Bounty Board", AngleDegrees = 0 },
-		{ Menu = "Wardrobe", Label = "Spirit Wardrobe", AngleDegrees = 250 },
+		{ Menu = "Codex", Label = "Codex Archive", At = { -64, -27 }, Prop = "CodexLectern" },
+		{ Menu = "Skills", Label = "Rune Monolith", At = { -64, -9 }, Prop = "RuneMonolith" },
+		{ Menu = "Luck", Label = "Fortune Shrine", At = { -64, 9 }, Prop = "OfferingBox" },
+		{ Menu = "Wardrobe", Label = "Spirit Wardrobe", At = { -64, 27 } },
+		{ Menu = "Relics", Label = "Relic Keeper", At = { 64, -18 } },
+		{ Menu = "Journal", Label = "Journal Board", At = { 64, 0 } },
+		{ Menu = "Bounties", Label = "Bounty Board", At = { 64, 18 } },
 	},
+	-- Leaderboard tablets beside the street mouth, facing down the street (hub space {x, z}).
+	Leaderboards = { Seals = { -40, -34 }, Rarest = { 40, -34 } },
 }
 
 -- Lasting Luck: the luck multiplier from permanent sources only (MultiplierService source names).

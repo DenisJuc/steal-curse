@@ -3,6 +3,8 @@
 -- Step included). Stamina math lives in Shared/Stamina; a slim screen bar just above the bottom
 -- ROLL bar shows it while it is not full (a bar under your feet got covered when zoomed in).
 -- A WalkSpeed of 0 means a bind froze you (HuntController): sprint stays out of it.
+-- Spirit Lane: on the paved Shrine Street you move Config.Plots.Street.Lane.Multiplier x faster
+-- and sprinting there costs no stamina (purple wind trails your feet; a hint shows the first time).
 
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
@@ -12,7 +14,33 @@ local RunService = game:GetService("RunService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local Stamina = require(ReplicatedStorage.Shared.Stamina)
+local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
+local Toasts = require(script.Parent.Parent.UI.Toasts)
 local UIKit = require(script.Parent.Parent.UI.UIKit)
+
+local LANE_COLOR = Color3.fromRGB(190, 140, 255)
+
+-- Wind streaks at the feet while the Spirit Lane speeds you up.
+local function laneWind(root: BasePart): ParticleEmitter
+	local existing = root:FindFirstChild("LaneWind")
+	if existing and existing:IsA("ParticleEmitter") then
+		return existing
+	end
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "LaneWind"
+	emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	emitter.Color = ColorSequence.new(LANE_COLOR)
+	emitter.LightEmission = 1
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	emitter.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
+	emitter.Lifetime = NumberRange.new(0.35, 0.6)
+	emitter.Speed = NumberRange.new(1, 3)
+	emitter.SpreadAngle = Vector2.new(40, 40)
+	emitter.Rate = 0
+	emitter.Enabled = false
+	emitter.Parent = root
+	return emitter
+end
 
 local SprintController = {}
 
@@ -76,6 +104,7 @@ function SprintController.Start(screen: ScreenGui, anchor: GuiObject?)
 	local state = Stamina.new()
 	local held, toggled = false, false
 	local fullFor = math.huge
+	local laneHinted = false
 	local holder, back, fill = makeBar(screen)
 	local icon = holder:FindFirstChild("Icon") :: TextLabel
 
@@ -100,16 +129,38 @@ function SprintController.Start(screen: ScreenGui, anchor: GuiObject?)
 		end
 		local frozen = humanoid.WalkSpeed == 0
 		local moving = humanoid.MoveDirection.Magnitude > 0.1
-		Stamina.step(state, dt, (held or toggled) and not frozen, moving, cfg)
-		if state.Winded then
+		local root = character:FindFirstChild("HumanoidRootPart")
+		local onLane = root ~= nil
+			and root:IsA("BasePart")
+			and WorldLayout.onStreet(Config.Plots, Config.World, Config.Hub.PlazaSize, root.Position.X, root.Position.Z)
+		local wantsRun = (held or toggled) and not frozen
+		-- On the lane, running is free: stamina refills instead of draining.
+		Stamina.step(state, dt, wantsRun and not onLane, moving, cfg)
+		if state.Winded and not onLane then
 			toggled = false
 		end
 		if not frozen then
 			local base = character:GetAttribute("BaseWalkSpeed")
 			local walk = if type(base) == "number" then base else SkillConfig.walkSpeed(0)
-			local speed = Stamina.speed(walk, state.Running, cfg.Multiplier, cfg.MaxSpeed)
+			local running = state.Running or (onLane and wantsRun)
+			local speed = Stamina.speed(walk, running, cfg.Multiplier, cfg.MaxSpeed)
+			if onLane then
+				speed = math.min(speed * Config.Plots.Street.Lane.Multiplier, cfg.MaxSpeed)
+			end
 			if humanoid.WalkSpeed ~= speed then
 				humanoid.WalkSpeed = speed
+			end
+		end
+		if root and root:IsA("BasePart") then
+			local wind = laneWind(root)
+			local boosted = onLane and moving and not frozen
+			if wind.Enabled ~= boosted then
+				wind.Enabled = boosted
+				wind.Rate = if boosted then 40 else 0
+			end
+			if boosted and not laneHinted then
+				laneHinted = true
+				Toasts.Show("Spirit Lane: you move faster on Shrine Street, and running here is free!")
 			end
 		end
 		fullFor = if state.Value >= 1 then fullFor + dt else 0

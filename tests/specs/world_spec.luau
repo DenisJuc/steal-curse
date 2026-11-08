@@ -62,15 +62,16 @@ return {
 		Name = "the town fits inside the ring: plaza and every plot stay out of the wild",
 		Run = function()
 			local street = Config.Plots.Street
-			local plaza = Config.Hub.PlazaRadius
-			local hx, hz = WorldLayout.hubPosition(Config.Plots)
+			local plazaBox = WorldLayout.plazaBox(Config.Plots, Config.Hub.PlazaSize)
 			for index = 1, Config.Plots.Count do
 				for _, corner in plotCorners(index) do
 					local r = math.sqrt(corner[1] ^ 2 + corner[2] ^ 2)
 					expect.truthy(r < world.WildInner - 10, `plot {index} corner at {r}`)
 				end
-				local gap = WorldLayout.distanceToBox(hx, hz, WorldLayout.plotBox(Config.Plots, index)) - plaza
-				expect.truthy(gap >= 8, `plaza {gap} studs from plot {index}`)
+				for _, corner in plotCorners(index) do
+					local gap = WorldLayout.distanceToBox(corner[1], corner[2], plazaBox)
+					expect.truthy(gap >= 8, `plaza {gap} studs from plot {index}`)
+				end
 				-- Entrances open onto the street, and plots never overlap each other.
 				local x, z = WorldLayout.plotPosition(Config.Plots, index)
 				local fx, fz = WorldLayout.plotFacing(Config.Plots, index)
@@ -83,7 +84,30 @@ return {
 					expect.truthy(d >= h, `plots {index} and {other} overlap`)
 				end
 			end
-			expect.truthy(math.sqrt(hx * hx + hz * hz) + plaza < world.WildInner - 10, "plaza inside the town")
+			for _, corner in boxCorners(plazaBox) do
+				local r = math.sqrt(corner[1] ^ 2 + corner[2] ^ 2)
+				expect.truthy(r < world.WildInner - 10, `plaza corner at {r}`)
+			end
+			-- Kiosks and leaderboards stand inside the plaza, apart from each other and the temple.
+			local halfW, halfD = Config.Hub.PlazaSize[1] / 2, Config.Hub.PlazaSize[2] / 2
+			local spots = {}
+			for _, kiosk in Config.Hub.Kiosks do
+				table.insert(spots, { kiosk.Menu, kiosk.At })
+			end
+			for key, at in Config.Hub.Leaderboards do
+				table.insert(spots, { key, at })
+			end
+			for i, spot in spots do
+				local at = spot[2]
+				expect.truthy(math.abs(at[1]) <= halfW - 6 and math.abs(at[2]) <= halfD - 4, `{spot[1]} inside the plaza`)
+				expect.truthy(math.abs(at[1]) > 13 + 6, `{spot[1]} clear of the temple`)
+				expect.truthy(math.abs(at[1]) > street.HalfWidth, `{spot[1]} clear of the street mouth`)
+				for j = i + 1, #spots do
+					local other = spots[j][2]
+					local d = math.sqrt((at[1] - other[1]) ^ 2 + (at[2] - other[2]) ^ 2)
+					expect.truthy(d >= 15, `{spot[1]} and {spots[j][1]} {d} studs apart`)
+				end
+			end
 			-- Plot pairs face each other across the street.
 			local x1, z1 = WorldLayout.plotPosition(Config.Plots, 1)
 			local x2, z2 = WorldLayout.plotPosition(Config.Plots, 2)
@@ -96,7 +120,7 @@ return {
 			-- WildBuilder hub paths are 12 wide with glow stones 1 stud outside; keep 3 more studs of air.
 			local clearance = 6 + 1 + 3
 			local street = Config.Plots.Street
-			local paths = WorldLayout.townPaths(Config.Plots, world, areas, Config.Hub.PlazaRadius)
+			local paths = WorldLayout.townPaths(Config.Plots, world, areas, Config.Hub.PlazaSize)
 			for _, area in areas do
 				local points = paths[area.Id]
 				expect.truthy(points ~= nil and #points >= 2, `{area.Id} has a town path`)
@@ -192,15 +216,25 @@ return {
 		Name = "travel stays short: every plot and the hub walk the street to the wild gate within the limit",
 		Run = function()
 			local street = Config.Plots.Street
+			local laneSpeed = world.WalkSpeed * street.Lane.Multiplier
 			for index = 1, Config.Plots.Count do
-				-- Out the entrance to the curb, then down the street to the gate.
+				-- Out the entrance to the curb, then down the Spirit Lane to the gate.
 				local along = WorldLayout.plotStreet(Config.Plots, index)
-				local walk = (Config.Plots.Size / 2) + (world.WildInner - along)
-				local seconds = walk / world.WalkSpeed
+				local seconds = (Config.Plots.Size / 2) / world.WalkSpeed + (world.WildInner - along) / laneSpeed
 				expect.truthy(seconds <= world.MaxTravelSeconds, `plot {index} -> wild gate: {seconds} s`)
 			end
-			local hubWalk = world.WildInner - street.HubAt
-			expect.truthy(hubWalk / world.WalkSpeed <= world.MaxHubTravelSeconds, "hub -> wild gate")
+			local hubWalk = world.WildInner - WorldLayout.streetStart(Config.Plots, Config.Hub.PlazaSize)
+			expect.truthy(hubWalk / laneSpeed <= world.MaxHubTravelSeconds, "hub -> wild gate")
+			-- The lane covers the street only: not the plaza, not a plot, not the wild.
+			local size = Config.Hub.PlazaSize
+			local function on(along: number, across: number): boolean
+				local x, z = WorldLayout.fromStreet(street, along, across)
+				return WorldLayout.onStreet(Config.Plots, world, size, x, z)
+			end
+			expect.truthy(on(0, 0) and on(250, street.HalfWidth - 1), "on the street")
+			expect.truthy(not on(0, street.HalfWidth + 2), "a plot is not the lane")
+			expect.truthy(not on(street.HubAt, 0), "the plaza is not the lane")
+			expect.truthy(not on(world.WildInner + 5, 0), "the wild is not the lane")
 			local gx, gz = WorldLayout.streetGate(Config.Plots, world, 0)
 			expect.near(math.sqrt(gx * gx + gz * gz), world.WildInner, 1e-6, "gate on the ring")
 			expect.equal((WorldLayout.areaAt(areas, world, gx, gz)), "HauntedForest", "the gate opens on the forest")

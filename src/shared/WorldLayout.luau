@@ -101,6 +101,8 @@ export type Street = {
 	PlotSpacing: number,
 	RowOffset: number,
 	LanternSpacing: number,
+	LanternLight: { Range: number, Brightness: number },
+	Lane: { Multiplier: number },
 	Bends: { [string]: { { number } } },
 }
 export type Plots = { Count: number, Size: number, Street: Street }
@@ -175,26 +177,52 @@ function WorldLayout.streetGate(plots: Plots, world: World, depth: number): (num
 	return WorldLayout.fromStreet(plots.Street, world.WildInner + depth, 0)
 end
 
+-- The plaza rectangle as a Box (W along the street, D across it), centered on the hub.
+function WorldLayout.plazaBox(plots: Plots, plazaSize: { number }): Box
+	local x, z = WorldLayout.hubPosition(plots)
+	return { X = x, Z = z, W = plazaSize[2], D = plazaSize[1], Rot = -plots.Street.AngleDegrees }
+end
+
+-- Along-street distance where the street leaves the plaza (its front edge).
+function WorldLayout.streetStart(plots: Plots, plazaSize: { number }): number
+	return plots.Street.HubAt + plazaSize[2] / 2
+end
+
+-- True on the paved street between the plaza and the wild gate (the Spirit Lane).
+function WorldLayout.onStreet(plots: Plots, world: World, plazaSize: { number }, x: number, z: number): boolean
+	local street = plots.Street
+	local along, across = WorldLayout.toStreet(street, x, z)
+	return math.abs(across) <= street.HalfWidth
+		and along >= WorldLayout.streetStart(plots, plazaSize)
+		and along <= world.WildInner
+end
+
 -- Town paths as polylines of world (x, z) points, one per area: the street itself for the area it
--- points at, otherwise hub plaza -> optional bends -> where that area's wild path starts.
-function WorldLayout.townPaths(plots: Plots, world: World, areas: { Area }, plazaRadius: number): { [string]: { { number } } }
+-- points at, otherwise plaza edge -> optional bends -> where that area's wild path starts.
+function WorldLayout.townPaths(plots: Plots, world: World, areas: { Area }, plazaSize: { number }): { [string]: { { number } } }
 	local street = plots.Street
 	local paths = {}
 	for _, area in areas do
 		local delta = math.abs(angleDelta(area.AngleDegrees, street.AngleDegrees))
 		local points = {}
 		if delta < 1e-6 then
-			table.insert(points, { WorldLayout.fromStreet(street, street.HubAt + plazaRadius, 0) })
+			table.insert(points, { WorldLayout.fromStreet(street, WorldLayout.streetStart(plots, plazaSize), 0) })
 			table.insert(points, { WorldLayout.fromStreet(street, world.WildInner, 0) })
 		else
 			local ex, ez = WorldLayout.polar(area.AngleDegrees, world.WildInner)
 			local bends = street.Bends[area.Id] or {}
 			local first = if #bends > 0 then { WorldLayout.fromStreet(street, bends[1][1], bends[1][2]) } else { ex, ez }
-			-- Leave the plaza edge facing the first point.
-			local hx, hz = WorldLayout.hubPosition(plots)
-			local ux, uz = first[1] - hx, first[2] - hz
-			local length = math.sqrt(ux * ux + uz * uz)
-			table.insert(points, { hx + ux / length * plazaRadius, hz + uz / length * plazaRadius })
+			-- Leave the plaza through its edge, heading for the first point.
+			local hubAlong = street.HubAt
+			local fa, fc = WorldLayout.toStreet(street, first[1], first[2])
+			local da, dc = fa - hubAlong, fc
+			local length = math.sqrt(da * da + dc * dc)
+			da, dc = da / length, dc / length
+			local t = math.min(
+				if math.abs(da) > 1e-9 then plazaSize[2] / 2 / math.abs(da) else math.huge,
+				if math.abs(dc) > 1e-9 then plazaSize[1] / 2 / math.abs(dc) else math.huge
+			)
+			table.insert(points, { WorldLayout.fromStreet(street, hubAlong + da * t, dc * t) })
 			for _, bend in bends do
 				table.insert(points, { WorldLayout.fromStreet(street, bend[1], bend[2]) })
 			end

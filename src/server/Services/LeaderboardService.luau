@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
+local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local RollRules = require(ReplicatedStorage.Shared.RollRules)
@@ -25,8 +26,6 @@ local LeaderboardService = {}
 local WRITE_SECONDS = 300
 local STAT_SECONDS = 2
 local ROWS = 10
-local BOARD_ANGLE = 290
-local BOARD_RADIUS = 36
 local GOLD = Color3.fromRGB(255, 205, 90)
 local SPIRIT = Color3.fromRGB(170, 110, 255)
 
@@ -239,13 +238,13 @@ end
 local function buildBoards()
 	local model = Instance.new("Model")
 	model.Name = "Leaderboards"
-	local angle = math.rad(BOARD_ANGLE)
-	local center = Vector3.new(math.cos(angle), 0, math.sin(angle)) * BOARD_RADIUS
-	-- Front (-Z) faces the obelisk; the SurfaceGui is on the Front face. Placed in hub space.
-	local base = HubBuilder.CFrame() * CFrame.lookAt(center + Vector3.new(0, 1, 0), Vector3.new(0, 1, 0))
+	-- One tablet each side of the street mouth (Config.Hub.Leaderboards, hub space). Front (-Z)
+	-- carries the SurfaceGui and faces down the street, toward everyone walking to the hub.
+	local hub = HubBuilder.CFrame()
+	local spots = Config.Hub.Leaderboards
 	local defs = {
-		{ Key = "Seals", Title = "MOST SEALS", Offset = -6.5, Format = Format.number },
-		{ Key = "Rarest", Title = "RAREST FIND", Offset = 6.5, Format = rarestText },
+		{ Key = "Seals", Title = "MOST SEALS", Format = Format.number },
+		{ Key = "Rarest", Title = "RAREST FIND", Format = rarestText },
 	}
 	for _, def in defs do
 		local store: OrderedDataStore? = nil
@@ -253,7 +252,9 @@ local function buildBoards()
 			local ok, result = pcall(DataStoreService.GetOrderedDataStore, DataStoreService, `Leaderboard_{def.Key}_v1`)
 			store = if ok then result else nil
 		end
-		local rows = buildTablet(model, base * CFrame.new(def.Offset, 0, 0), def.Title)
+		local spot = spots[def.Key]
+		local at = Vector3.new(spot[1], 1, spot[2])
+		local rows = buildTablet(model, hub * CFrame.lookAt(at, at - Vector3.new(0, 0, 1)), def.Title)
 		table.insert(boards, { Key = def.Key, Title = def.Title, Store = store, Rows = rows, Format = def.Format })
 	end
 	model.Parent = workspace
