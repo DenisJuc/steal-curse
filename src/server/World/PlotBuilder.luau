@@ -119,6 +119,17 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 		Color = SPIRIT,
 		Transparency = 0.45,
 	}))
+	-- Small warm uplight from the dais onto the stand (PedestalVisuals turns it on for owned slots).
+	-- Kept short: Roblox drops lights in blocky patches when too many large ones overlap.
+	local uplight = BuildUtil.decor(BuildUtil.part(model, {
+		Name = "Uplight",
+		Size = Vector3.new(0.2, 0.2, 0.2),
+		CFrame = at(x, FLOOR_TOP + 0.6, z),
+		Transparency = 1,
+	}))
+	local up = BuildUtil.light(uplight, Color3.fromRGB(255, 196, 140), 8, 1.4)
+	up.Name = "PedestalUplight"
+	up.Enabled = false
 	-- In the aisle, level with the pedestal, reaching the aisle's center line.
 	local side = if x < 0 then -1 else 1
 	buildCollectPad(model, at, side * Config.Plots.PadInset, z)
@@ -736,6 +747,8 @@ local function buildAltar(parent: Instance, at: (number, number, number) -> CFra
 		Color = STONE_DARK,
 	})
 	BuildUtil.billboard(anchor, "Huge & Titanic finds rest here", 12, 1.4, 6, Color3.fromRGB(255, 215, 150))
+	-- A low gold glow on the plinth top, lit or empty.
+	BuildUtil.light(anchor, Color3.fromRGB(255, 205, 120), 14, 1.2)
 	stone.CanCollide = false
 	model.Parent = parent
 end

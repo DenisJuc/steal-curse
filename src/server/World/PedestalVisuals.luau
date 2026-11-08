@@ -409,6 +409,11 @@ function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 		end
 		base.Transparency = if look then 1 else standTransparency
 		top.Transparency = if look then 1 else standTransparency
+		local uplight = pedestal:FindFirstChild("Uplight")
+		local up = uplight and uplight:FindFirstChild("PedestalUplight")
+		if up and up:IsA("Light") then
+			up.Enabled = state.Owned
+		end
 		base.CanCollide = state.Owned
 		top.CanCollide = state.Owned
 		local level = state.Level or 1

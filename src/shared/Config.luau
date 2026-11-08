@@ -859,19 +859,22 @@ Config.Ambience = {
 		-- the wild's outer edge.
 		LidBeyond = 80,
 	},
-	-- The town shares the wild's night (thinner fog, a little more light) so the shrines read as
-	-- the same cursed world; relics are lit by their pedestal rim lights (PedestalVisuals).
+	-- The town shares the wild's night so the shrines read as the same cursed world, but it is the
+	-- lit part of it: thinner violet fog and a brighter moonlit ambient so floors and relics read on
+	-- a phone at low brightness (lighting pass 2026-11-08). Relics also get their pedestal key/rim
+	-- lights and a small uplight (PedestalVisuals). The fill comes from this ambient, not from big
+	-- lights: overlapping large PointLights make Roblox drop lights in blocky patches.
 	Town = {
-		Atmosphere = { Density = 0.42, Offset = 0.2, Haze = 2.2, Color = { 44, 40, 66 }, Decay = { 18, 14, 30 } },
+		Atmosphere = { Density = 0.3, Offset = 0.15, Haze = 1.4, Color = { 72, 54, 104 }, Decay = { 40, 24, 62 } },
 		Lighting = {
 			ClockTime = 0,
-			Brightness = 1.5,
-			Ambient = { 90, 80, 120 },
-			OutdoorAmbient = { 100, 92, 135 },
-			Exposure = 0.1,
+			Brightness = 1.8,
+			Ambient = { 118, 102, 160 },
+			OutdoorAmbient = { 132, 114, 178 },
+			Exposure = 0.2,
 		},
-		Tint = { 240, 232, 255 },
-		Saturation = -0.05,
+		Tint = { 242, 234, 255 },
+		Saturation = 0.05,
 		Particles = {
 			{ Name = "Motes", Texture = FIREFLY, Color = { 190, 150, 255 }, Rate = 6, Size = 0.3, Lifetime = 6, Speed = 0.5, LightEmission = 1, Drift = { 0, 0.3, 0 } },
 			{ Name = "Mist", Texture = SMOKE, Color = { 150, 140, 185 }, Rate = 2, Size = 9, Lifetime = 10, Speed = 0.4, LightEmission = 0, Transparency = 0.88, Low = true },

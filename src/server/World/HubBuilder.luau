@@ -174,6 +174,8 @@ local function buildKiosk(parent: Instance, kiosk: { Menu: string, Label: string
 		Color = Color3.fromRGB(40, 32, 30),
 	})
 	BuildUtil.surfaceText(sign, Enum.NormalId.Front, kiosk.Label, color)
+	-- Each kiosk glows in its own colour under the roof, so the plaza reads as a lit market.
+	BuildUtil.light(sign, color, 16, 1.5).Shadows = false
 	local emblem = BuildUtil.decor(BuildUtil.part(model, {
 		Name = "Emblem",
 		Size = Vector3.new(1.4, 1.4, 1.4),
