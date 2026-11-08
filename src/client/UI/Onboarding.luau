@@ -718,9 +718,12 @@ function Onboarding.Start(screen: ScreenGui)
 			side, text = step.Fallback.Side, step.Fallback.Text
 		end
 		local inMenu = string.find(step.Target, "/", 1, true) ~= nil and target ~= nil and find(step.Target) ~= nil
-		-- A rare find's reveal has the screen: the tip waits behind it.
+		-- A rare find's reveal, or the bonus rolls after a seal, has the screen: the tip waits behind
+		-- it (outside the hunt tutorial, which points at the hunt buttons on purpose).
 		local reveal = screen:FindFirstChild("RevealCard")
-		local revealing = reveal ~= nil and reveal:IsA("GuiObject") and reveal.Visible
+		local bonus = screen:FindFirstChild("HuntRolls")
+		local revealing = (reveal ~= nil and reveal:IsA("GuiObject") and reveal.Visible)
+			or (mode ~= "hunt" and bonus ~= nil and bonus:IsA("GuiObject") and bonus.Visible)
 		if not target or revealing or (menuOpen() and not inMenu) then
 			bubble.Visible = false
 			screen:SetAttribute("ReelLift", nil)

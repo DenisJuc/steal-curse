@@ -185,27 +185,55 @@ local function refreshRank(player: Player, plot: Model)
 	buildGarden(plot, garden, BaseDecor.stageFor(index))
 end
 
-local watching: { [Player]: RBXScriptConnection } = {}
+local watching: { [Player]: { RBXScriptConnection } } = {}
+local pendingAltar: { [Player]: boolean } = {}
+
+-- New relics land in the backpack without touching the pedestals, so the altar also follows the
+-- InventoryCount attribute (batched: a burst of finds refreshes once).
+local function queueAltar(player: Player)
+	if pendingAltar[player] then
+		return
+	end
+	pendingAltar[player] = true
+	task.delay(0.5, function()
+		pendingAltar[player] = nil
+		local plot = PlotService.GetPlot(player)
+		if plot and player.Parent then
+			refreshAltar(player, plot)
+		end
+	end)
+end
+
+local function unwatch(player: Player)
+	for _, connection in watching[player] or {} do
+		connection:Disconnect()
+	end
+	watching[player] = nil
+end
 
 function BaseDecorService.Init()
 	GameEvents.On("PlotAssigned", function(player: Player, plot: Model)
 		refreshRank(player, plot)
 		refreshAltar(player, plot)
-		if watching[player] then
-			watching[player]:Disconnect()
-		end
-		watching[player] = player:GetAttributeChangedSignal("LastingLuck"):Connect(function()
-			local current = PlotService.GetPlot(player)
-			if current then
-				refreshRank(player, current)
-			end
-		end)
+		unwatch(player)
+		watching[player] = {
+			player:GetAttributeChangedSignal("LastingLuck"):Connect(function()
+				local current = PlotService.GetPlot(player)
+				if current then
+					refreshRank(player, current)
+				end
+			end),
+			player:GetAttributeChangedSignal("InventoryCount"):Connect(function()
+				queueAltar(player)
+			end),
+		}
+	end)
+	-- The save may finish loading after the plot was assigned.
+	DataService.OnPlayerLoaded(function(player: Player)
+		queueAltar(player)
 	end)
 	GameEvents.On("PlotReleased", function(player: Player, plot: Model)
-		if watching[player] then
-			watching[player]:Disconnect()
-			watching[player] = nil
-		end
+		unwatch(player)
 		clearGarden(plot)
 		resetAltar(plot)
 		setPlaque(plot, "Unclaimed", "", PLAQUE_TEXT)

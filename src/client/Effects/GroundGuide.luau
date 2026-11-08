@@ -98,16 +98,23 @@ local function reroute(from: Vector3, to: Vector3)
 	routing = true
 	lastRoute = os.clock()
 	task.spawn(function()
-		local path = PathfindingService:CreatePath({ AgentRadius = 2, AgentHeight = 5, AgentCanJump = true })
-		local ok = pcall(function()
-			path:ComputeAsync(from, to)
-		end)
+		-- Walk-only route first: the plot front fence is low enough to jump, and arrows that hop
+		-- fences confuse new players (they should leave through the gate). Jumps only when no
+		-- walking route exists (some wild ledges), then a straight line.
 		local points = {}
-		if ok and path.Status == Enum.PathStatus.Success then
-			for _, waypoint in path:GetWaypoints() do
-				table.insert(points, waypoint.Position)
+		for _, canJump in { false, true } do
+			local path = PathfindingService:CreatePath({ AgentRadius = 2, AgentHeight = 5, AgentCanJump = canJump })
+			local ok = pcall(function()
+				path:ComputeAsync(from, to)
+			end)
+			if ok and path.Status == Enum.PathStatus.Success then
+				for _, waypoint in path:GetWaypoints() do
+					table.insert(points, waypoint.Position)
+				end
+				break
 			end
-		else
+		end
+		if #points == 0 then
 			points = { from, to }
 		end
 		route = points

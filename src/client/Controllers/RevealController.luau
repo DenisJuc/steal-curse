@@ -417,6 +417,18 @@ local function build(screen: ScreenGui): Ui
 	}
 end
 
+-- The card's bottom strip holds the note (and Skip), so the mutation/size line would sit on top of
+-- it: while that line shows, the model, name and odds move up to make room.
+local LINE_SHIFT = 22
+
+local function layoutLines(withExtraLine: boolean)
+	local shift = if withExtraLine then LINE_SHIFT else 0
+	ui.Viewport.Size = UDim2.fromOffset(320, 220 - shift)
+	ui.NameLabel.Position = UDim2.fromOffset(0, 258 - shift)
+	ui.OddsLabel.Position = UDim2.fromOffset(0, 292 - shift)
+	ui.MutationLabel.Position = UDim2.fromOffset(0, 312 - shift)
+end
+
 local function setModel(relicId: string, sizeId: string?)
 	if model then
 		model:Destroy()
@@ -507,6 +519,7 @@ local function play(entry: Presentation.Entry, dropped: number)
 	ui.NameLabel.TextColor3 = accent
 	ui.OddsLabel.Text = `Base odds {Odds.describe(relic.Id, nil)}`
 	ui.MutationLabel.Visible = false
+	layoutLines(false)
 	ui.Stroke.Color = accent
 	local worth = RewardPresentation.worthKeeping(result, relic.Tier)
 	local note = worth
@@ -627,6 +640,7 @@ local function play(entry: Presentation.Entry, dropped: number)
 			.. (if mutationInfo then `  (x{mutationInfo.IncomeMultiplier} income)` else "")
 		ui.MutationLabel.TextColor3 = color
 		ui.MutationLabel.Visible = true
+		layoutLines(true)
 		ui.NameLabel.Text = prefix .. Odds.displayName(relic.Id, mutation, sizeId)
 		ui.NameLabel.TextColor3 = color
 		ui.Stroke.Color = color
@@ -642,6 +656,7 @@ local function play(entry: Presentation.Entry, dropped: number)
 		ui.MutationLabel.Text = `+ {string.upper(sizeId)} SIZE  (×{SizeConfig.incomeMult(sizeId)} income)`
 		ui.MutationLabel.TextColor3 = accent
 		ui.MutationLabel.Visible = true
+		layoutLines(true)
 		waitUnlessSkipped(if instant then 0 else 0.45)
 	end
 

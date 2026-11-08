@@ -996,7 +996,7 @@ Config.Plots = {
 	AltarOffset = { 31, 30 },
 	GardenOffset = { -30, 30 },
 	-- On the aisle between the gate and the first pads, so spawning never claims a pad.
-	SpawnOffset = { 0, -42 },
+	SpawnOffset = { 0, -40 },
 }
 
 -- Hub plaza at the near end of Shrine Street. Hub space: X across the street, -Z toward the
