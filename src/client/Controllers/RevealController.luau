@@ -41,6 +41,10 @@ local LARGE_INDEX = RarityConfig.IndexById[Config.Reveal.LargeTier]
 -- Bigger than it was (400 x 300) so the relic itself carries the moment.
 local CARD_SIZE = Vector2.new(460, 360)
 local CAMERA_ZOOM_FOV = 12
+-- Sparks drifting up behind a reveal's relic.
+local MOTES = 14
+-- Glow rings behind the relic: { size as a share of the glow, transparency }.
+local GLOW_RINGS = { { 1, 0.93 }, { 0.75, 0.9 }, { 0.5, 0.86 }, { 0.3, 0.82 } }
 -- From this tier up every find gets the overlay and the full-width band.
 local BAND_INDEX = RarityConfig.IndexById.Legendary or 5
 -- Room above and below the card for the rarity name and the odds.
@@ -60,6 +64,9 @@ local SOURCE_TEXT: { [string]: string } = {
 type Ui = {
 	Dim: Frame,
 	Glow: Frame,
+	Backdrop: Frame,
+	BackGlow: Frame,
+	Motes: { Frame },
 	Band: Frame,
 	BandTitle: TextLabel,
 	BandOdds: TextLabel,
@@ -224,6 +231,54 @@ local function build(screen: ScreenGui): Ui
 	stroke.Thickness = 3
 	stroke.Transparency = 0
 
+	-- Backdrop: the card is lit by the find (tier-tinted gradient, a glow behind the relic, sparks
+	-- drifting up) instead of one flat color. Colors are set per reveal.
+	local backdrop = UIKit.create("Frame", {
+		Name = "Backdrop",
+		Position = UDim2.fromOffset(-12, -12),
+		Size = UDim2.new(1, 24, 1, 24),
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		ClipsDescendants = true,
+		ZIndex = 1,
+		Parent = card,
+	}, {
+		UIKit.corner(16),
+		UIKit.create("UIGradient", { Name = "Tint", Rotation = 90 }),
+	})
+	-- Soft radial glow behind the relic: stacked faint rings, brightest in the middle.
+	local backGlow = UIKit.create("Frame", {
+		Name = "Glow",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 0, 156),
+		Size = UDim2.fromOffset(300, 300),
+		BackgroundTransparency = 1,
+		ZIndex = 1,
+		Parent = backdrop,
+	})
+	for _, ring in GLOW_RINGS do
+		UIKit.create("Frame", {
+			Name = "Ring",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(ring[1], ring[1]),
+			BackgroundTransparency = ring[2],
+			ZIndex = 1,
+			Parent = backGlow,
+		}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	end
+	local motes: { Frame } = {}
+	for index = 1, MOTES do
+		table.insert(motes, UIKit.create("Frame", {
+			Name = "Mote",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(index / (MOTES + 1), 1),
+			Size = UDim2.fromOffset(4, 4),
+			Rotation = 45,
+			BorderSizePixel = 0,
+			ZIndex = 1,
+			Parent = backdrop,
+		}))
+	end
 	local rays = UIKit.create("Frame", {
 		Name = "Rays",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -240,7 +295,7 @@ local function build(screen: ScreenGui): Ui
 			Size = UDim2.new(1, 0, 0, 10),
 			Rotation = index * 45,
 			BackgroundColor3 = Color3.new(1, 1, 1),
-			BackgroundTransparency = 0.55,
+			BackgroundTransparency = 0.75,
 			BorderSizePixel = 0,
 			ZIndex = 32,
 			Parent = rays,
@@ -342,6 +397,9 @@ local function build(screen: ScreenGui): Ui
 	return {
 		Dim = dim,
 		Glow = glow,
+		Backdrop = backdrop,
+		BackGlow = backGlow,
+		Motes = motes,
 		Band = band,
 		BandTitle = bandTitle,
 		BandOdds = bandOdds,
@@ -461,7 +519,22 @@ local function play(entry: Presentation.Entry, dropped: number)
 		note = `+{dropped} more rare find{if dropped == 1 then "" else "s"} in your Journal`
 	end
 	ui.NoteLabel.Text = note
-	ui.Rays.Visible = (large or sizeId == "Titanic") and not low
+	ui.Rays.Visible = not low
+	local tint = ui.Backdrop:FindFirstChild("Tint") :: UIGradient
+	tint.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, accent:Lerp(Color3.fromRGB(10, 6, 16), 0.45)),
+		ColorSequenceKeypoint.new(0.55, accent:Lerp(Color3.fromRGB(10, 6, 16), 0.8)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 8, 18)),
+	})
+	for _, ring in ui.BackGlow:GetChildren() do
+		if ring:IsA("Frame") then
+			ring.BackgroundColor3 = accent:Lerp(Color3.new(1, 1, 1), 0.2)
+		end
+	end
+	for _, mote in ui.Motes do
+		mote.BackgroundColor3 = accent:Lerp(Color3.new(1, 1, 1), 0.5)
+		mote.Visible = not low
+	end
 	for _, ray in ui.Rays:GetChildren() do
 		if ray:IsA("Frame") then
 			ray.BackgroundColor3 = accent
@@ -740,6 +813,17 @@ function RevealController.Start(screen: ScreenGui)
 		if ui.Rays.Visible then
 			ui.Rays.Rotation = (ui.Rays.Rotation + dt * 25) % 360
 		end
+		local now = os.clock()
+		for index, mote in ui.Motes do
+			if mote.Visible then
+				-- Each spark rises on its own loop, swaying a little, fading near the top.
+				local t = (now * (0.18 + (index % 5) * 0.04) + index * 0.37) % 1
+				mote.Position = UDim2.fromScale(index / (#ui.Motes + 1) + math.sin(now * 1.3 + index) * 0.02, 1 - t)
+				mote.BackgroundTransparency = 0.1 + t * 0.9
+			end
+		end
+		local breathe = 1 + math.sin(now * 2.2) * 0.04
+		ui.BackGlow.Size = UDim2.fromOffset(300 * breathe, 300 * breathe)
 		if ui.Glow.Visible then
 			ui.Glow.BackgroundTransparency = 0.5 + math.sin(os.clock() * 3) * 0.12
 		end
