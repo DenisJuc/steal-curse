@@ -92,7 +92,7 @@ local function makeBeacon(position: Vector3): BasePart
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
 	label.Size = UDim2.fromScale(1, 1)
-	label.Font = Enum.Font.GothamBold
+	label.Font = Enum.Font.FredokaOne
 	label.TextSize = 14
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextStrokeTransparency = 0.4

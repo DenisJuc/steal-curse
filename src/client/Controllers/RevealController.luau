@@ -38,7 +38,8 @@ local RevealController = {}
 
 local MEDIUM_INDEX = RarityConfig.IndexById[Config.Reveal.MediumTier]
 local LARGE_INDEX = RarityConfig.IndexById[Config.Reveal.LargeTier]
-local CARD_SIZE = Vector2.new(400, 300)
+-- Bigger than it was (400 x 300) so the relic itself carries the moment.
+local CARD_SIZE = Vector2.new(460, 360)
 local CAMERA_ZOOM_FOV = 12
 -- From this tier up every find gets the overlay and the full-width band.
 local BAND_INDEX = RarityConfig.IndexById.Legendary or 5
@@ -58,6 +59,7 @@ local SOURCE_TEXT: { [string]: string } = {
 
 type Ui = {
 	Dim: Frame,
+	Glow: Frame,
 	Band: Frame,
 	BandTitle: TextLabel,
 	BandOdds: TextLabel,
@@ -181,6 +183,29 @@ local function build(screen: ScreenGui): Ui
 		Parent = band,
 	})
 
+	-- Legendary and up: a pulsing glow of the tier color behind the card.
+	local glow = UIKit.create("Frame", {
+		Name = "RevealGlow",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.45),
+		Size = UDim2.fromOffset(CARD_SIZE.X + 90, CARD_SIZE.Y + 90),
+		BackgroundColor3 = colors.Accent,
+		BackgroundTransparency = 0.5,
+		Visible = false,
+		ZIndex = 32,
+		Parent = screen,
+	}, {
+		UIKit.corner(60),
+		UIKit.create("UIGradient", {
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 1),
+				NumberSequenceKeypoint.new(0.3, 0.2),
+				NumberSequenceKeypoint.new(0.7, 0.2),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		}),
+	})
+	UIKit.scaler(glow)
 	local card = UIKit.create("Frame", {
 		Name = "RevealCard",
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -189,7 +214,7 @@ local function build(screen: ScreenGui): Ui
 		BackgroundColor3 = colors.Panel,
 		BackgroundTransparency = 0.05,
 		Visible = false,
-		ZIndex = 32,
+		ZIndex = 33,
 		Parent = screen,
 	}, { UIKit.corner(16), UIKit.padding(12) })
 	UIKit.scaler(card)
@@ -202,8 +227,8 @@ local function build(screen: ScreenGui): Ui
 	local rays = UIKit.create("Frame", {
 		Name = "Rays",
 		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(0.5, 0, 0, 118),
-		Size = UDim2.fromOffset(230, 230),
+		Position = UDim2.new(0.5, 0, 0, 144),
+		Size = UDim2.fromOffset(300, 300),
 		BackgroundTransparency = 1,
 		ZIndex = 32,
 		Parent = card,
@@ -242,9 +267,9 @@ local function build(screen: ScreenGui): Ui
 		Name = "Model",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 34),
-		Size = UDim2.fromOffset(220, 150),
+		Size = UDim2.fromOffset(320, 220),
 		BackgroundTransparency = 1,
-		Ambient = Color3.fromRGB(190, 190, 200),
+		Ambient = Color3.fromRGB(205, 200, 215),
 		LightColor = Color3.new(1, 1, 1),
 		LightDirection = Vector3.new(-1, -1, -1),
 		ZIndex = 33,
@@ -258,11 +283,11 @@ local function build(screen: ScreenGui): Ui
 
 	local nameLabel = UIKit.label({
 		Name = "RelicName",
-		TextSize = 24,
+		TextSize = 28,
 		TextScaled = true,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Position = UDim2.fromOffset(0, 188),
-		Size = UDim2.new(1, 0, 0, 28),
+		Position = UDim2.fromOffset(0, 258),
+		Size = UDim2.new(1, 0, 0, 32),
 		ZIndex = 34,
 		Parent = card,
 	})
@@ -271,7 +296,7 @@ local function build(screen: ScreenGui): Ui
 		TextSize = 15,
 		TextColor3 = colors.SubText,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Position = UDim2.fromOffset(0, 216),
+		Position = UDim2.fromOffset(0, 292),
 		Size = UDim2.new(1, 0, 0, 18),
 		ZIndex = 34,
 		Parent = card,
@@ -280,7 +305,7 @@ local function build(screen: ScreenGui): Ui
 		Name = "Mutation",
 		TextSize = 20,
 		TextXAlignment = Enum.TextXAlignment.Center,
-		Position = UDim2.fromOffset(0, 236),
+		Position = UDim2.fromOffset(0, 312),
 		Size = UDim2.new(1, 0, 0, 24),
 		Visible = false,
 		ZIndex = 34,
@@ -316,6 +341,7 @@ local function build(screen: ScreenGui): Ui
 
 	return {
 		Dim = dim,
+		Glow = glow,
 		Band = band,
 		BandTitle = bandTitle,
 		BandOdds = bandOdds,
@@ -345,6 +371,14 @@ local function setModel(relicId: string, sizeId: string?)
 	part.Parent = ui.Viewport
 	model = part
 	modelBase = part.CFrame
+	-- Frame the relic so it fills the view whatever its size (thin swords used to look tiny):
+	-- back the camera off just enough for its largest side, plus a little room to turn.
+	local camera = ui.Viewport.CurrentCamera
+	if camera then
+		local extent = part.Size.Magnitude
+		local distance = extent / (2 * math.tan(math.rad(camera.FieldOfView / 2))) * 1.05
+		camera.CFrame = CFrame.lookAt(Vector3.new(0, extent * 0.12, distance), Vector3.zero)
+	end
 end
 
 local function flash(color: Color3, from: number, seconds: number)
@@ -475,6 +509,8 @@ local function play(entry: Presentation.Entry, dropped: number)
 			})
 			ui.BandTitle.TextColor3 = Color3.new(1, 1, 1)
 		end
+		ui.Glow.BackgroundColor3 = accent
+		ui.Glow.Visible = not Settings.LowEffects()
 		if instant then
 			ui.Band.Size = UDim2.new(1, 0, 0, height)
 		else
@@ -559,6 +595,7 @@ local function play(entry: Presentation.Entry, dropped: number)
 		task.wait(0.2)
 	end
 	ui.Card.Visible = false
+	ui.Glow.Visible = false
 	ui.Band.Visible = false
 	ui.Dim.Visible = false
 	ui.Flash.Visible = false
@@ -583,6 +620,7 @@ local function runQueue()
 				warn(`[RevealController] {err}`)
 				showing = false
 				ui.Card.Visible = false
+				ui.Glow.Visible = false
 				ui.Band.Visible = false
 				ui.Dim.Visible = false
 				ui.Dim.Active = false
@@ -701,6 +739,9 @@ function RevealController.Start(screen: ScreenGui)
 		end
 		if ui.Rays.Visible then
 			ui.Rays.Rotation = (ui.Rays.Rotation + dt * 25) % 360
+		end
+		if ui.Glow.Visible then
+			ui.Glow.BackgroundTransparency = 0.5 + math.sin(os.clock() * 3) * 0.12
 		end
 	end)
 

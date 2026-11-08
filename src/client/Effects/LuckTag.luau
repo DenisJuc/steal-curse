@@ -111,7 +111,7 @@ local function make(head: BasePart, own: boolean): Entry
 		nextLabel.Position = UDim2.new(0.5, 0, 1, -HEIGHT)
 		nextLabel.Size = UDim2.new(0.9, 0, 0, NEXT_HEIGHT)
 		nextLabel.BackgroundTransparency = 1
-		nextLabel.Font = Enum.Font.GothamBold
+		nextLabel.Font = Enum.Font.FredokaOne
 		nextLabel.TextScaled = true
 		nextLabel.TextColor3 = Color3.fromRGB(225, 225, 235)
 		nextLabel.TextStrokeTransparency = 0.2

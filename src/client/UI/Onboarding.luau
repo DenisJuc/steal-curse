@@ -398,12 +398,20 @@ local HUNT_STEPS: { Step } = {
 		Text = "Sealed! Every seal gives that relic plus bonus rolls. Press F to leave the spirit world.",
 	},
 }
--- Direct children of the main screen that stay up during the spirit hunt tutorial.
+-- Direct children of the main screen that stay up during the spirit hunt tutorial. Rolling goes
+-- on in the background, so a rare find's reveal (card, band, glow, dim, flashes) must still show.
 local HUNT_KEEP = {
 	HintBubble = true,
 	TravelBar = true,
 	HuntButtons = true,
 	[TOP] = true,
+	RevealCard = true,
+	RevealBand = true,
+	RevealGlow = true,
+	RevealDim = true,
+	RevealFlash = true,
+	RollDim = true,
+	RollFlash = true,
 }
 
 local ANCHORS: { [Side]: Vector2 } = {
@@ -709,7 +717,10 @@ function Onboarding.Start(screen: ScreenGui)
 			side, text = step.Fallback.Side, step.Fallback.Text
 		end
 		local inMenu = string.find(step.Target, "/", 1, true) ~= nil and target ~= nil and find(step.Target) ~= nil
-		if not target or (menuOpen() and not inMenu) then
+		-- A rare find's reveal has the screen: the tip waits behind it.
+		local reveal = screen:FindFirstChild("RevealCard")
+		local revealing = reveal ~= nil and reveal:IsA("GuiObject") and reveal.Visible
+		if not target or revealing or (menuOpen() and not inMenu) then
 			bubble.Visible = false
 			screen:SetAttribute("ReelLift", nil)
 			return

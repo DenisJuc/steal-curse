@@ -338,17 +338,24 @@ function RollKit.rainbow(gui: GuiObject)
 end
 
 -- The tier-scaled landing around `center` (rays go behind `raysParent`): every landing bursts;
--- Rare adds sparks; Epic a shine on `card`; Legendary and up rays, a screen flash and a camera
--- kick, each step bigger; Celestial and Cosmic white out first.
+-- Rare adds sparks, a shine sweep over `card` and a bright sting (higher for Epic), so a Rare
+-- never feels like a Common; Legendary and up rays, a screen flash and a camera kick, each step
+-- bigger; Celestial and Cosmic white out first.
 function RollKit.impact(info: Info, center: GuiObject, raysParent: GuiObject, card: GuiObject?)
 	local tier = info.TierIndex
 	local color = info.Color
 	RollKit.burst(center, color, 40, 120 + tier * 14)
 	if tier >= 3 then
 		RollKit.sparks(center, color, 2 + tier * 2, 55 + tier * 6)
+		if card then
+			Motion.shine(card, 0.5)
+		end
+		if tier < LEGENDARY then
+			Sounds.PlayReveal("Shine", nil, 1 + (tier - 3) * 0.18)
+		end
 	end
 	if tier >= 4 and card then
-		Motion.shine(card, 0.6)
+		task.delay(0.25, Motion.shine, card, 0.5)
 	end
 	if tier >= LEGENDARY then
 		local step = tier - LEGENDARY

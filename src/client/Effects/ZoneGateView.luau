@@ -168,7 +168,7 @@ local function sign(at: Vector3, border: ZoneGates.Border, parent: Instance)
 	sub.BackgroundTransparency = 1
 	sub.Position = UDim2.fromScale(0, 0.62)
 	sub.Size = UDim2.fromScale(1, 0.32)
-	sub.Font = Enum.Font.GothamBold
+	sub.Font = Enum.Font.FredokaOne
 	sub.TextScaled = true
 	sub.TextColor3 = Color3.fromRGB(235, 230, 240)
 	sub.TextStrokeTransparency = 0.2

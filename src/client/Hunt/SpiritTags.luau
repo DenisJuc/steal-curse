@@ -22,12 +22,12 @@ local function rgb(c: { number }): Color3
 	return Color3.fromRGB(c[1], c[2], c[3])
 end
 
-local function label(parent: Instance, text: string, color: Color3, y: number, height: number, bold: boolean)
+local function label(parent: Instance, text: string, color: Color3, y: number, height: number, _bold: boolean)
 	local l = Instance.new("TextLabel")
 	l.BackgroundTransparency = 1
 	l.Size = UDim2.new(1, 0, height, 0)
 	l.Position = UDim2.new(0, 0, y, 0)
-	l.Font = if bold then Enum.Font.GothamBlack else Enum.Font.GothamBold
+	l.Font = Enum.Font.FredokaOne
 	l.TextScaled = true
 	l.Text = text
 	l.TextColor3 = color

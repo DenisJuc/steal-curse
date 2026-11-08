@@ -20,7 +20,9 @@ local Motion = require(script.Parent.Motion)
 local UIKit = {}
 
 UIKit.Font = Enum.Font.FredokaOne
-UIKit.TitleFont = Font.new("rbxasset://fonts/families/Merriweather.json", Enum.FontWeight.Bold)
+-- One font family across the game (the old serif titles made the UI look like two games glued
+-- together): titles use the same face as the HUD.
+UIKit.TitleFont = Font.fromEnum(Enum.Font.FredokaOne)
 
 UIKit.Colors = {
 	Panel = Color3.fromRGB(17, 13, 24),

@@ -1,8 +1,12 @@
--- "Omikuji" roll (the default): a shrine fortune box rattles, a slip shoots out and a paper fortune
+-- "Omikuji" roll (the default): a shrine fortune box rattles, a slip shoots out and a talisman card
 -- unrolls, all in about a third of a second. The box is the ROLL button's own (OmikujiBox launcher)
 -- when it is showing; with Auto Roll on the roll draws its own. Then relics flicker on the paper (quick at first,
 -- slowing, with a rising tick; rare teasers often flash by just before the end) until the result
 -- sticks and a seal in its tier color stamps down.
+--
+-- Look: a dark talisman card in the HUD's style (the old cream paper looked like another game): the
+-- frame and odds take the relic's tier color, the relic turns slowly on a glow of that color, and
+-- the name is in the HUD font.
 
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -10,13 +14,14 @@ local TweenService = game:GetService("TweenService")
 local Sounds = require(script.Parent.Parent.Parent.Sounds)
 local Motion = require(script.Parent.Parent.Motion)
 local OmikujiBox = require(script.Parent.Parent.OmikujiBox)
+local RelicViewport = require(script.Parent.Parent.RelicViewport)
 local RollKit = require(script.Parent.RollKit)
 local UIKit = require(script.Parent.Parent.UIKit)
 
 local Omikuji = {}
 
-local PAPER_WIDTH = 290
-local PAPER_HEIGHT = 84
+local PAPER_WIDTH = 300
+local PAPER_HEIGHT = 88
 local BOX_SIZE = Vector2.new(66, 86)
 local SHAKES = 3
 -- The draw (rattle, slip, unroll) before the flicker starts; shorter on fast rolls.
@@ -29,14 +34,18 @@ local LAUNCHER_LIFT = 4
 -- The slip grows out of the top of the ROLL button's box up to the paper.
 local LAUNCH_SLIP = UDim2.fromOffset(10, 40)
 
-local PAPER = Color3.fromRGB(244, 234, 212)
-local INK = Color3.fromRGB(48, 32, 28)
-local WOOD = Color3.fromRGB(70, 44, 30)
-local BLACK = Color3.new(0, 0, 0)
+-- The card: near-black lacquer like the HUD panels, slightly lighter at the top.
+local PAPER = Color3.fromRGB(24, 18, 34)
+local PAPER_TOP = Color3.fromRGB(40, 30, 56)
+local INK = Color3.fromRGB(12, 8, 18)
+local WOOD = Color3.fromRGB(58, 40, 78)
+local WHITE = Color3.new(1, 1, 1)
+-- Radians per second the relic turns on the card.
+local SPIN = 1.4
 
--- Ink version of a tier color, readable on the paper.
+-- A tier color made a little brighter, readable on the dark card.
 local function ink(color: Color3): Color3
-	return color:Lerp(BLACK, 0.35)
+	return color:Lerp(WHITE, 0.18)
 end
 
 -- The slip that grows out of the top of the ROLL button's box (made once per box).
@@ -109,12 +118,23 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 		Name = "Paper",
 		AnchorPoint = Vector2.new(0.5, 1),
 		Size = UDim2.fromOffset(0, PAPER_HEIGHT),
-		BackgroundColor3 = PAPER,
+		-- White base: the UIGradient below gives the lacquer colors.
+		BackgroundColor3 = WHITE,
 		ClipsDescendants = true,
 		Visible = false,
 		ZIndex = 5,
 		Parent = root,
-	}, { UIKit.corner(3), UIKit.stroke(WOOD, 2, 0), UIKit.create("UIScale", { Name = "Juice" }) })
+	}, {
+		UIKit.corner(8),
+		UIKit.create("UIGradient", {
+			Rotation = 90,
+			Color = ColorSequence.new(PAPER_TOP, PAPER),
+		}),
+		UIKit.create("UIScale", { Name = "Juice" }),
+	})
+	-- The outer frame takes the tier color (set in write).
+	local frameStroke = UIKit.stroke(WOOD, 2.5, 0)
+	frameStroke.Parent = paper
 	-- Fixed-width content centered in the paper, so unrolling reveals it from the middle out.
 	local content = UIKit.create("Frame", {
 		Name = "Content",
@@ -133,7 +153,7 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 		ZIndex = 5,
 		Parent = content,
 	})
-	local borderStroke = UIKit.stroke(colors.Red, 1.5, 0.3)
+	local borderStroke = UIKit.stroke(colors.Red, 1, 0.55)
 	borderStroke.Parent = border
 	for _, side in { 0, 1 } do
 		UIKit.create("Frame", {
@@ -147,10 +167,29 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 			Parent = content,
 		})
 	end
+	-- A soft glow of the tier color behind the relic.
+	local glow = UIKit.create("Frame", {
+		Name = "Glow",
+		Position = UDim2.fromOffset(18, 8),
+		Size = UDim2.fromOffset(72, 72),
+		BackgroundColor3 = colors.Accent,
+		BackgroundTransparency = 0.55,
+		ZIndex = 5,
+		Parent = content,
+	}, {
+		UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		UIKit.create("UIGradient", {
+			Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0),
+				NumberSequenceKeypoint.new(0.7, 0.6),
+				NumberSequenceKeypoint.new(1, 1),
+			}),
+		}),
+	})
 	local art = UIKit.create("Frame", {
 		Name = "Art",
-		Position = UDim2.fromOffset(20, 10),
-		Size = UDim2.fromOffset(64, 64),
+		Position = UDim2.fromOffset(18, 8),
+		Size = UDim2.fromOffset(72, 72),
 		BackgroundTransparency = 1,
 		ZIndex = 6,
 		Parent = content,
@@ -158,21 +197,21 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 	local nameLabel = UIKit.label({
 		Name = "RelicName",
 		FontFace = UIKit.TitleFont,
-		TextSize = 17,
-		TextColor3 = INK,
+		TextSize = 19,
+		TextColor3 = colors.Text,
 		TextWrapped = true,
 		TextYAlignment = Enum.TextYAlignment.Bottom,
-		Position = UDim2.fromOffset(90, 8),
-		Size = UDim2.new(1, -152, 0, 42),
+		Position = UDim2.fromOffset(98, 8),
+		Size = UDim2.new(1, -160, 0, 46),
 		ZIndex = 6,
 		Parent = content,
 	})
 	local oddsLabel = UIKit.label({
 		Name = "Odds",
-		TextSize = 13,
+		TextSize = 14,
 		TextTruncate = Enum.TextTruncate.AtEnd,
-		Position = UDim2.fromOffset(90, 52),
-		Size = UDim2.new(1, -152, 0, 18),
+		Position = UDim2.fromOffset(98, 56),
+		Size = UDim2.new(1, -160, 0, 18),
 		ZIndex = 6,
 		Parent = content,
 	})
@@ -284,7 +323,20 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 		oddsLabel.Text = detail
 		oddsLabel.TextColor3 = ink(info.Color)
 		borderStroke.Color = ink(info.Color)
+		frameStroke.Color = info.Color
+		glow.BackgroundColor3 = info.Color
 	end
+
+	-- The relic on the card turns slowly while the card is up.
+	RunService.RenderStepped:Connect(function(dt)
+		if not root.Visible or not paper.Visible or not art.Visible then
+			return
+		end
+		local render = art:FindFirstChild("Render")
+		if render and render:IsA("ViewportFrame") then
+			RelicViewport.spin(render, dt * SPIN)
+		end
+	end)
 
 	-- The hush before a big landing: the relic hides behind "???", the world dims, the paper
 	-- trembles harder and harder inside a pulsing aura of the result's color, heartbeats quicken.
@@ -293,6 +345,7 @@ function Omikuji.new(holder: GuiObject): RollKit.Style
 		nameLabel.Text = "? ? ?"
 		oddsLabel.Text = ""
 		borderStroke.Color = ink(result.Color)
+		frameStroke.Color = result.Color
 		aura.BackgroundColor3 = result.Color
 		aura.BackgroundTransparency = 0.6
 		aura.Visible = true

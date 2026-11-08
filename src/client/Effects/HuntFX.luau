@@ -75,7 +75,7 @@ function HuntFX.ring(diameter: number, color: Color3, runes: boolean): Part
 			label.BackgroundTransparency = 1
 			label.Text = rune
 			label.TextScaled = true
-			label.Font = Enum.Font.GothamBold
+			label.Font = Enum.Font.FredokaOne
 			label.TextColor3 = color
 			label.Parent = gui
 		end
