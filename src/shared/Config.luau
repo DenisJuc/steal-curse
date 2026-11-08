@@ -971,19 +971,29 @@ Config.Plots = {
 	},
 	StartingPedestals = 3,
 	MaxPedestals = 6,
-	-- Front row toward the gate, back row toward the resonator, with real walking gaps.
+	-- Base interior (2026-11-08): two rows of three face a center aisle that runs from the gate to
+	-- the resonator. Slots fill left/right from the gate: 1 L-front, 2 R-front, 3 L-mid, ...
 	PedestalOffsets = {
-		{ -20, -22 },
-		{ 0, -22 },
-		{ 20, -22 },
-		{ -20, -2 },
-		{ 0, -2 },
-		{ 20, -2 },
+		{ -9, -30 },
+		{ 9, -30 },
+		{ -9, -14 },
+		{ 9, -14 },
+		{ -9, 2 },
+		{ 9, 2 },
 	},
+	-- Collect pads in the aisle, one line: each reaches the aisle's center, so one walk from the
+	-- gate to the resonator claims every pedestal.
+	PadInset = 1.6,
 	ResonatorOffset = { 0, 28 },
-	ShowcaseOffset = { 30, 24 },
-	-- Clear of the front-row collect pads (PlotBuilder), so spawning never claims one.
-	SpawnOffset = { 0, -33 },
+	-- Front corners face the street: the Showcase (right) and the Seal Shrine with the owner's
+	-- name, seal rank and the pedestal upgrades (left). Back corners: the Great Altar for Huge and
+	-- Titanic relics (right) and the owner's garden (left, BaseDecor).
+	ShowcaseOffset = { 32, -34 },
+	SealShrineOffset = { -32, -40 },
+	AltarOffset = { 31, 30 },
+	GardenOffset = { -30, 30 },
+	-- On the aisle between the gate and the first pads, so spawning never claims a pad.
+	SpawnOffset = { 0, -42 },
 }
 
 -- Hub plaza at the near end of Shrine Street. Hub space: X across the street, -Z toward the

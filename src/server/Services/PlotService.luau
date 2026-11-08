@@ -55,6 +55,7 @@ local function release(player: Player)
 	for index, owner in owners do
 		if owner == player then
 			owners[index] = nil
+			GameEvents.Fire("PlotReleased", player, plots[index])
 			plots[index]:SetAttribute("OwnerUserId", nil)
 			setSignText(plots[index], "Unclaimed Shrine")
 			PedestalVisuals.Reset(plots[index])

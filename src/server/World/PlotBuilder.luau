@@ -41,13 +41,12 @@ local TERRACE_H = 1.0
 -- Collect pad on the gate side of each pedestal: the pedestal's CE piles up there and walking onto
 -- it claims the lot (PedestalService). A dark seal plate with a warm rune inlay; the trigger is an
 -- invisible box so a player touches it the moment they step on. PedestalVisuals shows the amount.
-local COLLECT_PAD_DISTANCE = 4.4
 local PAD_STONE = Color3.fromRGB(30, 26, 36)
 
 local function buildCollectPad(model: Model, at: (number, number, number) -> CFrame, x: number, z: number)
 	local pad = BuildUtil.part(model, {
 		Name = "CollectPad",
-		Size = Vector3.new(4.8, 0.24, 2.8),
+		Size = Vector3.new(2.8, 0.24, 4.8),
 		CFrame = at(x, FLOOR_TOP + 0.12, z),
 		Material = Enum.Material.Slate,
 		Color = PAD_STONE,
@@ -55,14 +54,14 @@ local function buildCollectPad(model: Model, at: (number, number, number) -> CFr
 	pad.CanTouch = false
 	BuildUtil.part(model, {
 		Name = "CollectTrim",
-		Size = Vector3.new(5.2, 0.16, 3.2),
+		Size = Vector3.new(3.2, 0.16, 5.2),
 		CFrame = at(x, FLOOR_TOP + 0.08, z),
 		Material = Enum.Material.Metal,
 		Color = Color3.fromRGB(150, 120, 70),
 	}).CanTouch = false
 	BuildUtil.decor(BuildUtil.part(model, {
 		Name = "CollectGlow",
-		Size = Vector3.new(4.0, 0.05, 2.0),
+		Size = Vector3.new(2.0, 0.05, 4.0),
 		CFrame = at(x, FLOOR_TOP + 0.26, z),
 		Material = Enum.Material.Neon,
 		Color = WARM,
@@ -70,7 +69,7 @@ local function buildCollectPad(model: Model, at: (number, number, number) -> CFr
 	}))
 	local trigger = BuildUtil.part(model, {
 		Name = "CollectTrigger",
-		Size = Vector3.new(4.8, 5, 2.8),
+		Size = Vector3.new(2.8, 5, 4.8),
 		CFrame = at(x, FLOOR_TOP + 2.6, z),
 		Transparency = 1,
 		CanCollide = false,
@@ -120,7 +119,26 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 		Color = SPIRIT,
 		Transparency = 0.45,
 	}))
-	buildCollectPad(model, at, x, z - COLLECT_PAD_DISTANCE)
+	-- In the aisle, level with the pedestal, reaching the aisle's center line.
+	local side = if x < 0 then -1 else 1
+	buildCollectPad(model, at, side * Config.Plots.PadInset, z)
+	-- Sealed lid over a locked slot (PedestalVisuals shows it on slots past the next buyable one).
+	local lid = BuildUtil.cylinder(model, at(x, FLOOR_TOP + height + 0.35, z), 0.7, width * 1.02, {
+		Name = "SealLid",
+		Material = Enum.Material.Slate,
+		Color = WALL_PILLAR,
+		Transparency = 1,
+	})
+	lid.CanCollide = false
+	local seal = BuildUtil.decor(BuildUtil.part(model, {
+		Name = "LidSeal",
+		Size = Vector3.new(1.4, 0.06, width * 1.04),
+		CFrame = at(x, FLOOR_TOP + height + 0.72, z),
+		Material = Enum.Material.Fabric,
+		Color = PAPER,
+		Transparency = 1,
+	}))
+	seal.CanCollide = false
 	if imported then
 		local look = MapProps.build(model, "RelicPedestal", at(x, FLOOR_TOP, z))
 		if look then
@@ -577,15 +595,149 @@ local function buildCornerLanterns(parent: Instance, at: (number, number, number
 	buildLantern(parent, at, GATE_GAP / 2 + 2, -half + 4)
 end
 
--- Sakura in the free back-left corner, mirroring the Showcase podium across the path: clear of the
--- binding circle, the terrace and its rails, the pedestals and the wall pillars. Built only when the
--- model is imported (a primitive fallback tree would look wrong in the chamber).
-local BLOSSOM_TREE = { -30, 26 }
-
-local function buildBlossomTree(parent: Instance, at: (number, number, number) -> CFrame)
-	if MapProps.has("HomeBlossomTree") then
-		MapProps.build(parent, "HomeBlossomTree", at(BLOSSOM_TREE[1], FLOOR_TOP, BLOSSOM_TREE[2]))
+-- Seal Shrine (front-left, facing the street): a small hokora with a lit plaque for the owner's
+-- name and seal rank (PlotService fills it), and the owner's prompt for the pedestal upgrades
+-- (opens the Shrine menu; the client shows it to the owner only).
+local function buildSealShrine(parent: Instance, at: (number, number, number) -> CFrame)
+	local offset = Config.Plots.SealShrineOffset
+	local x, z = offset[1], offset[2]
+	local model = Instance.new("Model")
+	model.Name = "SealShrine"
+	BuildUtil.part(model, {
+		Name = "Base",
+		Size = Vector3.new(9, 1, 6),
+		CFrame = at(x, FLOOR_TOP + 0.5, z),
+		Material = Enum.Material.Basalt,
+		Color = WALL_PILLAR,
+	})
+	BuildUtil.part(model, {
+		Name = "Hokora",
+		Size = Vector3.new(5, 4.4, 3.6),
+		CFrame = at(x, FLOOR_TOP + 1 + 2.2, z + 0.8),
+		Material = Enum.Material.Wood,
+		Color = WOOD,
+	})
+	BuildUtil.part(model, {
+		Name = "Roof",
+		Size = Vector3.new(6.6, 0.6, 5),
+		CFrame = at(x, FLOOR_TOP + 1 + 4.7, z + 0.6) * CFrame.Angles(math.rad(-8), 0, 0),
+		Material = Enum.Material.Slate,
+		Color = Color3.fromRGB(56, 48, 66),
+	})
+	for _, side in { -1, 1 } do
+		BuildUtil.part(model, {
+			Name = "Post",
+			Size = Vector3.new(0.5, 5.6, 0.5),
+			CFrame = at(x + side * 3.6, FLOOR_TOP + 1 + 2.8, z - 2.2),
+			Material = Enum.Material.Wood,
+			Color = GATE_RED,
+		})
 	end
+	-- Plaque on the street side (-Z), lit from inside.
+	local plaque = BuildUtil.part(model, {
+		Name = "Plaque",
+		Size = Vector3.new(6.6, 2.6, 0.3),
+		CFrame = at(x, FLOOR_TOP + 1 + 3.6, z - 2.3),
+		Material = Enum.Material.Wood,
+		Color = Color3.fromRGB(30, 24, 26),
+	})
+	local gui = Instance.new("SurfaceGui")
+	gui.Name = "PlaqueGui"
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 50
+	gui.LightInfluence = 0
+	gui.Parent = plaque
+	for _, row in { { "OwnerName", 0.06, 0.5, "Unclaimed" }, { "SealRank", 0.56, 0.36, "" } } do
+		local label = Instance.new("TextLabel")
+		label.Name = row[1]
+		label.BackgroundTransparency = 1
+		label.Position = UDim2.fromScale(0.04, row[2])
+		label.Size = UDim2.fromScale(0.92, row[3])
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.Text = row[4]
+		label.TextColor3 = Color3.fromRGB(255, 236, 200)
+		label.TextStrokeTransparency = 0.4
+		label.Parent = gui
+	end
+	local lamp = BuildUtil.decor(BuildUtil.part(model, {
+		Name = "ShrineLamp",
+		Size = Vector3.new(1.2, 1.4, 1.2),
+		CFrame = at(x, FLOOR_TOP + 1 + 1.2, z - 1.6),
+		Material = Enum.Material.Neon,
+		Color = WARM,
+		Transparency = 0.1,
+	}))
+	BuildUtil.light(lamp, Color3.fromRGB(255, 200, 130), 18, 2)
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.Name = "UpgradePrompt"
+	prompt.ActionText = "Upgrade pedestals"
+	prompt.ObjectText = "Seal Shrine"
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = 10
+	prompt.RequiresLineOfSight = false
+	prompt:SetAttribute("OpensMenu", "Shrine")
+	prompt:SetAttribute("OwnerOnly", true)
+	prompt.Parent = lamp
+	model.Parent = parent
+end
+
+-- Great Altar (back-right): a raised stone plinth with steps toward the aisle. The owner's best
+-- Huge or Titanic relic rests on it (BaseDecorService); empty, it shows a sealed stone.
+local ALTAR_TOP = 3.2
+
+local function buildAltar(parent: Instance, at: (number, number, number) -> CFrame)
+	local offset = Config.Plots.AltarOffset
+	local x, z = offset[1], offset[2]
+	local model = Instance.new("Model")
+	model.Name = "GreatAltar"
+	BuildUtil.part(model, {
+		Name = "Plinth",
+		Size = Vector3.new(13, ALTAR_TOP, 13),
+		CFrame = at(x, FLOOR_TOP + ALTAR_TOP / 2, z),
+		Material = Enum.Material.Basalt,
+		Color = Color3.fromRGB(48, 44, 58),
+	})
+	BuildUtil.part(model, {
+		Name = "Cap",
+		Size = Vector3.new(13.6, 0.4, 13.6),
+		CFrame = at(x, FLOOR_TOP + ALTAR_TOP + 0.2, z),
+		Material = Enum.Material.Slate,
+		Color = STONE_TRIM,
+	})
+	for i = 1, 3 do
+		local h = ALTAR_TOP * i / 4
+		BuildUtil.part(model, {
+			Name = "Step",
+			Size = Vector3.new(1.6, h, 7),
+			CFrame = at(x - 6.5 - (4 - i) * 1.6 + 0.8, FLOOR_TOP + h / 2, z),
+			Material = Enum.Material.Concrete,
+			Color = STONE_TRIM,
+		})
+	end
+	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + ALTAR_TOP + 0.45, z), 0.1, 9, {
+		Name = "AltarRing",
+		Material = Enum.Material.Neon,
+		Color = Color3.fromRGB(255, 205, 110),
+		Transparency = 0.45,
+	}))
+	local anchor = BuildUtil.decor(BuildUtil.part(model, {
+		Name = "AltarAnchor",
+		Size = Vector3.new(0.2, 0.2, 0.2),
+		CFrame = at(x, FLOOR_TOP + ALTAR_TOP + 0.4, z),
+		Transparency = 1,
+	}))
+	local stone = BuildUtil.part(model, {
+		Name = "SealedStone",
+		Size = Vector3.new(3, 3.6, 3),
+		CFrame = at(x, FLOOR_TOP + ALTAR_TOP + 0.4 + 1.8, z) * CFrame.Angles(0, math.rad(45), 0),
+		Material = Enum.Material.Slate,
+		Color = STONE_DARK,
+	})
+	BuildUtil.billboard(anchor, "Huge & Titanic finds rest here", 12, 1.4, 6, Color3.fromRGB(255, 215, 150))
+	stone.CanCollide = false
+	model.Parent = parent
 end
 
 function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Model
@@ -616,7 +768,16 @@ function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Mod
 	buildResonator(model, at, FLOOR_TOP + TERRACE_H)
 	buildShowcasePodium(model, at)
 	buildCornerLanterns(model, at)
-	buildBlossomTree(model, at)
+	buildSealShrine(model, at)
+	buildAltar(model, at)
+	-- The owner's garden goes here (BaseDecorService); unclaimed shrines keep the corner bare.
+	local garden = BuildUtil.decor(BuildUtil.part(model, {
+		Name = "GardenAnchor",
+		Size = Vector3.new(0.2, 0.2, 0.2),
+		CFrame = at(Config.Plots.GardenOffset[1], FLOOR_TOP, Config.Plots.GardenOffset[2]),
+		Transparency = 1,
+	}))
+	garden.CanCollide = false
 
 	local pedestals = Instance.new("Folder")
 	pedestals.Name = "Pedestals"

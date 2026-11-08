@@ -161,9 +161,28 @@ local function makeBadge(prompt: ProximityPrompt)
 	end)
 end
 
+-- Owner-only prompts (the Seal Shrine's "Upgrade pedestals"): shown only in your own shrine.
+local function watchOwner(prompt: ProximityPrompt)
+	local plot = prompt:FindFirstAncestorWhichIsA("Model")
+	while plot and plot:GetAttribute("PlotIndex") == nil do
+		plot = plot.Parent and plot.Parent:FindFirstAncestorWhichIsA("Model")
+	end
+	if not plot then
+		return
+	end
+	local function update()
+		prompt.Enabled = plot:GetAttribute("OwnerUserId") == Players.LocalPlayer.UserId
+	end
+	update()
+	plot:GetAttributeChangedSignal("OwnerUserId"):Connect(update)
+end
+
 local function watchPrompt(item: Instance)
 	if not item:IsA("ProximityPrompt") then
 		return
+	end
+	if item:GetAttribute("OwnerOnly") then
+		watchOwner(item)
 	end
 	local menu = item:GetAttribute("OpensMenu")
 	if menu == "Bounties" then

@@ -1,6 +1,7 @@
 -- Server-side look of a plot's six pedestals, so visitors see the same shrine as the owner.
 -- Owned: solid stand, glow brightens with level, the relic's model (RelicModels) + info billboard.
--- Next buyable slot: ghost stand with its price. Later slots: hidden ghost.
+-- Next buyable slot: ghost stand with its price. Later slots: ghost stand under a sealed lid with
+-- its price in grey, so the base visibly fills up as you buy slots.
 -- Each pedestal model mirrors Owned / RelicName / IncomePerSec attributes for the owner's prompt.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -246,14 +247,17 @@ local function updateInfo(top: BasePart, state: SlotState)
 	gui.StudsOffset = Vector3.new(0, height, 0)
 
 	if not state.Owned then
-		gui.Enabled = state.IsNext == true and state.Price ~= nil
-		name.Text = `Pedestal {state.Slot}`
-		name.TextColor3 = WHITE
+		local isNext = state.IsNext == true
+		gui.Enabled = state.Price ~= nil
+		name.Text = if isNext then `Pedestal {state.Slot}` else "Sealed pedestal"
+		name.TextColor3 = if isNext then WHITE else GREY
 		amount.Text = Format.number(state.Price or 0)
+		amount.TextColor3 = if isNext then GOLD else GREY
 		level.Visible = false
-		tag.Text = "Unlock it in the Shrine menu"
+		tag.Text = if isNext then "Unlock it at the Seal Shrine" else ""
 		return
 	end
+	amount.TextColor3 = GOLD
 	gui.Enabled = true
 	if state.Id then
 		name.Text, name.TextColor3 = relicLook(state)
@@ -382,9 +386,17 @@ function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 		local base = pedestal:FindFirstChild("Base") :: BasePart
 		local top = pedestal:FindFirstChild("Top") :: BasePart
 		local glow = pedestal:FindFirstChild("Glow") :: BasePart
-		local visible = state.Owned or state.IsNext == true
 		local ghost = not state.Owned
-		local standTransparency = if not visible then 1 elseif ghost then 0.75 else 0
+		local sealed = ghost and state.IsNext ~= true
+		local standTransparency = if sealed then 0.55 elseif ghost then 0.75 else 0
+		local lid = pedestal:FindFirstChild("SealLid")
+		local lidSeal = pedestal:FindFirstChild("LidSeal")
+		if lid and lid:IsA("BasePart") then
+			lid.Transparency = if sealed then 0 else 1
+		end
+		if lidSeal and lidSeal:IsA("BasePart") then
+			lidSeal.Transparency = if sealed then 0 else 1
+		end
 		-- An imported RelicPedestal model ("Look") replaces the primitive base and top, which stay
 		-- as invisible colliders and display anchors.
 		local look = pedestal:FindFirstChild("Look")

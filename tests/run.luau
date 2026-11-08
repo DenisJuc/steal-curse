@@ -28,6 +28,7 @@ local suites = {
 	{ Name = "settings", Tests = require("./specs/settings_spec") },
 	{ Name = "afk", Tests = require("./specs/afk_spec") },
 	{ Name = "world", Tests = require("./specs/world_spec") },
+	{ Name = "base_decor", Tests = require("./specs/base_decor_spec") },
 	{ Name = "skills", Tests = require("./specs/skills_spec") },
 	{ Name = "showcase", Tests = require("./specs/showcase_spec") },
 	{ Name = "models", Tests = require("./specs/models_spec") },
