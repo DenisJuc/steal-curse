@@ -219,7 +219,8 @@ local function setSight(on: boolean)
 	SpiritSight.SetEnabled(on)
 	hud.SetSightMode(on)
 	options.SetManagementVisible(not on)
-	if on then
+	-- The spirit hunt tutorial says the same thing in its own bubble.
+	if on and player:GetAttribute("HuntTutorial") ~= true then
 		hud.ShowHint("Pulse to sense your signals. Get close, then hold to bind.", 4)
 	end
 end

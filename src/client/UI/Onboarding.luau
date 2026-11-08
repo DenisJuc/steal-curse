@@ -224,8 +224,10 @@ local STEPS: { Step } = {
 	},
 	{
 		Target = "AutoRoll",
-		-- Beside the switch: above it would cover the ROLL button (covering Backpack is fine).
+		-- Beside the switch: above it would cover the ROLL button, and right beside it the bubble
+		-- covered half the Backpack button, so it keeps clear of the Backpack slot.
 		Side = "Left",
+		Clear = "BackpackButtonSlot",
 		Text = "Now let it roll for you: turn on Auto Roll.",
 		Done = function(player)
 			return player:GetAttribute("AutoRoll") ~= false
@@ -812,6 +814,8 @@ function Onboarding.Start(screen: ScreenGui)
 		end
 		savedRun = { Steps = activeSteps, Index = index, Running = running }
 		mode = "hunt"
+		-- HuntController skips its own Spirit Sight hint while the tutorial explains the same.
+		player:SetAttribute("HuntTutorial", true)
 		token += 1
 		for _, child in screen:GetChildren() do
 			if not child:IsA("GuiObject") or HUNT_KEEP[child.Name] then
@@ -840,6 +844,7 @@ function Onboarding.Start(screen: ScreenGui)
 			return
 		end
 		mode = "main"
+		player:SetAttribute("HuntTutorial", nil)
 		for _, connection in huntConnections do
 			connection:Disconnect()
 		end

@@ -168,6 +168,8 @@ function HuntHUD.Start(screen: ScreenGui, callbacks: Callbacks): Hud
 
 	local hint = UIKit.label({
 		Name = "Hint",
+		-- Empty until a hint is shown (otherwise it reads "Label" when Spirit Sight opens without one).
+		Text = "",
 		AnchorPoint = Vector2.new(0.5, 0),
 		Position = UDim2.new(0.5, 0, 0, 26),
 		Size = UDim2.new(1, 0, 0, 22),
