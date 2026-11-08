@@ -184,7 +184,8 @@ local function wildSpot(): Vector3?
 	if not position then
 		return nil
 	end
-	local x, z = WorldLayout.wildEntry(Config.World, position.X, position.Z, Config.Travel.WildDepth)
+	-- Through the street's wild gate (walking straight out would run into the plot's back wall).
+	local x, z = WorldLayout.streetGate(Config.Plots, Config.World, Config.Travel.WildDepth)
 	local luck = Players.LocalPlayer:GetAttribute("GateLuck")
 	x, z = ZoneGates.nearestAllowed(ZONE_CONTEXT, if type(luck) == "number" then luck else 1, x, z, 8, true)
 	wildCache, wildCachedAt = Vector3.new(x, position.Y, z), os.clock()

@@ -163,7 +163,7 @@ local function buildKiosk(parent: Instance, kiosk: { Menu: string, Label: string
 	model.Parent = parent
 end
 
-local function buildSignpost(parent: Instance)
+local function buildSignpost(parent: Instance, frame: CFrame)
 	local model = Instance.new("Model")
 	model.Name = "AreaSignpost"
 	BuildUtil.part(model, {
@@ -173,9 +173,12 @@ local function buildSignpost(parent: Instance)
 		Material = Enum.Material.Wood,
 		Color = WOOD,
 	})
+	local paths = WorldLayout.townPaths(Config.Plots, Config.World, Config.Areas, Config.Hub.PlazaRadius)
 	for index, district in Config.Areas do
-		local cx, cz = WorldLayout.areaCenter(district, Config.World)
-		local direction = (Vector3.new(cx, 0, cz) - SIGNPOST_AT).Unit
+		-- Point each arm along that area's town path (its first leg out of the plaza).
+		local path = paths[district.Id]
+		local target = frame:PointToObjectSpace(Vector3.new(path[2][1], 0, path[2][2]))
+		local direction = (Vector3.new(target.X, 0, target.Z) - SIGNPOST_AT).Unit
 		local height = 10.4 - index * 1.6
 		local center = SIGNPOST_AT + direction * 3.6 + Vector3.new(0, height, 0)
 		local arm = BuildUtil.part(model, {
@@ -192,14 +195,24 @@ local function buildSignpost(parent: Instance)
 	model.Parent = parent
 end
 
+-- Where the hub stands: the near end of Shrine Street, hub -Z pointing down the street.
+function HubBuilder.CFrame(): CFrame
+	local x, z, fx, fz = WorldLayout.hubFrame(Config.Plots)
+	return CFrame.lookAt(Vector3.new(x, 0, z), Vector3.new(x + fx, 0, z + fz))
+end
+
 function HubBuilder.Build(parent: Instance)
 	local hub = Instance.new("Model")
 	hub.Name = "Hub"
+	local frame = HubBuilder.CFrame()
+	-- Built around the origin in hub space, then moved to the street's end.
 	buildCenter(hub)
-	buildSignpost(hub)
+	buildSignpost(hub, frame)
 	for _, kiosk in Config.Hub.Kiosks do
 		buildKiosk(hub, kiosk)
 	end
+	hub.WorldPivot = CFrame.new()
+	hub:PivotTo(frame)
 	hub.Parent = parent
 end
 

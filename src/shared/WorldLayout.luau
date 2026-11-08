@@ -91,10 +91,118 @@ function WorldLayout.inStream(world: World, x: number, z: number, margin: number
 	return math.abs(r - world.StreamRadius) <= world.StreamWidth / 2 + margin
 end
 
--- Center of plot `index` on the plot ring (same placement as MapBuilder).
-function WorldLayout.plotPosition(plots: { Count: number, RingRadius: number }, index: number): (number, number)
-	local radians = (index - 1) / plots.Count * math.pi * 2
-	return math.cos(radians) * plots.RingRadius, math.sin(radians) * plots.RingRadius
+-- Shrine Street (Config.Plots.Street): a straight avenue through the town. Street coordinates are
+-- (along, across): along runs from the map center toward the wild gate, across is perpendicular.
+export type Street = {
+	AngleDegrees: number,
+	HalfWidth: number,
+	HubAt: number,
+	FirstPlotAt: number,
+	PlotSpacing: number,
+	RowOffset: number,
+	LanternSpacing: number,
+	Bends: { [string]: { { number } } },
+}
+export type Plots = { Count: number, Size: number, Street: Street }
+
+-- Unit vectors (x, z) of the street's along and across directions.
+function WorldLayout.streetAxes(street: Street): (number, number, number, number)
+	local dx, dz = WorldLayout.polar(street.AngleDegrees, 1)
+	return dx, dz, -dz, dx
+end
+
+-- World (x, z) of street coordinates (along, across).
+function WorldLayout.fromStreet(street: Street, along: number, across: number): (number, number)
+	local dx, dz, nx, nz = WorldLayout.streetAxes(street)
+	return dx * along + nx * across, dz * along + nz * across
+end
+
+-- Street coordinates (along, across) of world (x, z).
+function WorldLayout.toStreet(street: Street, x: number, z: number): (number, number)
+	local dx, dz, nx, nz = WorldLayout.streetAxes(street)
+	return x * dx + z * dz, x * nx + z * nz
+end
+
+-- Street coordinates of plot `index`: pairs face each other across the street, 1 and 2 by the hub.
+function WorldLayout.plotStreet(plots: Plots, index: number): (number, number, number)
+	local street = plots.Street
+	local side = if index % 2 == 1 then 1 else -1
+	local along = street.FirstPlotAt + (math.ceil(index / 2) - 1) * street.PlotSpacing
+	return along, side * street.RowOffset, side
+end
+
+-- Center of plot `index` (same placement as MapBuilder).
+function WorldLayout.plotPosition(plots: Plots, index: number): (number, number)
+	local along, across = WorldLayout.plotStreet(plots, index)
+	return WorldLayout.fromStreet(plots.Street, along, across)
+end
+
+-- Unit (x, z) a plot's entrance faces: straight across to the street.
+function WorldLayout.plotFacing(plots: Plots, index: number): (number, number)
+	local _, _, side = WorldLayout.plotStreet(plots, index)
+	local _, _, nx, nz = WorldLayout.streetAxes(plots.Street)
+	return -nx * side, -nz * side
+end
+
+-- A plot's footprint as a Box (squares, so the street angle is all the rotation needed).
+function WorldLayout.plotBox(plots: Plots, index: number): Box
+	local x, z = WorldLayout.plotPosition(plots, index)
+	return { X = x, Z = z, W = plots.Size, D = plots.Size, Rot = -plots.Street.AngleDegrees }
+end
+
+-- Hub plaza center (x, z) at the street's near end.
+function WorldLayout.hubPosition(plots: Plots): (number, number)
+	return WorldLayout.fromStreet(plots.Street, plots.Street.HubAt, 0)
+end
+
+-- Hub plaza center plus the unit (x, z) of its -Z: hub space -Z points down the street.
+function WorldLayout.hubFrame(plots: Plots): (number, number, number, number)
+	local x, z = WorldLayout.hubPosition(plots)
+	local dx, dz = WorldLayout.streetAxes(plots.Street)
+	return x, z, dx, dz
+end
+
+-- World (x, z) of hub-space offset {x, z} (hub -Z points down the street, like a CFrame.lookAt).
+function WorldLayout.fromHub(plots: Plots, hx: number, hz: number): (number, number)
+	local cx, cz, fx, fz = WorldLayout.hubFrame(plots)
+	-- lookAt frame: LookVector = (fx, fz) = -Z, RightVector = (-fz, fx) = +X.
+	local rx, rz = -fz, fx
+	return cx + rx * hx - fx * hz, cz + rz * hx - fz * hz
+end
+
+-- Where the street meets the wild (`depth` studs past WildInner, on the street's center line).
+function WorldLayout.streetGate(plots: Plots, world: World, depth: number): (number, number)
+	return WorldLayout.fromStreet(plots.Street, world.WildInner + depth, 0)
+end
+
+-- Town paths as polylines of world (x, z) points, one per area: the street itself for the area it
+-- points at, otherwise hub plaza -> optional bends -> where that area's wild path starts.
+function WorldLayout.townPaths(plots: Plots, world: World, areas: { Area }, plazaRadius: number): { [string]: { { number } } }
+	local street = plots.Street
+	local paths = {}
+	for _, area in areas do
+		local delta = math.abs(angleDelta(area.AngleDegrees, street.AngleDegrees))
+		local points = {}
+		if delta < 1e-6 then
+			table.insert(points, { WorldLayout.fromStreet(street, street.HubAt + plazaRadius, 0) })
+			table.insert(points, { WorldLayout.fromStreet(street, world.WildInner, 0) })
+		else
+			local ex, ez = WorldLayout.polar(area.AngleDegrees, world.WildInner)
+			local bends = street.Bends[area.Id] or {}
+			local first = if #bends > 0 then { WorldLayout.fromStreet(street, bends[1][1], bends[1][2]) } else { ex, ez }
+			-- Leave the plaza edge facing the first point.
+			local hx, hz = WorldLayout.hubPosition(plots)
+			local ux, uz = first[1] - hx, first[2] - hz
+			local length = math.sqrt(ux * ux + uz * uz)
+			table.insert(points, { hx + ux / length * plazaRadius, hz + uz / length * plazaRadius })
+			for _, bend in bends do
+				table.insert(points, { WorldLayout.fromStreet(street, bend[1], bend[2]) })
+			end
+			table.insert(points, { ex, ez })
+		end
+		paths[area.Id] = points
+	end
+	return paths
 end
 
 -- Distance from (x, z) to a box in the same frame (0 inside). Rot follows CFrame.Angles(0, rot, 0).

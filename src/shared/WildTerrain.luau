@@ -12,7 +12,7 @@ local WildTerrain = {}
 export type Box = { X: number, Z: number, W: number, D: number, Rot: number? }
 export type Options = {
 	Areas: { { Id: string, AngleDegrees: number, Seed: number } },
-	World: { WildInner: number, StreamRadius: number, StreamWidth: number },
+	World: { WildInner: number, StreamRadius: number, StreamWidth: number, ReliefShift: number? },
 	AreaAt: (areas: any, world: any, x: number, z: number) -> (string, number, string?),
 	PathDistance: (areas: any, x: number, z: number) -> number,
 	PathHalfWidth: number,
@@ -82,6 +82,8 @@ function WildTerrain.new(options: Options): Shape
 		table.insert(clearings, { X = box.X, Z = box.Z, R = math.sqrt(box.W * box.W + box.D * box.D) / 2 + CLEARING_MARGIN })
 	end
 
+	local shift = world.ReliefShift or 0
+
 	local function relief(id: string, x: number, z: number): number
 		local shape = RELIEF[id]
 		return if shape then shape(x, z, seeds[id] or 0) else 0
@@ -122,9 +124,13 @@ function WildTerrain.new(options: Options): Shape
 			return 0
 		end
 		local id, weight, other = options.AreaAt(options.Areas, world, x, z)
-		local height = relief(id, x, z) * weight
+		-- The relief is sampled ReliefShift studs further in, so moving the ring outward keeps
+		-- the hills, pits and ravines it was tuned with.
+		local scale = (r - shift) / r
+		local sx, sz = x * scale, z * scale
+		local height = relief(id, sx, sz) * weight
 		if other then
-			height += relief(other, x, z) * (1 - weight)
+			height += relief(other, sx, sz) * (1 - weight)
 		end
 		return height * flat
 	end

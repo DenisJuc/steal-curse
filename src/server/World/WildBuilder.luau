@@ -218,8 +218,9 @@ local function fillGround(terrain: Terrain, rng: Random, seed: number, shape: Wi
 		end
 		task.wait()
 	end
+	local hubX, hubZ = WorldLayout.hubPosition(Config.Plots)
 	terrain:FillCylinder(
-		CFrame.new(0, -GROUND_DEPTH / 2, 0),
+		CFrame.new(hubX, -GROUND_DEPTH / 2, hubZ),
 		GROUND_DEPTH + 0.5,
 		Config.Hub.PlazaRadius + 4,
 		Enum.Material.Slate
@@ -228,8 +229,10 @@ local function fillGround(terrain: Terrain, rng: Random, seed: number, shape: Wi
 	local plots = Config.Plots
 	for index = 1, plots.Count do
 		local x, z = WorldLayout.plotPosition(plots, index)
+		local fx, fz = WorldLayout.plotFacing(plots, index)
+		local facing = Vector3.new(fx, 0, fz)
 		terrain:FillBlock(
-			CFrame.lookAt(Vector3.new(x, -GROUND_DEPTH / 2, z), Vector3.new(0, -GROUND_DEPTH / 2, 0)),
+			CFrame.lookAt(Vector3.new(x, -GROUND_DEPTH / 2, z), Vector3.new(x, -GROUND_DEPTH / 2, z) + facing),
 			Vector3.new(plots.Size + 4, GROUND_DEPTH, plots.Size + 4),
 			Enum.Material.Slate
 		)
@@ -237,7 +240,7 @@ local function fillGround(terrain: Terrain, rng: Random, seed: number, shape: Wi
 		-- and its daises and binding circle; clear one voxel more so the surface sits below the Base.
 		local center = Vector3.new(x, 2, z)
 		terrain:FillBlock(
-			CFrame.lookAt(center, Vector3.new(0, 2, 0)),
+			CFrame.lookAt(center, center + facing),
 			Vector3.new(plots.Size - 2, 12, plots.Size - 2),
 			Enum.Material.Air
 		)
@@ -256,21 +259,91 @@ local function strip(terrain: Terrain, angle: number, inner: number, outer: numb
 	)
 end
 
+-- Terrain strip between two ground points (x, z).
+local function segment(terrain: Terrain, a: { number }, b: { number }, width: number, material: Enum.Material)
+	local from = Vector3.new(a[1], -GROUND_DEPTH / 2, a[2])
+	local to = Vector3.new(b[1], -GROUND_DEPTH / 2, b[2])
+	local length = (to - from).Magnitude
+	if length < 0.5 then
+		return
+	end
+	-- Pad the ends so bends join without gaps.
+	terrain:FillBlock(CFrame.lookAt((from + to) / 2, to), Vector3.new(width, GROUND_DEPTH + 0.5, length + width / 2), material)
+end
+
+local function glowPair(folder: Instance, point: Vector3, side: Vector3)
+	for _, sign in { -1, 1 } do
+		BuildUtil.decor(BuildUtil.part(folder, {
+			Name = "PathGlow",
+			Size = Vector3.new(0.8, 0.6, 0.8),
+			CFrame = CFrame.new(point + side * sign) * CFrame.Angles(0, math.rad(45), 0),
+			Material = Enum.Material.Neon,
+			Color = PATH_GLOW,
+		}))
+	end
+end
+
+-- Shrine Street: the paved avenue from the hub plaza to the wild gate, stone lanterns along both
+-- curbs and a torii where it leaves the plaza; town paths from the plaza to the other areas.
+local function buildTown(terrain: Terrain, folder: Instance)
+	local world = Config.World
+	local plots = Config.Plots
+	local street = plots.Street
+	local plaza = Config.Hub.PlazaRadius
+	local nearEnd = { WorldLayout.fromStreet(street, street.HubAt, 0) }
+	local farEnd = { WorldLayout.fromStreet(street, world.WildInner, 0) }
+	segment(terrain, nearEnd, farEnd, street.HalfWidth * 2, TOWN_PATH)
+	local dx, dz, nx, nz = WorldLayout.streetAxes(street)
+	local along = Vector3.new(dx, 0, dz)
+	for distance = street.HubAt + plaza + 8, world.WildInner - 14, street.LanternSpacing do
+		-- Keep plot entrances clear.
+		local blocking = false
+		for index = 1, plots.Count, 2 do
+			blocking = blocking or math.abs(distance - (WorldLayout.plotStreet(plots, index))) < 10
+		end
+		if blocking then
+			continue
+		end
+		for _, side in { -1, 1 } do
+			local x, z = WorldLayout.fromStreet(street, distance, side * (street.HalfWidth - 2))
+			local position = Vector3.new(x, 0, z)
+			MapProps.build(folder, "StoneLantern", CFrame.lookAt(position, position + Vector3.new(-nx * side, 0, -nz * side)))
+		end
+	end
+	local gx, gz = WorldLayout.fromStreet(street, street.HubAt + plaza + 2, 0)
+	local gate = Vector3.new(gx, 0, gz)
+	MapProps.build(folder, "ShrineGate", CFrame.lookAt(gate, gate + along))
+
+	local paths = WorldLayout.townPaths(plots, world, Config.Areas, plaza)
+	for _, area in Config.Areas do
+		local points = paths[area.Id]
+		if math.abs(area.AngleDegrees - street.AngleDegrees) < 1e-6 then
+			continue
+		end
+		for index = 1, #points - 1 do
+			local a, b = points[index], points[index + 1]
+			segment(terrain, a, b, PATH_WIDTH, TOWN_PATH)
+			local from, to = Vector3.new(a[1], 0.3, a[2]), Vector3.new(b[1], 0.3, b[2])
+			local direction = (to - from).Unit
+			local side = Vector3.new(-direction.Z, 0, direction.X) * (PATH_WIDTH / 2 + 1)
+			for distance = 8, (to - from).Magnitude, 16 do
+				glowPair(folder, from + direction * distance, side)
+			end
+		end
+	end
+end
+
 local function buildPaths(terrain: Terrain, folder: Instance)
 	local world = Config.World
-	for index = 1, Config.Plots.Count do
-		local angle = (index - 1) / Config.Plots.Count * 360
-		strip(terrain, angle, Config.Hub.PlazaRadius, Config.Plots.RingRadius - Config.Plots.Size / 2, 10, TOWN_PATH)
-	end
+	buildTown(terrain, folder)
 	for _, area in Config.Areas do
-		strip(terrain, area.AngleDegrees, Config.Hub.PlazaRadius, world.WildInner, PATH_WIDTH, TOWN_PATH)
 		strip(terrain, area.AngleDegrees, world.WildInner, world.WildOuter, PATH_WIDTH, look(area.Id).Path)
-		-- Glowing stones lead from the plaza out to the wild, then sparser all the way to the edge
+		-- Glowing stones lead from the town edge into the wild, then sparser all the way to the edge
 		-- (in the dark they are how you find the path back).
 		local ux, uz = WorldLayout.polar(area.AngleDegrees, 1)
 		local side = Vector3.new(-uz, 0, ux) * (PATH_WIDTH / 2 + 1)
 		local distances = {}
-		for distance = Config.Hub.PlazaRadius + 8, world.WildInner + 30, 16 do
+		for distance = world.WildInner + 2, world.WildInner + 30, 16 do
 			table.insert(distances, distance)
 		end
 		for distance = world.WildInner + 58, world.WildOuter - 10, 28 do

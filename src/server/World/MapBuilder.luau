@@ -1,11 +1,12 @@
 -- Builds the whole map from code at server start (GDD 4.1, Slice 11): lighting, the shrine town
--- (hub plaza and plot ring) and the wild ring around it (WildBuilder: terrain, paths, stream,
+-- (hub plaza and Shrine Street) and the wild ring around it (WildBuilder: terrain, paths, stream,
 -- landmarks, props, signal spawn grid), then checks the part budget.
 
 local Lighting = game:GetService("Lighting")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local HubBuilder = require(script.Parent.HubBuilder)
 local PlotBuilder = require(script.Parent.PlotBuilder)
 local WildBuilder = require(script.Parent.WildBuilder)
@@ -95,9 +96,11 @@ function MapBuilder.Build(): Map
 
 	local plots = {}
 	for index = 1, Config.Plots.Count do
-		local angle = (index - 1) / Config.Plots.Count * math.pi * 2
-		local position = Vector3.new(math.cos(angle), 0, math.sin(angle)) * Config.Plots.RingRadius
-		local cframe = CFrame.lookAt(position, Vector3.zero)
+		local x, z = WorldLayout.plotPosition(Config.Plots, index)
+		local fx, fz = WorldLayout.plotFacing(Config.Plots, index)
+		local position = Vector3.new(x, 0, z)
+		-- Local -Z (the entrance) faces the street.
+		local cframe = CFrame.lookAt(position, position + Vector3.new(fx, 0, fz))
 		plots[index] = PlotBuilder.Build(index, cframe, plotFolder)
 	end
 

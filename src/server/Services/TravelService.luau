@@ -34,15 +34,17 @@ local function destination(player: Player, character: Model, root: BasePart, whe
 		local home = PlotService.HomeCFrame(player)
 		return home, if home then nil else "You have no shrine yet."
 	elseif where == "Hub" then
-		local x, z = Config.Travel.HubSpot[1], Config.Travel.HubSpot[2]
+		local x, z = WorldLayout.fromHub(Config.Plots, Config.Travel.HubSpot[1], Config.Travel.HubSpot[2])
+		local hx, hz = WorldLayout.hubPosition(Config.Plots)
 		local position = Vector3.new(x, groundAt(x, z, { character }) + 4, z)
-		return CFrame.lookAt(position, Vector3.new(0, position.Y, 0)), nil
+		return CFrame.lookAt(position, Vector3.new(hx, position.Y, hz)), nil
 	elseif where == "Wild" then
 		local here = root.Position
 		if WorldLayout.inWild(Config.World, here.X, here.Z) then
 			return nil, "You are already in the wild."
 		end
-		local x, z = WorldLayout.wildEntry(Config.World, here.X, here.Z, Config.Travel.WildDepth)
+		-- From town: through the street's wild gate (the Haunted Forest).
+		local x, z = WorldLayout.streetGate(Config.Plots, Config.World, Config.Travel.WildDepth)
 		-- Zone gates: the nearest wild spot this player may enter (Forest Edge for a new player).
 		x, z = ZoneGateService.OpenWildNear(player, x, z)
 		local position = Vector3.new(x, groundAt(x, z, { character }) + 4, z)

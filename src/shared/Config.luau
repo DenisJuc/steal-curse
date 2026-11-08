@@ -435,8 +435,8 @@ Config.Hunt = {
 -- deeper you are (bands by distance from the hub center). It resets in town or after IdleSeconds
 -- without a capture (the timer pauses while you have no signals left).
 Config.HuntStreak = {
-	EdgeUntil = 330,
-	DeepUntil = 500,
+	EdgeUntil = 390,
+	DeepUntil = 560,
 	Gains = { Edge = 0.1, Deep = 0.2, Heart = 0.3 },
 	Max = 2,
 	IdleSeconds = 90,
@@ -766,28 +766,36 @@ Config.ZoneEvents = {
 -- border the two neighbours mix (props, terrain and ambience). No walls between areas.
 -- Landmarks live in WildLayout; signal spawn points are a generated grid (WorldLayout, Lune-tested).
 Config.World = {
-	-- Wild ring, in studs from the hub center.
-	-- Past the outer corner of a plot. Keep a small gap before the wild / signposts.
-	WildInner = 240,
-	WildOuter = 620,
+	-- Wild ring, in studs from the map center (the middle of Shrine Street, not the hub).
+	-- Past the street's far plot corners. Keep a small gap before the wild / signposts.
+	-- 2026-11-08 Shrine Street: the whole ring moved out 60 studs (bands, stream, landmarks too).
+	WildInner = 300,
+	WildOuter = 680,
+	-- Terrain relief is sampled this many studs further in (WildTerrain), so the moved ring keeps
+	-- the ground it was tuned with.
+	ReliefShift = 60,
 	BlendDegrees = 25,
 	-- Signal spawn grid: spacing, distance kept from the ring edges and from landmark footprints.
 	SpawnSpacing = 20,
 	SpawnEdgeMargin = 12,
 	SpawnClearance = 5,
 	-- A water stream circles through all three areas (bridges in WildLayout).
-	StreamRadius = 405,
+	StreamRadius = 465,
 	StreamWidth = 12,
 	-- The server warns at startup when the built map has more parts than this.
 	PartBudget = 12000,
 	-- Default Roblox walk speed (studs/s), used by the travel-time tests.
 	WalkSpeed = 16,
-	-- Every plot must reach the wild within this many seconds of walking.
-	MaxTravelSeconds = 15,
+	-- Every plot must reach the street's wild gate within this many seconds of walking. Walking
+	-- the street past every base is the point of the layout; the Wild button is the shortcut.
+	MaxTravelSeconds = 30,
+	-- From the hub plaza to the street's wild gate.
+	MaxHubTravelSeconds = 36,
 }
 
 -- AngleDegrees: the middle of each area's slice of the ring, and where its path runs out of town.
--- Plots sit at multiples of 45 degrees, so every area angle is a gap between two plots (22.5 + 45k).
+-- Shrine Street runs out of town along the Haunted Forest angle; the other two areas are reached
+-- by paths from the hub plaza (Config.Plots.Street).
 Config.Areas = {
 	{ Id = "HauntedForest", Name = "Haunted Forest", AngleDegrees = 22.5, Seed = 7 },
 	{ Id = "AbandonedVillage", Name = "Abandoned Village", AngleDegrees = 157.5, Seed = 11 },
@@ -930,17 +938,34 @@ Config.Travel = {
 	CooldownSeconds = 4,
 	-- "Wild" lands this far inside the ring, straight out from where you stand.
 	WildDepth = 16,
-	-- "Hub" lands here {x, z}, facing the obelisk (the hub spawn, on the side with no kiosk).
+	-- "Hub" lands here {x, z} in hub space (-Z points down the street), facing the obelisk (the hub
+	-- spawn, on the side with no kiosk).
 	HubSpot = { 0, -22 },
 }
 
--- Plot local space: -Z faces the hub (entrance side). Offsets are {x, z} in studs.
--- Courtyard ~88 studs (was 64): walkable shrine yard. RingRadius keeps town paths clear of plots;
--- World.WildInner sits past the plot's outer corner.
+-- Plot local space: -Z faces the street (entrance side). Offsets are {x, z} in studs.
+-- Shrine Street (2026-11-08, base overhaul option A): two rows of 4 plots face a lantern avenue,
+-- the hub plaza at one end and the wild gate (Haunted Forest) at the other, so every trip from
+-- home to the wild walks past every base. Street distances are studs along the street axis from
+-- the map center (toward the gate is positive); across is positive on the odd plots' side (the
+-- Abandoned Village side), even plots face them, plots 1 and 2 sit next to the hub.
 Config.Plots = {
 	Count = 8,
-	RingRadius = 180,
-	Size = 88,
+	Size = 100,
+	Street = {
+		AngleDegrees = 22.5,
+		HalfWidth = 20,
+		HubAt = -232,
+		FirstPlotAt = -124,
+		PlotSpacing = 108,
+		-- Plot center distance from the street's center line (HalfWidth + Size / 2).
+		RowOffset = 70,
+		-- Stone lanterns along both curbs, this far apart.
+		LanternSpacing = 27,
+		-- Town paths from the hub plaza to the other wild areas: optional bends, as
+		-- {along, across} street coordinates (across is positive on the odd-plot side).
+		Bends = { AncientRuins = { { -200, -190 } } },
+	},
 	StartingPedestals = 3,
 	MaxPedestals = 6,
 	-- Front row toward the gate, back row toward the resonator, with real walking gaps.

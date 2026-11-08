@@ -16,6 +16,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local RollMath = require(ReplicatedStorage.Shared.RollMath)
 local RollRules = require(ReplicatedStorage.Shared.RollRules)
 local BuildUtil = require(script.Parent.Parent.World.BuildUtil)
+local HubBuilder = require(script.Parent.Parent.World.HubBuilder)
 local DataService = require(script.Parent.DataService)
 local GameEvents = require(script.Parent.GameEvents)
 
@@ -240,8 +241,8 @@ local function buildBoards()
 	model.Name = "Leaderboards"
 	local angle = math.rad(BOARD_ANGLE)
 	local center = Vector3.new(math.cos(angle), 0, math.sin(angle)) * BOARD_RADIUS
-	-- Front (-Z) faces the obelisk; the SurfaceGui is on the Front face.
-	local base = CFrame.lookAt(center + Vector3.new(0, 1, 0), Vector3.new(0, 1, 0))
+	-- Front (-Z) faces the obelisk; the SurfaceGui is on the Front face. Placed in hub space.
+	local base = HubBuilder.CFrame() * CFrame.lookAt(center + Vector3.new(0, 1, 0), Vector3.new(0, 1, 0))
 	local defs = {
 		{ Key = "Seals", Title = "MOST SEALS", Offset = -6.5, Format = Format.number },
 		{ Key = "Rarest", Title = "RAREST FIND", Offset = 6.5, Format = rarestText },

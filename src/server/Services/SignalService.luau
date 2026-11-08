@@ -112,7 +112,8 @@ local function anchorOf(player: Player): Vector3
 	local position = rootPosition(player) or homePosition(player)
 	local x, z = position.X, position.Z
 	if not WorldLayout.inWild(Config.World, x, z) then
-		x, z = WorldLayout.wildEntry(Config.World, x, z, Config.Travel.WildDepth)
+		-- In town: gather past the street's wild gate, where the player walks out.
+		x, z = WorldLayout.streetGate(Config.Plots, Config.World, Config.Travel.WildDepth)
 	end
 	-- Zone gates: gather signals in the nearest wild cell this player may enter.
 	x, z = ZoneGateService.OpenWildNear(player, x, z)
