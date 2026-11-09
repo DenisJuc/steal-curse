@@ -28,48 +28,65 @@ local PAPER = Color3.fromRGB(228, 216, 184)
 local SEAL_INK = Color3.fromRGB(170, 24, 30)
 local ROPE = Color3.fromRGB(176, 146, 98)
 local SEAL_GLOW = Color3.fromRGB(150, 80, 255)
-local CIRCLE_CENTER = { 0, -12 }
+local CIRCLE_CENTER = { 0, -10 }
 
 local FLOOR_TOP = 1.2
 local WALL_H = 8
 -- Front wall (the street side) is a low fence so the relics show from Shrine Street.
 local FRONT_H = 3
 local GATE_GAP = 16
-local PATH_W = 10
 local TERRACE_H = 1.0
 
--- Collect pad on the gate side of each pedestal: the pedestal's CE piles up there and walking onto
--- it claims the lot (PedestalService). A dark seal plate with a warm rune inlay; the trigger is an
--- invisible box so a player touches it the moment they step on. PedestalVisuals shows the amount.
+-- Collect pad in the lane beside each pedestal: the pedestal's CE piles up there and walking onto
+-- it claims the lot (PedestalService). A big round pressure plate (2026-11-08): a gold-rimmed
+-- diamond seal plate under a dark disc with a glowing rune core, joined to its pedestal by a gold
+-- inlay. Clients press it down and ring it on a collect (CollectFX). The trigger is an invisible
+-- box so a player touches it the moment they step on. PedestalVisuals shows the amount.
 local PAD_STONE = Color3.fromRGB(30, 26, 36)
+local PAD_GOLD = Color3.fromRGB(196, 150, 78)
 
-local function buildCollectPad(model: Model, at: (number, number, number) -> CFrame, x: number, z: number)
-	local pad = BuildUtil.part(model, {
+local function buildCollectPad(model: Model, at: (number, number, number) -> CFrame, x: number, z: number, pedestalX: number)
+	local size = Config.Plots.PadSize
+	-- Diamond seal plate (a square turned 45 degrees) under the disc: four gold points show.
+	local plate = BuildUtil.part(model, {
+		Name = "CollectBase",
+		Size = Vector3.new(size * 0.8, 0.16, size * 0.8),
+		CFrame = at(x, FLOOR_TOP + 0.08, z) * CFrame.Angles(0, math.rad(45), 0),
+		Material = Enum.Material.Metal,
+		Color = PAD_GOLD,
+	})
+	plate.CanTouch = false
+	local trim = BuildUtil.cylinder(model, at(x, FLOOR_TOP + 0.14, z), 0.28, size, {
+		Name = "CollectTrim",
+		Material = Enum.Material.Metal,
+		Color = PAD_GOLD,
+	})
+	trim.CanTouch = false
+	local pad = BuildUtil.cylinder(model, at(x, FLOOR_TOP + 0.22, z), 0.32, size - 0.7, {
 		Name = "CollectPad",
-		Size = Vector3.new(2.8, 0.24, 4.8),
-		CFrame = at(x, FLOOR_TOP + 0.12, z),
 		Material = Enum.Material.Slate,
 		Color = PAD_STONE,
 	})
 	pad.CanTouch = false
-	BuildUtil.part(model, {
-		Name = "CollectTrim",
-		Size = Vector3.new(3.2, 0.16, 5.2),
-		CFrame = at(x, FLOOR_TOP + 0.08, z),
-		Material = Enum.Material.Metal,
-		Color = Color3.fromRGB(150, 120, 70),
-	}).CanTouch = false
-	BuildUtil.decor(BuildUtil.part(model, {
+	BuildUtil.decor(BuildUtil.cylinder(model, at(x, FLOOR_TOP + 0.4, z), 0.05, size * 0.55, {
 		Name = "CollectGlow",
-		Size = Vector3.new(2.0, 0.05, 4.0),
-		CFrame = at(x, FLOOR_TOP + 0.26, z),
 		Material = Enum.Material.Neon,
 		Color = WARM,
 		Transparency = 0.75,
 	}))
+	-- Gold inlay from the pad's rim to the pedestal's dais.
+	local from = x + (if pedestalX > x then size / 2 else -size / 2)
+	local to = pedestalX - (if pedestalX > x then 2.75 else -2.75)
+	BuildUtil.decor(BuildUtil.part(model, {
+		Name = "CollectLink",
+		Size = Vector3.new(math.abs(to - from), 0.06, 0.5),
+		CFrame = at((from + to) / 2, FLOOR_TOP + 0.03, z),
+		Material = Enum.Material.Metal,
+		Color = PAD_GOLD,
+	}))
 	local trigger = BuildUtil.part(model, {
 		Name = "CollectTrigger",
-		Size = Vector3.new(2.8, 5, 4.8),
+		Size = Vector3.new(size - 0.6, 5, size - 0.6),
 		CFrame = at(x, FLOOR_TOP + 2.6, z),
 		Transparency = 1,
 		CanCollide = false,
@@ -130,9 +147,9 @@ local function buildPedestal(parent: Instance, at: (number, number, number) -> C
 	local up = BuildUtil.light(uplight, Color3.fromRGB(255, 196, 140), 8, 1.4)
 	up.Name = "PedestalUplight"
 	up.Enabled = false
-	-- In the aisle, level with the pedestal, reaching the aisle's center line.
+	-- In the pedestal's lane, level with it.
 	local side = if x < 0 then -1 else 1
-	buildCollectPad(model, at, side * Config.Plots.PadInset, z)
+	buildCollectPad(model, at, side * Config.Plots.PadX, z, x)
 	-- Sealed lid over a locked slot (PedestalVisuals shows it on slots past the next buyable one).
 	local lid = BuildUtil.cylinder(model, at(x, FLOOR_TOP + height + 0.35, z), 0.7, width * 1.02, {
 		Name = "SealLid",
@@ -363,14 +380,86 @@ local function buildCourtyardFloor(parent: Instance, at: (number, number, number
 		})
 	end
 
-	-- Processional path: gate → resonator
-	BuildUtil.part(parent, {
-		Name = "Path",
-		Size = Vector3.new(PATH_W, 0.14, size - 10),
-		CFrame = at(0, FLOOR_TOP + 0.08, 2),
-		Material = Enum.Material.Cobblestone,
-		Color = STONE_DARK,
+	-- Two lanes (one per pedestal row) joined at the front and back, plus a stub to the gate.
+	local plots = Config.Plots
+	local laneW = plots.LaneWidth
+	local front, back = plots.LaneFrontZ, plots.LaneBackZ
+	local function path(name: string, sizeX: number, sizeZ: number, x: number, z: number)
+		BuildUtil.part(parent, {
+			Name = name,
+			Size = Vector3.new(sizeX, 0.14, sizeZ),
+			CFrame = at(x, FLOOR_TOP + 0.08, z),
+			Material = Enum.Material.Cobblestone,
+			Color = STONE_DARK,
+		})
+	end
+	for _, side in { -1, 1 } do
+		path("Lane", laneW, back - front + laneW, side * plots.PadX, (front + back) / 2)
+	end
+	local span = plots.PadX * 2 + laneW
+	path("LaneFront", span, laneW, 0, front)
+	path("LaneBack", span, laneW, 0, back)
+	local gateZ = -half + 2
+	path("Path", 10, front - laneW / 2 - gateZ, 0, (gateZ + front - laneW / 2) / 2)
+end
+
+-- Reflecting pool between the lanes: a basalt kerb around dark violet water with a few floating
+-- paper lanterns (neon, no lights: many overlapping lights drop in blocky patches).
+local POOL_WATER = Color3.fromRGB(28, 18, 52)
+local function buildPool(parent: Instance, at: (number, number, number) -> CFrame)
+	local plots = Config.Plots
+	local w = plots.PoolHalfWidth * 2
+	local z0, z1 = plots.LaneFrontZ + plots.LaneWidth / 2 + 1.5, plots.LaneBackZ - plots.LaneWidth / 2 - 1.5
+	local depth = z1 - z0
+	local cz = (z0 + z1) / 2
+	local kerbH, kerbT = 0.9, 0.9
+	local model = Instance.new("Model")
+	model.Name = "Pool"
+	BuildUtil.part(model, {
+		Name = "Water",
+		Size = Vector3.new(w - kerbT * 2, 0.2, depth - kerbT * 2),
+		CFrame = at(0, FLOOR_TOP + 0.45, cz),
+		Material = Enum.Material.Glass,
+		Color = POOL_WATER,
+		Transparency = 0.15,
+		Reflectance = 0.35,
 	})
+	for _, spec in {
+		{ w, depth / 2 - kerbT / 2, 0 },
+		{ w, -(depth / 2 - kerbT / 2), 0 },
+		{ kerbT, 0, w / 2 - kerbT / 2 },
+		{ kerbT, 0, -(w / 2 - kerbT / 2) },
+	} do
+		local long = spec[1] == kerbT
+		BuildUtil.part(model, {
+			Name = "Kerb",
+			Size = if long then Vector3.new(kerbT, kerbH, depth) else Vector3.new(w, kerbH, kerbT),
+			CFrame = at(spec[3], FLOOR_TOP + kerbH / 2, cz + spec[2]),
+			Material = Enum.Material.Basalt,
+			Color = WALL_PILLAR,
+		})
+	end
+	-- Floating lanterns, staggered down the pool.
+	for i, spot in { { -2.2, 0.16 }, { 2.0, 0.38 }, { -1.6, 0.62 }, { 2.3, 0.86 } } do
+		local lz = z0 + kerbT + spot[2] * (depth - kerbT * 2)
+		local turn = CFrame.Angles(0, math.rad(i * 37), 0)
+		BuildUtil.decor(BuildUtil.part(model, {
+			Name = "FloatLantern",
+			Size = Vector3.new(0.8, 0.7, 0.8),
+			CFrame = at(spot[1], FLOOR_TOP + 0.9, lz) * turn,
+			Material = Enum.Material.Neon,
+			Color = Color3.fromRGB(150, 86, 40),
+			Transparency = 0.35,
+		}))
+		BuildUtil.decor(BuildUtil.part(model, {
+			Name = "FloatLanternCap",
+			Size = Vector3.new(1.3, 0.18, 1.3),
+			CFrame = at(spot[1], FLOOR_TOP + 1.34, lz) * turn,
+			Material = Enum.Material.Wood,
+			Color = WOOD,
+		}))
+	end
+	model.Parent = parent
 end
 
 local function buildWalls(parent: Instance, at: (number, number, number) -> CFrame)
@@ -526,9 +615,10 @@ local function buildSealCircle(parent: Instance, at: (number, number, number) ->
 			}))
 		end
 	end
-	ring("SealRing", 28.5, 40, 0.5, 0.05, 0.3)
-	ring("SealRing", 26.7, 36, 0.25, 0.05, 0.45)
-	ring("SealRune", 27.6, 16, 0.6, 9.4, 0.15)
+	-- Clear of the pedestal daises (inside) and the Showcase podium (outside).
+	ring("SealRing", 31, 44, 0.5, 0.05, 0.3)
+	ring("SealRing", 29.4, 40, 0.25, 0.05, 0.45)
+	ring("SealRune", 30.2, 16, 0.6, 10.3, 0.15)
 end
 
 local function buildResonatorTerrace(parent: Instance, at: (number, number, number) -> CFrame)
@@ -772,6 +862,7 @@ function PlotBuilder.Build(index: number, cframe: CFrame, parent: Instance): Mod
 	})
 
 	buildCourtyardFloor(model, at)
+	buildPool(model, at)
 	buildSealCircle(model, at)
 	buildWalls(model, at)
 	buildWallSeals(model, at)

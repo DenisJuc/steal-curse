@@ -988,19 +988,27 @@ Config.Plots = {
 	},
 	StartingPedestals = 3,
 	MaxPedestals = 6,
-	-- Base interior (2026-11-08): two rows of three face a center aisle that runs from the gate to
-	-- the resonator. Slots fill left/right from the gate: 1 L-front, 2 R-front, 3 L-mid, ...
+	-- Base interior (reworked 2026-11-08 evening): two lanes. A pedestal row on each side, each with
+	-- its own paved lane on the inside and a reflecting pool between the lanes, joined at the front
+	-- (by the gate) and the back (by the resonator steps): walk up the left lane collecting 1-3-5,
+	-- cross at the back, come down the right collecting 6-4-2. Slots: 1 L-front, 2 R-front, ...
 	PedestalOffsets = {
-		{ -9, -30 },
-		{ 9, -30 },
-		{ -9, -14 },
-		{ 9, -14 },
-		{ -9, 2 },
-		{ 9, 2 },
+		{ -19, -26 },
+		{ 19, -26 },
+		{ -19, -10 },
+		{ 19, -10 },
+		{ -19, 6 },
+		{ 19, 6 },
 	},
-	-- Collect pads in the aisle, one line: each reaches the aisle's center, so one walk from the
-	-- gate to the resonator claims every pedestal.
-	PadInset = 1.6,
+	-- Lane center line (studs from the plot's middle); the collect pads sit on it, level with
+	-- their pedestal. Lanes are LaneWidth wide; the pool fills PoolHalfWidth either side of 0.
+	PadX = 11,
+	PadSize = 6.4,
+	LaneWidth = 8,
+	PoolHalfWidth = 6,
+	-- Lane z range: front connector (by the gate) to back connector (by the resonator steps).
+	LaneFrontZ = -40,
+	LaneBackZ = 16,
 	ResonatorOffset = { 0, 28 },
 	-- Front corners face the street: the Showcase (right) and the Seal Shrine with the owner's
 	-- name, seal rank and the pedestal upgrades (left). Back corners: the Great Altar for Huge and

@@ -244,6 +244,7 @@ DataTemplate.Template = {
 			RollStyle = "Omikuji",
 			Camera = "On",
 			Sound = 100,
+			Footsteps = 50,
 			InterfaceSize = "Medium",
 			AfkReports = "On",
 			Hints = "On",

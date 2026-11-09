@@ -37,6 +37,10 @@ UIKit.Colors = {
 	Plum = Color3.fromRGB(46, 30, 62),
 	Cyan = Color3.fromRGB(130, 220, 255),
 	Jade = Color3.fromRGB(62, 170, 108),
+	-- Action colours (2026-11-08): each kind of button says what it does by colour.
+	Coral = Color3.fromRGB(232, 92, 72), -- sell (items leave for CE)
+	Azure = Color3.fromRGB(64, 150, 236), -- equip / place
+	Mint = Color3.fromRGB(96, 214, 140), -- switch on
 }
 
 type Props = { [string]: any }
@@ -299,7 +303,8 @@ function UIKit.setAffordable(button: TextButton, affordable: boolean, cost: numb
 end
 
 -- Button looks: "Primary" (violet action), "Buy" (jade, spends CE), "Gold" (rewards / claim),
--- "Danger" (vermilion, close) and "Dark" (secondary).
+-- "Sell" (coral, items for CE), "Equip" (azure, place / equip), "Danger" (vermilion, confirm a
+-- loss) and "Dark" (secondary).
 function UIKit.skinButton(button: GuiButton, kind: string)
 	local colors = UIKit.Colors
 	local stroke = button:FindFirstChildOfClass("UIStroke") or UIKit.create("UIStroke", { Parent = button })
@@ -313,6 +318,20 @@ function UIKit.skinButton(button: GuiButton, kind: string)
 		button.BackgroundColor3 = colors.Red
 		stroke.Color = Color3.fromRGB(96, 22, 18)
 		stroke.Transparency = 0.1
+	elseif kind == "Sell" then
+		button.BackgroundColor3 = colors.Coral
+		stroke.Color = Color3.fromRGB(110, 34, 22)
+		stroke.Transparency = 0.1
+		if button:IsA("TextButton") then
+			button.TextColor3 = colors.Text
+		end
+	elseif kind == "Equip" then
+		button.BackgroundColor3 = colors.Azure
+		stroke.Color = Color3.fromRGB(18, 56, 104)
+		stroke.Transparency = 0.1
+		if button:IsA("TextButton") then
+			button.TextColor3 = colors.Text
+		end
 	elseif kind == "Gold" then
 		button.BackgroundColor3 = colors.Gold
 		stroke.Color = Color3.fromRGB(120, 78, 26)
@@ -598,6 +617,66 @@ end
 -- are dark cards with readable light text.
 UIKit.TAB_HEIGHT = 44
 UIKit.TAB_TEXT_SIZE = 18
+
+-- An on/off switch: a pill track with a sliding knob (mint when on). Returns the button and a
+-- `set(on)` that restyles it without calling `onToggle`. `onToggle` gets the new value.
+function UIKit.switch(parent: Instance, on: boolean, onToggle: (boolean) -> (), props: Props?): (TextButton, (boolean) -> ())
+	local colors = UIKit.Colors
+	local value = on
+	local track = UIKit.create("TextButton", {
+		Name = "Switch",
+		Text = "",
+		AutoButtonColor = false,
+		Size = UDim2.fromOffset(64, 32),
+		BackgroundColor3 = colors.Track,
+		Parent = parent,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	for key, v in props or {} do
+		(track :: any)[key] = v
+	end
+	local stroke = UIKit.stroke(colors.Trim, 1.5, 0.5)
+	stroke.Parent = track
+	local knob = UIKit.create("Frame", {
+		Name = "Knob",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Size = UDim2.fromOffset(24, 24),
+		BackgroundColor3 = colors.Text,
+		ZIndex = (track.ZIndex or 1) + 1,
+		Parent = track,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	local function set(next: boolean, animate: boolean?)
+		value = next
+		local goal = {
+			Position = if next then UDim2.new(1, -16, 0.5, 0) else UDim2.new(0, 16, 0.5, 0),
+			BackgroundColor3 = if next then colors.Text else colors.SubText,
+		}
+		if animate then
+			TweenService:Create(knob, TweenInfo.new(0.16, Enum.EasingStyle.Back), goal):Play()
+			TweenService:Create(track, TweenInfo.new(0.16), { BackgroundColor3 = if next then colors.Mint else colors.Track }):Play()
+		else
+			knob.Position = goal.Position
+			knob.BackgroundColor3 = goal.BackgroundColor3
+			track.BackgroundColor3 = if next then colors.Mint else colors.Track
+		end
+		stroke.Color = if next then Color3.fromRGB(30, 96, 58) else colors.Trim
+		stroke.Transparency = if next then 0.1 else 0.5
+		track:SetAttribute("On", next)
+	end
+	set(on)
+	Motion.button(track)
+	track.Activated:Connect(function()
+		if track:GetAttribute("Disabled") == true then
+			return
+		end
+		set(not value, true)
+		onToggle(value)
+	end)
+	return track, function(next: boolean)
+		if next ~= value then
+			set(next, true)
+		end
+	end
+end
 
 function UIKit.skinTab(button: TextButton, selected: boolean)
 	UIKit.skinButton(button, if selected then "Gold" else "Dark")

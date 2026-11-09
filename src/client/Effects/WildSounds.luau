@@ -1,8 +1,10 @@
 -- Sound details of the world:
 --   Distant sounds: now and then, while you are in the wild, one of your area's Distant sounds
 --   (Config.Ambience.Areas.<id>.Distant) plays from somewhere out in the fog.
---   Footsteps: Roblox's running loop is muted; one short step from the floor's set
---   (Config.FootstepSets) plays per stride, quicker the faster you move.
+--   Footsteps: Roblox's own running loop (a plastic/brick step, whatever the floor) is muted,
+--   whether the character sounds use Sounds or the new AudioPlayer API; one short step from the
+--   floor's set (Config.FootstepSets) plays per stride, quicker the faster you move, at the
+--   Footsteps volume from Settings.
 -- Entries with an empty id stay silent / keep Roblox's default step.
 
 local Players = game:GetService("Players")
@@ -47,7 +49,25 @@ function WildSounds.Start()
 	local player = Players.LocalPlayer
 	local cfg = Config.Ambience.DistantSounds
 	local nextSound = os.clock() + cfg.Every[1]
-	local muted: { [Sound]: boolean } = {}
+	local muted: { [Instance]: boolean } = {}
+	-- The default script may create, restart or re-level the loop at any time, so it is muted on
+	-- sight and held at zero.
+	local function mute(sound: Instance)
+		if muted[sound] then
+			return
+		end
+		muted[sound] = true
+		local function zero()
+			if (sound :: any).Volume ~= 0 then
+				(sound :: any).Volume = 0
+			end
+		end
+		zero()
+		sound:GetPropertyChangedSignal("Volume"):Connect(zero)
+		sound.Destroying:Once(function()
+			muted[sound] = nil
+		end)
+	end
 	local cadence = Config.FootstepCadence
 	local untilStep = 0
 	local lastPick = 0
@@ -72,16 +92,13 @@ function WildSounds.Start()
 		end
 
 		local running = root:FindFirstChild("Running")
-		if running and running:IsA("Sound") and not muted[running] then
-			muted[running] = true
-			running.Volume = 0
+		if running and (running:IsA("Sound") or running:IsA("AudioPlayer")) and not muted[running] then
+			mute(running)
 		end
-		if not humanoid or humanoid.FloorMaterial == Enum.Material.Air or humanoid.MoveDirection.Magnitude < 0.1 then
-			untilStep = 0
-			return
-		end
+		-- Steps follow real movement (keyboard, thumbstick, click-to-move alike), not input.
 		local speed = Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z).Magnitude
-		if speed < 2 then
+		if humanoid.FloorMaterial == Enum.Material.Air or speed < 3 then
+			untilStep = 0
 			return
 		end
 		untilStep -= dt
@@ -95,9 +112,13 @@ function WildSounds.Start()
 			pick = pick % #set + 1
 		end
 		lastPick = pick
+		local volume = cadence.Volume * Settings.FootstepVolume()
+		if volume <= 0.001 then
+			return
+		end
 		local step = Instance.new("Sound")
 		step.SoundId = set[pick]
-		step.Volume = cadence.Volume * Settings.Volume()
+		step.Volume = volume
 		step.PlaybackSpeed = 0.92 + math.random() * 0.16
 		step.RollOffMaxDistance = 60
 		step.Parent = root

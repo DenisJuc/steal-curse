@@ -63,13 +63,16 @@ return {
 		end,
 	},
 	{
-		Name = "interior layout: aisle pads meet in the middle, corners and spawn clear of each other",
+		Name = "interior layout: pads on two lanes around the pool, corners and spawn clear of each other",
 		Run = function()
-			-- Every pad reaches the aisle's center line, and pads sit level with their pedestal.
+			-- Every pad sits on its row's lane, clear of its pedestal and of the pool.
+			local padR = plots.PadSize / 2
 			for slot, offset in plots.PedestalOffsets do
-				local padX = (if offset[1] < 0 then -1 else 1) * plots.PadInset
-				expect.truthy(math.abs(padX) - 1.4 <= 0.5, `pad {slot} reaches the center line`)
-				expect.truthy(math.abs(offset[1]) - 3.75 > math.abs(padX) + 1.4, `pad {slot} clear of its pedestal`)
+				local padX = (if offset[1] < 0 then -1 else 1) * plots.PadX
+				expect.truthy(padR <= plots.LaneWidth / 2, `pad {slot} fits its lane`)
+				expect.truthy(math.abs(offset[1]) - 2.75 > math.abs(padX) + padR, `pad {slot} clear of its pedestal`)
+				expect.truthy(math.abs(padX) - plots.LaneWidth / 2 >= plots.PoolHalfWidth, `lane {slot} clear of the pool`)
+				expect.truthy(offset[2] > plots.LaneFrontZ and offset[2] < plots.LaneBackZ, `pad {slot} between the lane ends`)
 			end
 			local spots = {
 				circle(plots.ShowcaseOffset, 8, "Showcase"),
@@ -81,16 +84,14 @@ return {
 			}
 			for slot, offset in plots.PedestalOffsets do
 				table.insert(spots, circle(offset, 3.75, `Pedestal {slot}`))
-				table.insert(spots, circle({ (if offset[1] < 0 then -1 else 1) * plots.PadInset, offset[2] }, 2.4, `Pad {slot}`))
+				table.insert(spots, circle({ (if offset[1] < 0 then -1 else 1) * plots.PadX, offset[2] }, padR, `Pad {slot}`))
 			end
 			for i, a in spots do
 				expect.truthy(math.abs(a.X) + a.R <= half - 1 and math.abs(a.Z) + a.R <= half - 1, `{a.Name} inside the walls`)
 				for j = i + 1, #spots do
 					local b = spots[j]
-					-- A pedestal and its pad, or the two pads facing each other across the aisle, touch.
-					local pair = (string.sub(a.Name, 1, 3) == "Ped" and string.sub(b.Name, 1, 3) == "Pad")
-						or (string.sub(a.Name, 1, 3) == "Pad" and string.sub(b.Name, 1, 3) == "Pad" and a.Z == b.Z)
-					if not pair then
+					do
+
 						local d = math.sqrt((a.X - b.X) ^ 2 + (a.Z - b.Z) ^ 2)
 						expect.truthy(d >= a.R + b.R, `{a.Name} overlaps {b.Name} ({d})`)
 					end

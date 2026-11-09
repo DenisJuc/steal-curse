@@ -97,6 +97,13 @@ ClientSettings.Schema = {
 		Default = 100,
 	},
 	{
+		Key = "Footsteps",
+		Label = "Footsteps",
+		Help = "Volume of your own footsteps (each floor has its own step sound).",
+		Range = { Min = 0, Max = 100, Step = 5 },
+		Default = 50,
+	},
+	{
 		Key = "InterfaceSize",
 		Label = "Interface size",
 		Help = "Makes every menu and button bigger or smaller.",

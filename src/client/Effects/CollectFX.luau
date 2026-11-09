@@ -2,6 +2,8 @@
 -- pedestal's pad, the pad flashes, a warm ring sweeps out, gold motes and a few spirit wisps rise,
 -- a "+amount" floats up and the HUD coins fly from the pad to the CE counter. Bigger hauls (more
 -- seconds of income) throw more motes. Visual and sound only.
+-- 2026-11-08: the pad is a pressure plate: it sinks under your feet and springs back, and pads
+-- collected in a quick run ring higher each time (a walk down a lane plays a rising scale).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,6 +23,60 @@ local INK = Color3.fromRGB(17, 13, 24)
 local SPARK = "rbxasset://textures/particles/sparkles_main.dds"
 
 local player = Players.LocalPlayer
+-- Pads collected within COMBO_SECONDS of each other count as one run.
+local COMBO_SECONDS = 3
+local comboCount = 0
+local lastCollectAt = -math.huge
+local pressing: { [BasePart]: boolean } = {}
+
+-- Sinks the pad (and its rim, plate and rune) a little and springs it back. Local only.
+local function press(pad: BasePart)
+	if pressing[pad] then
+		return
+	end
+	local pedestal = pad.Parent
+	if not pedestal then
+		return
+	end
+	local parts = {}
+	for _, name in { "CollectPad", "CollectTrim", "CollectBase", "CollectGlow" } do
+		local part = pedestal:FindFirstChild(name)
+		if part and part:IsA("BasePart") then
+			table.insert(parts, part)
+		end
+	end
+	pressing[pad] = true
+	local value = Instance.new("NumberValue")
+	local homes = {}
+	for index, part in parts do
+		homes[index] = part.CFrame
+	end
+	value.Changed:Connect(function(depth)
+		for index, part in parts do
+			part.CFrame = homes[index] - Vector3.new(0, depth, 0)
+		end
+	end)
+	local down = TweenService:Create(value, TweenInfo.new(0.08, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Value = 0.22 })
+	down.Completed:Once(function()
+		local up = TweenService:Create(value, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Value = 0 })
+		up.Completed:Once(function()
+			for index, part in parts do
+				part.CFrame = homes[index]
+			end
+			value:Destroy()
+			pressing[pad] = nil
+		end)
+		up:Play()
+	end)
+	down:Play()
+	-- The rune core flares and fades back.
+	local glow = pedestal:FindFirstChild("CollectGlow")
+	if glow and glow:IsA("BasePart") then
+		local rest = glow.Transparency
+		glow.Transparency = 0
+		TweenService:Create(glow, TweenInfo.new(0.5), { Transparency = rest }):Play()
+	end
+end
 
 local function myPad(slot: number): BasePart?
 	local map = Workspace:FindFirstChild("Map")
@@ -112,11 +168,11 @@ local function burst(pad: BasePart, haul: number)
 	ring.Color = GOLD
 	ring.Transparency = 0.2
 	ring.Shape = Enum.PartType.Cylinder
-	ring.Size = Vector3.new(0.05, 3, 3)
+	ring.Size = Vector3.new(0.05, 5, 5)
 	ring.CFrame = CFrame.new(pad.Position + Vector3.new(0, 0.2, 0)) * CFrame.Angles(0, 0, math.rad(90))
 	ring.Parent = Workspace
 	TweenService:Create(ring, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Size = Vector3.new(0.05, 11, 11),
+		Size = Vector3.new(0.05, 16, 16),
 		Transparency = 1,
 	}):Play()
 
@@ -180,10 +236,15 @@ function CollectFX.Play(slot: number, amount: number)
 			Motion.markCoinSourceAt(Vector2.new(point.X, point.Y))
 		end
 	end
+	local now = os.clock()
+	comboCount = if now - lastCollectAt <= COMBO_SECONDS then math.min(comboCount + 1, 6) else 0
+	lastCollectAt = now
+	press(pad)
 	burst(pad, haul)
 	floatingAmount(pad, amount)
-	-- One sound only: the coin (Rosselle: two sounds per collect was too much).
-	Sounds.Play("Coin", pad, 0.9)
+	-- One sound only: the coin (Rosselle: two sounds per collect was too much), a step higher
+	-- for each pad in a run (whole-tone steps from 0.9).
+	Sounds.Play("Coin", pad, 0.9 * 2 ^ (comboCount * 2 / 12))
 end
 
 function CollectFX.Start()

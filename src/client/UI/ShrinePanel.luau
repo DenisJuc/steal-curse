@@ -2,15 +2,15 @@
 -- it earns per second and its level as a bar ("Lv 12/50"). The Upgrade side shows the next level
 -- ("Lv 3 -> 4") and a small gold boost (+10%) above one big price button ("+N Lv"). The padlock
 -- keeps a pedestal's relic during Equip Best.
--- The header holds the free Equip Best button and the Auto-equip toggle, a game pass (on: Equip
--- Best runs after every find, purchase and upgrade; without the pass it opens the purchase prompt); "Showcases" opens the Showcase menu (GDD 6.7). Selling, item locks and
+-- The header holds the free Equip Best button and, only for owners of the Auto-equip game pass, an
+-- Auto-equip switch (on: Equip Best runs after every find, purchase and upgrade; switched on by the
+-- server when the pass is bought). Players without the pass never see it (the Shop sells it); "Showcases" opens the Showcase menu (GDD 6.7). Selling, item locks and
 -- favorites live in the Relics menu.
 -- The client only sends intents; the server validates costs and pushes the new state back on
 -- ShrineState.
 -- Buying levels: the header's x1 / x10 / Max toggle picks what every row's single price button
 -- buys (one level, ten levels, or as many as the current CE affords).
 
-local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -175,32 +175,34 @@ function ShrinePanel.Start(
 	}, function()
 		ShrineAction:FireServer("EquipBest")
 	end)
-	UIKit.skinButton(equipBest, "Primary")
-	local autoEquip = UIKit.button({
+	UIKit.skinButton(equipBest, "Equip")
+	-- Auto-equip: a label and a switch, shown only with the game pass.
+	local autoEquip = UIKit.create("Frame", {
 		Name = "AutoEquip",
-		Text = "",
-		TextSize = 17,
 		Position = UDim2.fromOffset(132, ROW2_Y),
 		Size = UDim2.fromOffset(196, ROW2_HEIGHT),
+		BackgroundColor3 = colors.Card,
+		Visible = false,
 		Parent = content,
-	}, function()
-		local owned = snapshot ~= nil and snapshot.AutoEquipOwned == true
-		local passId = Config.GamePasses.AutoEquip
-		if not owned and passId > 0 then
-			MarketplaceService:PromptGamePassPurchase(player, passId)
-			return
-		end
-		local on = not (snapshot ~= nil and snapshot.AutoEquip == true)
+	}, { UIKit.corner(10) })
+	UIKit.skinCard(autoEquip)
+	UIKit.label({
+		Text = "Auto-equip",
+		TextSize = 18,
+		Position = UDim2.fromOffset(12, 0),
+		Size = UDim2.new(1, -88, 1, 0),
+		Parent = autoEquip,
+	})
+	local _, setAutoEquip = UIKit.switch(autoEquip, false, function(on)
 		ShrineAction:FireServer("SetAutoEquip", on)
-	end)
+	end, {
+		AnchorPoint = Vector2.new(1, 0.5),
+		Position = UDim2.new(1, -8, 0.5, 0),
+	})
 	local function refreshAutoEquip()
 		local owned = snapshot ~= nil and snapshot.AutoEquipOwned == true
-		local on = snapshot ~= nil and snapshot.AutoEquip == true
-		autoEquip.Text = if not owned then "Auto-equip (Pass)"
-			elseif on then "Auto-equip: ON"
-			else "Auto-equip: OFF"
-		UIKit.skinButton(autoEquip, if not owned then "Gold" elseif on then "Buy" else "Dark")
-		autoEquip.TextColor3 = if not owned then colors.Panel elseif on then colors.Text else colors.SubText
+		autoEquip.Visible = owned
+		setAutoEquip(owned and snapshot ~= nil and snapshot.AutoEquip == true)
 	end
 	refreshAutoEquip()
 

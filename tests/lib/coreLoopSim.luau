@@ -43,6 +43,7 @@ export type Result = {
 	CE: number,
 	Rebirths: number,
 	MinToFirstRebirth: number?,
+	RebirthTimes: { number }, -- minute of each Rebirth, in order
 	RebirthPathOk: boolean,
 	DeadEnd: boolean, -- shop empty + CE << rebirth + income flat
 	Huge: number,
@@ -161,6 +162,7 @@ function CoreLoop.run(options: { Minutes: number, Seed: number }): Result
 	local hugeN, titanicN, mutN = 0, 0, 0
 	local firstTier: { [string]: boolean } = {}
 	local minToR1: number? = nil
+	local rebirthTimes: { number } = {}
 	local saving = false
 
 	local luckDiv = 12
@@ -315,6 +317,7 @@ function CoreLoop.run(options: { Minutes: number, Seed: number }): Result
 			rebirths += 1
 			ce = 0
 			saving = false
+			table.insert(rebirthTimes, sec / 60)
 			if not minToR1 then
 				minToR1 = sec / 60
 			end
@@ -532,6 +535,7 @@ function CoreLoop.run(options: { Minutes: number, Seed: number }): Result
 		CE = ce,
 		Rebirths = rebirths,
 		MinToFirstRebirth = minToR1,
+		RebirthTimes = rebirthTimes,
 		RebirthPathOk = minToR1 ~= nil or (incomeEnd > 0 and (rCost / incomeEnd) < 12 * 3600),
 		DeadEnd = deadEnd,
 		Huge = hugeN,
@@ -593,6 +597,7 @@ function CoreLoop.aggregate(results: { Result }): Result
 		PedAvgLevel = avg("PedAvgLevel"),
 		CE = avg("CE"),
 		Rebirths = avg("Rebirths"),
+		RebirthTimes = {},
 		MinToFirstRebirth = if r1Count > 0 then r1Sum / r1Count else nil,
 		RebirthPathOk = pathOk / n >= 0.5,
 		DeadEnd = dead / n >= 0.5,

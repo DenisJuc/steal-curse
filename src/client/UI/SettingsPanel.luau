@@ -31,6 +31,7 @@ local SHORT_LABELS = {
 	["Visual effects"] = "Effects",
 	["Camera effects"] = "Camera shake",
 	["Sound volume"] = "Sound",
+	["Footsteps"] = "Footsteps",
 	["Interface size"] = "Menu size",
 	["Welcome Back summary"] = "Welcome Back",
 	["Beginner hints"] = "Tutorial",

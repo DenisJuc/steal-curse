@@ -1,7 +1,8 @@
 -- Server-side look of a plot's six pedestals, so visitors see the same shrine as the owner.
 -- Owned: solid stand, glow brightens with level, the relic's model (RelicModels) + info billboard.
--- Next buyable slot: ghost stand with its price. Later slots: ghost stand under a sealed lid with
--- its price in grey, so the base visibly fills up as you buy slots.
+-- Not bought yet (2026-11-08): no stand at all, only the square dais and its ring, with the price
+-- over it (white and gold for the next buyable slot, grey after). Buying one makes the stand rise
+-- out of the floor (clients animate it, PedestalRise).
 -- Each pedestal model mirrors Owned / RelicName / IncomePerSec attributes for the owner's prompt.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -21,6 +22,7 @@ local PedestalVisuals = {}
 local INFO_OFFSET = 10
 local INFO_OFFSET_PER_SCALE = 4
 local EMPTY_INFO_OFFSET = 6.5
+local UNBOUGHT_INFO_OFFSET = 3.2
 local WHITE = Color3.fromRGB(245, 240, 255)
 local GREY = Color3.fromRGB(182, 170, 158)
 local GOLD = Color3.fromRGB(240, 194, 104)
@@ -243,7 +245,8 @@ local function updateInfo(top: BasePart, state: SlotState)
 	local tag = gui:FindFirstChild("Tag") :: TextLabel
 	local height = if state.Owned and state.Id
 		then INFO_OFFSET + (SizeConfig.scaleOf(state.Size) - 1) * INFO_OFFSET_PER_SCALE
-		else EMPTY_INFO_OFFSET
+		elseif state.Owned then EMPTY_INFO_OFFSET
+		else UNBOUGHT_INFO_OFFSET
 	gui.StudsOffset = Vector3.new(0, height, 0)
 
 	if not state.Owned then
@@ -346,13 +349,17 @@ local function showStored(pedestal: Instance, owned: boolean, stored: number)
 		return
 	end
 	local glow = pedestal:FindFirstChild("CollectGlow") :: BasePart?
-	local trim = pedestal:FindFirstChild("CollectTrim") :: BasePart?
 	local ready = owned and stored >= 0.01
 	pad.Transparency = if owned then 0 else 1
 	pad.CanCollide = owned
-	if trim then
-		trim.Transparency = if owned then 0 else 1
-		trim.CanCollide = owned
+	for _, name in { "CollectTrim", "CollectBase", "CollectLink" } do
+		local part = pedestal:FindFirstChild(name)
+		if part and part:IsA("BasePart") then
+			part.Transparency = if owned then 0 else 1
+			if name ~= "CollectLink" then
+				part.CanCollide = owned
+			end
+		end
 	end
 	if glow then
 		glow.Transparency = if not owned then 1 elseif ready then PAD_GLOW_READY else PAD_GLOW_IDLE
@@ -386,16 +393,15 @@ function PedestalVisuals.Apply(plot: Model?, slots: { SlotState })
 		local base = pedestal:FindFirstChild("Base") :: BasePart
 		local top = pedestal:FindFirstChild("Top") :: BasePart
 		local glow = pedestal:FindFirstChild("Glow") :: BasePart
-		local ghost = not state.Owned
-		local sealed = ghost and state.IsNext ~= true
-		local standTransparency = if sealed then 0.55 elseif ghost then 0.75 else 0
+		-- Unbought: no stand (no ghost, no lid), just the dais and its ring.
+		local standTransparency = if state.Owned then 0 else 1
 		local lid = pedestal:FindFirstChild("SealLid")
 		local lidSeal = pedestal:FindFirstChild("LidSeal")
 		if lid and lid:IsA("BasePart") then
-			lid.Transparency = if sealed then 0 else 1
+			lid.Transparency = 1
 		end
 		if lidSeal and lidSeal:IsA("BasePart") then
-			lidSeal.Transparency = if sealed then 0 else 1
+			lidSeal.Transparency = 1
 		end
 		-- An imported RelicPedestal model ("Look") replaces the primitive base and top, which stay
 		-- as invisible colliders and display anchors.

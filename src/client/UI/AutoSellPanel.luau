@@ -1,9 +1,11 @@
 -- Auto-sell rules menu (GDD 9.2). Every change is sent at once and the server's cleaned-up rules
 -- are redrawn. The preview runs the same AutoSell.decide the server uses on your current
 -- inventory and Codex, so "what will happen" is exactly what will happen.
--- Layout: a quick row ("Sell duplicates up to: Off / Common / ... / Legendary") that sets every
--- rarity at once, one compact chip per rarity (tap to cycle Keep -> Sell dupes -> Sell all) for the exact
--- rules, the two protection switches, the two extra rules, and one line on your likely next find.
+-- Layout (reworked 2026-11-08, the old one showed every rule at once): one rarity ladder
+-- ("Sell duplicates up to": Off, Common ... Legendary; everything up to the pick lights up in its
+-- colour) with a sentence saying what it does, the two protections as switches side by side, and
+-- an "Advanced" fold with the per-rarity chips (tap to cycle Keep -> Sell dupes -> Sell all) and
+-- the two extra rules. A custom mix opens the fold. One line on your likely next find closes it.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -23,7 +25,8 @@ local GetCodex = Remotes:WaitForChild("GetCodex") :: RemoteFunction
 local AutoSellPanel = {}
 
 local ROW_HEIGHT = 52
-local CHIP_HEIGHT = 56
+local CHIP_HEIGHT = 50
+local LADDER_HEIGHT = 50
 -- Highest rarity the quick row offers; rarer finds are always worth a look.
 local QUICK_MAX_TIER = 5
 local MODE_SHORT = { Keep = "Keep", SellDuplicates = "Sell dupes", SellAll = "Sell all" }
@@ -69,10 +72,11 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 	local discovered: { [string]: number } = {}
 
 	local panel, content =
-		UIKit.modal(screen, "AutoSellMenu", "AUTO-SELL", colors.Accent, Vector2.new(600, 640), "Backpack")
-	local body = UIKit.scrollList(content, 8)
+		UIKit.modal(screen, "AutoSellMenu", "AUTO-SELL", colors.Coral, Vector2.new(560, 560), "Backpack")
+	local body = UIKit.scrollList(content, 10)
 	body.ScrollBarImageColor3 = colors.Trim
 	local order = 0
+	local advancedOpen = false
 
 	local function nextOrder(): number
 		order += 1
@@ -151,31 +155,48 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 		end)
 	end
 
-	-- A row with a label on the left and an ON/OFF (or value) button on the right.
-	local function switchRow(label: string, value: string, on: boolean, onClick: () -> ())
+	-- A full-width row: label left, switch right.
+	local function switchRow(label: string, on: boolean, onToggle: (boolean) -> ())
 		local frame = UIKit.create("Frame", {
 			LayoutOrder = nextOrder(),
 			Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
 			BackgroundColor3 = colors.Card,
 			Parent = body,
-		}, { UIKit.corner(8) })
+		}, { UIKit.corner(10) })
 		UIKit.skinCard(frame)
 		UIKit.label({
 			Text = label,
-			TextSize = 19,
+			TextSize = 18,
 			Position = UDim2.fromOffset(12, 0),
-			Size = UDim2.new(1, -150, 1, 0),
+			Size = UDim2.new(1, -100, 1, 0),
 			Parent = frame,
 		})
-		local button = UIKit.button({
-			Text = value,
-			TextSize = 19,
+		UIKit.switch(frame, on, onToggle, {
 			AnchorPoint = Vector2.new(1, 0.5),
-			Position = UDim2.new(1, -6, 0.5, 0),
-			Size = UDim2.fromOffset(124, ROW_HEIGHT - 10),
+			Position = UDim2.new(1, -10, 0.5, 0),
+		})
+	end
+
+	-- A half-width card in a horizontal row: label left, switch right.
+	local function switchCard(parent: Frame, index: number, label: string, on: boolean, onToggle: (boolean) -> ())
+		local frame = UIKit.create("Frame", {
+			LayoutOrder = index,
+			Size = UDim2.new(0.5, -4, 1, 0),
+			BackgroundColor3 = colors.Card,
+			Parent = parent,
+		}, { UIKit.corner(10) })
+		UIKit.skinCard(frame)
+		UIKit.label({
+			Text = label,
+			TextSize = 18,
+			Position = UDim2.fromOffset(12, 0),
+			Size = UDim2.new(1, -96, 1, 0),
 			Parent = frame,
-		}, onClick)
-		UIKit.skinTab(button, on)
+		})
+		UIKit.switch(frame, on, onToggle, {
+			AnchorPoint = Vector2.new(1, 0.5),
+			Position = UDim2.new(1, -10, 0.5, 0),
+		})
 	end
 
 	-- What your most likely next find (most common rarity at your luck, a relic you own) would do.
@@ -223,28 +244,55 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 		end
 		local rules = state.AutoSell
 
-		line("New finds only. Favorite, locked and placed relics are safe.")
+		local quick = quickChoice(rules)
+		if quick == nil then
+			advancedOpen = true
+		end
 		if state.Count >= state.Capacity then
 			line(`Backpack full ({state.Count}/{state.Capacity}): sell relics to keep scanning.`, colors.Red)
 		end
 
+		-- The ladder: everything up to the pick lights up in its rarity colour.
 		heading("Sell duplicates up to")
-		local quick = quickChoice(rules)
-		local quickGrid = grid("Quick", 3)
-		local quickOptions = { { Id = "Off", Text = "Off" } }
+		local ladder = UIKit.create("Frame", {
+			Name = "Ladder",
+			LayoutOrder = nextOrder(),
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, -10, 0, LADDER_HEIGHT),
+			Parent = body,
+		}, {
+			UIKit.create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 6),
+			}),
+		})
+		local quickOptions = { { Id = "Off", Text = "Off", Index = 0 } }
 		for index, tier in RarityConfig.Tiers do
 			if index > QUICK_MAX_TIER then
 				break
 			end
-			table.insert(quickOptions, { Id = tier.Id, Text = tier.Name })
+			table.insert(quickOptions, { Id = tier.Id, Text = tier.Name, Index = index })
 		end
-		for index, option in quickOptions do
+		local chosenIndex = -1
+		for _, option in quickOptions do
+			if option.Id == quick then
+				chosenIndex = option.Index
+			end
+		end
+		local count = #quickOptions
+		for _, option in quickOptions do
+			local lit = option.Index > 0 and option.Index <= chosenIndex
+			local chosen = option.Index == chosenIndex
+			local tint = if option.Index == 0 then colors.SubText else UIKit.tierColor(option.Id)
 			local chip = UIKit.button({
 				Name = option.Id,
-				LayoutOrder = index,
+				LayoutOrder = option.Index,
 				Text = option.Text,
-				TextSize = 19,
-				Parent = quickGrid,
+				TextSize = 16,
+				TextScaled = true,
+				Size = UDim2.new(1 / count, -6 + 6 / count, 1, 0),
+				Parent = ladder,
 			}, function()
 				save(function(draft)
 					local on = option.Id ~= "Off"
@@ -256,78 +304,153 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 					end
 				end)
 			end)
-			UIKit.skinTab(chip, quick == option.Id)
-			if option.Id ~= "Off" then
-				chip.TextColor3 = if quick == option.Id then colors.Panel else UIKit.tierColor(option.Id)
-			end
-		end
-
-		heading(if quick then "Each rarity" else "Each rarity (custom)")
-		local tierGrid = grid("Tiers", 4)
-		for index, tier in RarityConfig.Tiers do
-			local mode = rules.Tiers[tier.Id] or "Keep"
-			local chip = UIKit.button({
-				Name = tier.Id,
-				LayoutOrder = index,
-				Text = "",
-				Parent = tierGrid,
-			}, function()
-				save(function(draft)
-					draft.Tiers[tier.Id] = nextIn(AutoSell.Modes, mode)
-				end)
-			end)
+			UIKit.create("UITextSizeConstraint", { MaxTextSize = 17, Parent = chip })
+			UIKit.create("UIPadding", {
+				PaddingLeft = UDim.new(0, 4),
+				PaddingRight = UDim.new(0, 4),
+				PaddingTop = UDim.new(0, 10),
+				PaddingBottom = UDim.new(0, 10),
+				Parent = chip,
+			})
 			UIKit.skinButton(chip, "Dark")
 			local stroke = chip:FindFirstChildOfClass("UIStroke")
-			if stroke then
-				stroke.Color = MODE_COLORS[mode]
-				stroke.Transparency = if mode == "Keep" then 0.6 else 0
-				stroke.Thickness = if mode == "Keep" then 1.5 else 2.5
+			if lit then
+				chip.BackgroundColor3 = tint:Lerp(colors.Card, 0.2)
+				chip.TextColor3 = colors.Panel
+			elseif chosen then
+				chip.BackgroundColor3 = colors.Track
+				chip.TextColor3 = colors.Text
+			else
+				chip.TextColor3 = tint
 			end
-			UIKit.label({
-				Text = tier.Name,
-				TextSize = 17,
-				TextScaled = true,
-				TextColor3 = UIKit.tierColor(tier.Id),
-				TextXAlignment = Enum.TextXAlignment.Center,
-				Position = UDim2.fromOffset(4, 5),
-				Size = UDim2.new(1, -8, 0, 20),
-				Parent = chip,
-			})
-			UIKit.label({
-				Text = MODE_SHORT[mode],
-				TextSize = 18,
-				TextScaled = true,
-				TextColor3 = MODE_COLORS[mode],
-				TextXAlignment = Enum.TextXAlignment.Center,
-				Position = UDim2.fromOffset(4, 27),
-				Size = UDim2.new(1, -8, 0, 22),
-				Parent = chip,
-			})
+			if stroke then
+				stroke.Color = if chosen then colors.Text else tint
+				stroke.Thickness = if chosen then 3 else 1.5
+				stroke.Transparency = if chosen then 0 elseif lit then 0.2 else 0.65
+			end
 		end
+		local quickTier = if quick and quick ~= "Off" then RarityConfig.Get(quick) else nil
+		local summary = if quick == nil then "Custom rules (see Advanced)."
+			elseif quickTier then `Duplicates up to {quickTier.Name} are sold for CE as they drop.`
+			else "Off: every find is kept."
+		line(summary, if quickTier then colors.Text else colors.SubText, 18)
 
-		heading("Protect")
-		switchRow("First finds", if rules.ProtectFirst then "ON" else "OFF", rules.ProtectFirst, function()
+		-- Protections, side by side.
+		heading("Never sell")
+		local protect = UIKit.create("Frame", {
+			Name = "Protect",
+			LayoutOrder = nextOrder(),
+			BackgroundTransparency = 1,
+			Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
+			Parent = body,
+		}, {
+			UIKit.create("UIListLayout", {
+				FillDirection = Enum.FillDirection.Horizontal,
+				SortOrder = Enum.SortOrder.LayoutOrder,
+				Padding = UDim.new(0, 8),
+			}),
+		})
+		switchCard(protect, 1, "First finds", rules.ProtectFirst, function(on)
 			save(function(draft)
-				draft.ProtectFirst = not rules.ProtectFirst
+				draft.ProtectFirst = on
 			end)
 		end)
-		switchRow("Mutated relics", if rules.ProtectMutated then "ON" else "OFF", rules.ProtectMutated, function()
+		switchCard(protect, 2, "Mutations", rules.ProtectMutated, function(on)
 			save(function(draft)
-				draft.ProtectMutated = not rules.ProtectMutated
+				draft.ProtectMutated = on
 			end)
 		end)
+		line("Favorite, locked and placed relics are always safe.", colors.SubText, 15)
 
-		heading("More")
-		switchRow("Duplicates of any rarity", if rules.SellAllDuplicates then "ON" else "OFF", rules.SellAllDuplicates, function()
-			save(function(draft)
-				draft.SellAllDuplicates = not rules.SellAllDuplicates
-			end)
+		-- Advanced fold.
+		local fold = UIKit.button({
+			Name = "Advanced",
+			LayoutOrder = nextOrder(),
+			Text = if advancedOpen then "Advanced  \u{25BE}" else "Advanced  \u{25B8}",
+			TextSize = 18,
+			Size = UDim2.new(1, -10, 0, 36),
+			Parent = body,
+		}, function()
+			advancedOpen = not advancedOpen
+			render()
 		end)
-		switchRow("Anything more common than", thresholdLabel(rules.SellEasierThan), rules.SellEasierThan > 0, function()
-			save(function(draft)
-				draft.SellEasierThan = nextIn(AutoSell.ThresholdPresets, rules.SellEasierThan)
+		UIKit.skinButton(fold, "Dark")
+		fold.TextColor3 = colors.SubText
+		if advancedOpen then
+			local tierGrid = grid("Tiers", 4)
+			for index, tier in RarityConfig.Tiers do
+				local mode = rules.Tiers[tier.Id] or "Keep"
+				local chip = UIKit.button({
+					Name = tier.Id,
+					LayoutOrder = index,
+					Text = "",
+					Parent = tierGrid,
+				}, function()
+					save(function(draft)
+						draft.Tiers[tier.Id] = nextIn(AutoSell.Modes, mode)
+					end)
+				end)
+				UIKit.skinButton(chip, "Dark")
+				local stroke = chip:FindFirstChildOfClass("UIStroke")
+				if stroke then
+					stroke.Color = MODE_COLORS[mode]
+					stroke.Transparency = if mode == "Keep" then 0.6 else 0
+					stroke.Thickness = if mode == "Keep" then 1.5 else 2.5
+				end
+				UIKit.label({
+					Text = tier.Name,
+					TextSize = 16,
+					TextScaled = true,
+					TextColor3 = UIKit.tierColor(tier.Id),
+					TextXAlignment = Enum.TextXAlignment.Center,
+					Position = UDim2.fromOffset(4, 5),
+					Size = UDim2.new(1, -8, 0, 18),
+					Parent = chip,
+				})
+				UIKit.label({
+					Text = MODE_SHORT[mode],
+					TextSize = 16,
+					TextScaled = true,
+					TextColor3 = MODE_COLORS[mode],
+					TextXAlignment = Enum.TextXAlignment.Center,
+					Position = UDim2.fromOffset(4, 25),
+					Size = UDim2.new(1, -8, 0, 18),
+					Parent = chip,
+				})
+			end
+			switchRow("Duplicates of any rarity", rules.SellAllDuplicates, function(on)
+				save(function(draft)
+					draft.SellAllDuplicates = on
+				end)
 			end)
-		end)
+			local easier = UIKit.create("Frame", {
+				LayoutOrder = nextOrder(),
+				Size = UDim2.new(1, -10, 0, ROW_HEIGHT),
+				BackgroundColor3 = colors.Card,
+				Parent = body,
+			}, { UIKit.corner(10) })
+			UIKit.skinCard(easier)
+			UIKit.label({
+				Text = "Anything more common than",
+				TextSize = 18,
+				Position = UDim2.fromOffset(12, 0),
+				Size = UDim2.new(1, -150, 1, 0),
+				Parent = easier,
+			})
+			local cycle = UIKit.button({
+				Text = thresholdLabel(rules.SellEasierThan),
+				TextSize = 17,
+				AnchorPoint = Vector2.new(1, 0.5),
+				Position = UDim2.new(1, -8, 0.5, 0),
+				Size = UDim2.fromOffset(124, ROW_HEIGHT - 14),
+				Parent = easier,
+			}, function()
+				save(function(draft)
+					draft.SellEasierThan = nextIn(AutoSell.ThresholdPresets, rules.SellEasierThan)
+				end)
+			end)
+			UIKit.skinButton(cycle, if rules.SellEasierThan > 0 then "Sell" else "Dark")
+		end
 
 		local text, color = nextFindLine()
 		if text ~= "" then

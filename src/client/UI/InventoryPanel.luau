@@ -216,20 +216,8 @@ function InventoryPanel.Start(
 		end
 		refreshSellAll()
 	end)
-	local autoSellLink = UIKit.button({
-		Name = "AutoSellLink",
-		Text = "",
-		TextSize = 17,
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -(SELL_ALL_WIDTH + 8), 0, 0),
-		Size = UDim2.fromOffset(220, TAB_HEIGHT),
-		TextXAlignment = Enum.TextXAlignment.Right,
-		Parent = content,
-	}, function()
-		hooks.OnOpenAutoSell(state)
-	end)
-	autoSellLink.TextColor3 = colors.SubText
+	-- Footer's Auto-sell button (built below) shows the rule; refreshSellAll keeps it current.
+	local refreshAutoSellButton: () -> () = function() end
 
 	function refreshSellAll()
 		local preview = state and state.SellAll
@@ -242,20 +230,11 @@ function InventoryPanel.Start(
 		else
 			sellAll.Text = "Sell all"
 		end
-		UIKit.skinButton(sellAll, if confirming then "Danger" elseif count > 0 then "Gold" else "Dark")
-		sellAll.TextColor3 = if confirming then colors.Text elseif count > 0 then colors.Panel else colors.SubText
+		UIKit.skinButton(sellAll, if confirming then "Danger" elseif count > 0 then "Sell" else "Dark")
+		sellAll.TextColor3 = if count > 0 then colors.Text else colors.SubText
 		Motion.setDisabled(sellAll, count == 0)
-
-		local highest
-		for _, tier in RarityConfig.Tiers do
-			local mode = state and state.AutoSell and state.AutoSell.Tiers[tier.Id]
-			if mode == "SellDuplicates" or mode == "SellAll" then
-				highest = tier.Name
-			end
-		end
-		autoSellLink.Text = if highest then `<u>Auto-sell: up to {highest}</u>` else "<u>Auto-sell: off</u>"
+		refreshAutoSellButton()
 	end
-	autoSellLink.RichText = true
 
 	-- Relics page: grid (left), detail (right), footer (under the grid).
 	local gridArea = UIKit.create("Frame", {
@@ -323,10 +302,11 @@ function InventoryPanel.Start(
 	}, function()
 		ShrineAction:FireServer("EquipBest")
 	end)
-	UIKit.skinButton(equipBest, "Gold")
+	UIKit.skinButton(equipBest, "Equip")
+	-- Auto-sell: name on top, the current rule under it in its rarity colour ("Off" grey).
 	local autoSell = UIKit.button({
-		Text = "Auto-Sell",
-		TextSize = 18,
+		Name = "AutoSell",
+		Text = "",
 		AnchorPoint = Vector2.new(1, 0),
 		Position = UDim2.fromScale(1, 0),
 		Size = UDim2.new(0.3, -4, 1, 0),
@@ -335,6 +315,43 @@ function InventoryPanel.Start(
 		hooks.OnOpenAutoSell(state)
 	end)
 	UIKit.skinButton(autoSell, "Dark")
+	UIKit.label({
+		Name = "Title",
+		Text = "Auto-sell",
+		TextSize = 17,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		Position = UDim2.fromScale(0, 0.08),
+		Size = UDim2.fromScale(1, 0.46),
+		Parent = autoSell,
+	})
+	local autoSellState = UIKit.label({
+		Name = "State",
+		Text = "Off",
+		TextSize = 15,
+		TextXAlignment = Enum.TextXAlignment.Center,
+		TextColor3 = colors.SubText,
+		Position = UDim2.fromScale(0, 0.5),
+		Size = UDim2.fromScale(1, 0.42),
+		Parent = autoSell,
+	})
+	function refreshAutoSellButton()
+		local highestId
+		for _, tier in RarityConfig.Tiers do
+			local mode = state and state.AutoSell and state.AutoSell.Tiers[tier.Id]
+			if mode == "SellDuplicates" or mode == "SellAll" then
+				highestId = tier.Id
+			end
+		end
+		local tier = highestId and RarityConfig.Get(highestId)
+		autoSellState.Text = if tier then `Up to {tier.Name}` else "Off"
+		autoSellState.TextColor3 = if highestId then UIKit.tierColor(highestId) else colors.SubText
+		local stroke = autoSell:FindFirstChildOfClass("UIStroke")
+		if stroke then
+			stroke.Color = if highestId then colors.Coral else colors.Trim
+			stroke.Transparency = if highestId then 0.1 else 0.55
+		end
+	end
+	refreshAutoSellButton()
 
 	-- Pick mode reuses the footer: which pedestal, empty it, or go back.
 	local function endPick()
@@ -486,7 +503,7 @@ function InventoryPanel.Start(
 	}, onSelected(function(group)
 		ShrineAction:FireServer("EquipGroup", group.Id, group.Mutation, group.Size)
 	end))
-	UIKit.skinButton(equipButton, "Gold")
+	UIKit.skinButton(equipButton, "Equip")
 	local sellOneButton: TextButton
 	sellOneButton = UIKit.button({
 		Name = "Sell",
@@ -589,7 +606,7 @@ function InventoryPanel.Start(
 
 		local canSell = group.Sellable > 0
 		sellOneButton.Text = if canSell then `Sell +{Format.number(group.SellValue)}` else "Kept"
-		UIKit.skinButton(sellOneButton, if canSell then "Primary" else "Dark")
+		UIKit.skinButton(sellOneButton, if canSell then "Sell" else "Dark")
 		sellOneButton.TextColor3 = if canSell then colors.Text else colors.SubText
 		Motion.setDisabled(sellOneButton, not canSell)
 		styleToggle(lockButton, group.Locked >= group.Count)
@@ -597,6 +614,9 @@ function InventoryPanel.Start(
 		styleToggle(floatButton, group.Floating)
 		sellAllButton.Visible = group.Sellable > 1
 		styleToggle(sellAllButton, false, canSell)
+		if canSell then
+			UIKit.skinButton(sellAllButton, "Sell")
+		end
 	end
 
 	local function onCardClicked(group: any)
@@ -790,7 +810,6 @@ function InventoryPanel.Start(
 		equipBest.Visible = slot == nil
 		autoSell.Visible = slot == nil
 		sellAll.Visible = slot == nil
-		autoSellLink.Visible = slot == nil
 		emptyPedestal.Visible = slot ~= nil
 		backButton.Visible = slot ~= nil
 		if slot then
