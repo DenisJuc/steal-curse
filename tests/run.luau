@@ -39,6 +39,7 @@ local suites = {
 	{ Name = "terrain", Tests = require("./specs/terrain_spec") },
 	{ Name = "streak", Tests = require("./specs/streak_spec") },
 	{ Name = "spirit_types", Tests = require("./specs/spirit_types_spec") },
+	{ Name = "spirit_flee", Tests = require("./specs/spirit_flee_spec") },
 	{ Name = "zoneevents", Tests = require("./specs/zoneevents_spec") },
 	{ Name = "offerings", Tests = require("./specs/offerings_spec") },
 	{ Name = "mastery", Tests = require("./specs/mastery_spec") },

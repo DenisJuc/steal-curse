@@ -85,6 +85,9 @@ type Signal = {
 	Ready: boolean?,
 	-- Fire and lights added to ignited talismans during a bind.
 	Ignites: { Instance },
+	-- Skittish spirits: set while it flies from FlyFrom to Base (Bolt), from clock FlyStart.
+	FlyFrom: Vector3?,
+	FlyStart: number?,
 }
 
 type Bound = {
@@ -288,9 +291,29 @@ local function aboveGround(signal: Signal, position: Vector3): Vector3
 	return if position.Y < lowest then Vector3.new(position.X, lowest, position.Z) else position
 end
 
+-- Where a bolting spirit is now: an arc from FlyFrom to Base (nil once it has landed).
+local function flightPosition(signal: Signal): Vector3?
+	local from, start = signal.FlyFrom, signal.FlyStart
+	if not from or not start then
+		return nil
+	end
+	local t = (clock - start) / Config.Skittish.FlightSeconds
+	if t >= 1 then
+		signal.FlyFrom = nil
+		signal.FlyStart = nil
+		-- It lands with a puff (skipped when the flight ended unseen long ago).
+		if t < 1.6 then
+			HuntFX.shockwave(Vector3.new(signal.Base.X, signal.Ground + 0.2, signal.Base.Z), SIGNAL_COLOR, 12, 0.5)
+		end
+		return nil
+	end
+	local eased = 1 - (1 - t) * (1 - t)
+	return from:Lerp(signal.Base, eased) + Vector3.new(0, math.sin(t * math.pi) * 6, 0)
+end
+
 local function placeIdle(signal: Signal)
 	local bob = math.sin(clock * 2 + signal.Phase) * 0.4
-	local center = signal.Base + Vector3.new(0, bob, 0)
+	local center = (flightPosition(signal) or signal.Base) + Vector3.new(0, bob, 0)
 	setCoreScale(signal, 1 + signal.Swell * 0.5)
 	signal.Core.Part.CFrame = CFrame.new(center) * CFrame.Angles(0, signal.Spin, 0) * signal.Core.Turn
 	for index, talisman in signal.Talismans do
@@ -323,6 +346,22 @@ function SpiritSight.SetSignals(list: { [number]: Vector3 })
 			signal.Ground = groundBelow(position)
 			placeAnchors(signal)
 		end
+	end
+end
+
+-- A skittish spirit bolted (the server already moved it to its new Base): it streaks there from
+-- `from`, with a burst where it was and the snap of something fleeing through the trees.
+function SpiritSight.Bolt(id: number, from: Vector3)
+	local signal = signals[id]
+	if not signal then
+		return
+	end
+	signal.FlyFrom = from
+	signal.FlyStart = clock
+	if enabled then
+		HuntFX.burst(from, SIGNAL_COLOR, if Settings.LowEffects() then 10 else 30, 16)
+		Sounds.Play("BranchSnap", signal.Core.Part)
+		Sounds.Play("SignalWhisper", signal.Core.Part, 1.25)
 	end
 end
 
@@ -393,7 +432,7 @@ function SpiritSight.Update(dt: number, viewer: Vector3?)
 		local isBound = bound ~= nil and bound.Signal == signal
 		signal.Flare = math.max(0, signal.Flare - dt)
 		local distance = if viewer then (signal.Base - viewer).Magnitude else math.huge
-		local visible = isBound or distance <= revealRange
+		local visible = isBound or distance <= revealRange or signal.FlyFrom ~= nil
 		if visible ~= signal.Visible then
 			signal.Visible = visible
 			signal.Group.Parent = if visible then folder else nil

@@ -33,6 +33,7 @@ local BeginBind = Remotes:WaitForChild("BeginBind") :: RemoteEvent
 local CancelBind = Remotes:WaitForChild("CancelBind") :: RemoteEvent
 local CompleteBind = Remotes:WaitForChild("CompleteBind") :: RemoteEvent
 local BindResult = Remotes:WaitForChild("BindResult") :: RemoteEvent
+local SpiritPulse = Remotes:WaitForChild("SpiritPulse") :: RemoteEvent
 
 local HuntController = {}
 
@@ -53,6 +54,14 @@ local REASON_TEXT = {
 	NotReady = "You can't bind right now.",
 	NotBinding = "No bind in progress.",
 }
+
+-- Skittish spirits (Config.Skittish): what the hint says when one bolts. The first of each kind in a
+-- session explains the rule; later ones just call it out.
+local BOLT_TEXT = {
+	Spook = { First = "It saw you coming! Pulse before you get close and it won't run.", Again = "It bolted! Pulse, then sneak up." },
+	Chase = { First = "A Vengeful spirit always runs once. After it!", Again = "It's running! After it!" },
+}
+local boltExplained: { [string]: boolean } = {}
 
 local player = Players.LocalPlayer
 local signals: { [number]: Vector3 } = {}
@@ -241,6 +250,8 @@ local function pulse()
 	end
 	lastPulse = os.clock()
 	SpiritSight.Pulse(rootPart)
+	-- The server counts a pulse as a careful approach for skittish spirits.
+	SpiritPulse:FireServer()
 end
 
 -- os.clock() of the last pulse (0 if none yet), for the spirit hunt tutorial.
@@ -391,7 +402,8 @@ local function onBindResult(result: { [string]: any })
 		Sounds.Play("Cancel")
 	end
 	resetBind()
-	if result.Reason ~= "Released" then
+	-- Fled: the bolt's own hint (from the signal update just before) already says what happened.
+	if result.Reason ~= "Released" and result.Reason ~= "Fled" then
 		hud.ShowHint(REASON_TEXT[result.Reason] or "Bind failed.", 2)
 	end
 end
@@ -466,6 +478,7 @@ function HuntController.Start(screen: ScreenGui, startOptions: Options)
 		table.clear(spiritTypes)
 		table.clear(spiritRolls)
 		table.clear(struckUntil)
+		local bolts: { { Id: number, From: Vector3, Kind: string } } = {}
 		for _, signal in list do
 			if type(signal) == "table" and type(signal.Id) == "number" and typeof(signal.Position) == "Vector3" then
 				signals[signal.Id] = signal.Position
@@ -478,10 +491,21 @@ function HuntController.Start(screen: ScreenGui, startOptions: Options)
 				if type(signal.StruckUntil) == "number" then
 					struckUntil[signal.Id] = signal.StruckUntil
 				end
+				if typeof(signal.BoltFrom) == "Vector3" and type(signal.Bolt) == "string" then
+					table.insert(bolts, { Id = signal.Id, From = signal.BoltFrom, Kind = signal.Bolt })
+				end
 			end
 		end
 		SpiritSight.SetSignals(signals)
 		SpiritTags.Sync(spiritTypes, spiritRolls, struckUntil)
+		for _, boltInfo in bolts do
+			SpiritSight.Bolt(boltInfo.Id, boltInfo.From)
+			local text = BOLT_TEXT[boltInfo.Kind]
+			if text and SpiritSight.IsEnabled() then
+				hud.ShowHint(if boltExplained[boltInfo.Kind] then text.Again else text.First, 3.5)
+				boltExplained[boltInfo.Kind] = true
+			end
+		end
 	end)
 	BindResult.OnClientEvent:Connect(onBindResult)
 	player:GetAttributeChangedSignal("BindSignalId"):Connect(onBindConfirmed)

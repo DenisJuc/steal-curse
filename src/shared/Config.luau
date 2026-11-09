@@ -517,6 +517,29 @@ Config.Spirits = {
 	MaxBonusRolls = 12,
 }
 
+-- Skittish spirits (SpiritFlee, SignalService, HuntController), the intro's chase in real hunts.
+-- Come within Distance and a spirit may bolt Hop studs to a new spot, away from you:
+--   Chase = bolts that many times whatever you do; Spook = bolts that many times if you rush in
+--   with no pulse in the last CalmSeconds. Wisps never flee; lightning-struck spirits are stunned.
+-- Nothing flees before FromCaptures real captures (the hunt tutorial's spirit holds still).
+-- Rewards are unchanged; this only adds a few seconds of chase to the stronger spirits.
+Config.Skittish = {
+	Enabled = true,
+	FromCaptures = 1,
+	-- More than Bind.LockRange + RangeSlack (16), so it bolts before a bind can start.
+	Distance = 20,
+	CalmSeconds = 10,
+	Hop = { 28, 45 },
+	-- How often the server checks distances, and how long the client's flight takes.
+	CheckSeconds = 0.2,
+	FlightSeconds = 1.1,
+	Types = {
+		Wisp = { Chase = 0, Spook = 0 },
+		Restless = { Chase = 0, Spook = 1 },
+		Vengeful = { Chase = 1, Spook = 1 },
+	},
+}
+
 Config.SpiritSight = {
 	-- Signal orbs are only drawn within this distance; pulses point to all of them.
 	RevealRange = 90,

@@ -5,17 +5,26 @@
 -- player (from the nearest wild edge while the player is in the town). Walking RelocateDistance away
 -- from all of them moves them near the player again (keeping ids; a signal being bound stays put).
 -- The SignalArea attribute tells the HUD which area they are in.
+-- Skittish spirits (Config.Skittish, SpiritFlee): stronger spirits bolt to a new spot when the
+-- player comes close (checked every Skittish.CheckSeconds, and again when a bind begins). The
+-- client reports its pulses (SpiritPulse) so a careful approach can be told from a rushed one. A
+-- bolt goes out as one push with BoltFrom / Bolt on that signal, for the client's flight.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
+local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
+local SpiritFlee = require(ReplicatedStorage.Shared.SpiritFlee)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local SpiritTypes = require(ReplicatedStorage.Shared.SpiritTypes)
 local DataService = require(script.Parent.DataService)
+local RemoteGuard = require(script.Parent.RemoteGuard)
 local ZoneGateService = require(script.Parent.ZoneGateService)
 
-local SignalsUpdated = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("SignalsUpdated") :: RemoteEvent
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local SignalsUpdated = Remotes:WaitForChild("SignalsUpdated") :: RemoteEvent
+local SpiritPulse = Remotes:WaitForChild("SpiritPulse") :: RemoteEvent
 
 local SignalService = {}
 
@@ -26,6 +35,11 @@ export type Signal = {
 	StruckUntil: number?,
 	-- Spirit type (Config.Spirits): Wisp / Restless / Vengeful.
 	Type: string?,
+	-- Skittish spirits: how often it has bolted (SpiritFlee memory), and a bolt not yet sent.
+	Chased: number?,
+	Spooked: number?,
+	BoltFrom: Vector3?,
+	Bolt: string?,
 }
 
 export type SpawnPoint = { Position: Vector3, Area: string }
@@ -44,6 +58,8 @@ local states: { [Player]: State } = {}
 -- rolls each spirit's capture would give, shown on its tag. Last pushed values per player.
 local rollPreview: ((Player, Signal) -> number?)? = nil
 local pushedRolls: { [Player]: { [number]: number | false } } = {}
+-- os.clock() of each player's last accepted pulse.
+local lastPulse: { [Player]: number } = {}
 
 local function countOf(state: State): number
 	local count = 0
@@ -74,7 +90,12 @@ local function push(player: Player, state: State)
 			StruckUntil = signal.StruckUntil,
 			Type = signal.Type,
 			Rolls = rolls[signal.Id] or nil,
+			BoltFrom = signal.BoltFrom,
+			Bolt = signal.Bolt,
 		})
+		-- A bolt is sent once.
+		signal.BoltFrom = nil
+		signal.Bolt = nil
 	end
 	SignalsUpdated:FireClient(player, list)
 	player:SetAttribute("SignalCount", #list)
@@ -204,6 +225,9 @@ local function relocate(player: Player, state: State)
 		signal.Position = pickPosition(player, state, anchor) or signal.Position
 		signal.Type = spiritTypeAt(state, signal.Position)
 		signal.StruckUntil = nil
+		-- A new spirit in a new place: it may bolt again.
+		signal.Chased = nil
+		signal.Spooked = nil
 		state.Signals[signal.Id] = signal
 	end
 	push(player, state)
@@ -229,8 +253,99 @@ local function checkDistances()
 	end
 end
 
+-- Skittish spirits ---------------------------------------------------------------------------------
+
+local function captures(player: Player): number
+	local data = DataService.Get(player)
+	return if data then data.TotalCaptures or 0 else 0
+end
+
+-- Moves `signal` to a spot away from `from` (the player). Returns false when no spot fits.
+local function bolt(player: Player, state: State, signal: Signal, reaction: SpiritFlee.Reaction, from: Vector3): boolean
+	local rules = Config.Skittish :: any
+	local spots, positions = {}, {}
+	for _, point in spawnPoints do
+		local position = point.Position
+		if flatDistance(position, signal.Position) > rules.Hop[2] then
+			continue
+		end
+		if not ZoneGateService.Allowed(player, position.X, position.Z) then
+			continue
+		end
+		local crowded = false
+		for id, other in state.Signals do
+			if id ~= signal.Id and flatDistance(other.Position, position) < Config.Signals.MinSpacing then
+				crowded = true
+				break
+			end
+		end
+		if not crowded then
+			table.insert(spots, { X = position.X, Z = position.Z })
+			table.insert(positions, position)
+		end
+	end
+	local index = SpiritFlee.pickSpot(rules, spots, signal.Position.X, signal.Position.Z, from.X, from.Z, state.Rng:NextNumber())
+	if not index then
+		return false
+	end
+	SpiritFlee.remember(signal :: any, reaction)
+	signal.BoltFrom = signal.Position
+	signal.Bolt = reaction
+	signal.Position = positions[index] + Vector3.new(0, Config.Signals.HoverHeight, 0)
+	return true
+end
+
+-- Lets each of `player`'s spirits react to where they stand. With `onlyId`, just that one.
+-- Returns true when something bolted (and was pushed).
+local function checkFlee(player: Player, state: State, onlyId: number?): boolean
+	local rules = Config.Skittish :: any
+	if not rules.Enabled or not Config.Spirits.Enabled then
+		return false
+	end
+	local position = rootPosition(player)
+	if not position or not WorldLayout.inWild(Config.World, position.X, position.Z) then
+		return false
+	end
+	local count = captures(player)
+	if count < rules.FromCaptures then
+		return false
+	end
+	local bound = player:GetAttribute("BindSignalId")
+	local sincePulse = os.clock() - (lastPulse[player] or -math.huge)
+	local now = workspace:GetServerTimeNow()
+	local moved = false
+	for id, signal in state.Signals do
+		if id == bound or (onlyId and id ~= onlyId) then
+			continue
+		end
+		-- Lightning-struck spirits are stunned.
+		if signal.StruckUntil and signal.StruckUntil > now then
+			continue
+		end
+		local reaction = SpiritFlee.reaction(rules, signal.Type, signal :: any, (signal.Position - position).Magnitude, sincePulse, count)
+		if reaction and bolt(player, state, signal, reaction, position) then
+			moved = true
+		end
+	end
+	if moved then
+		push(player, state)
+	end
+	return moved
+end
+
+-- Pulses arrive from the client; one faster than the player's pulse cooldown allows is ignored.
+local function onPulse(player: Player)
+	local data = DataService.Get(player)
+	local rank = if data then data.Skills.SpiritSight or 0 else 0
+	local now = os.clock()
+	if now - (lastPulse[player] or -math.huge) >= SkillConfig.pulseCooldown(rank) - 0.5 then
+		lastPulse[player] = now
+	end
+end
+
 function SignalService.Init(points: { SpawnPoint })
 	spawnPoints = points
+	RemoteGuard.Event(SpiritPulse, onPulse)
 
 	DataService.OnPlayerLoaded(function(player)
 		if states[player] or not player.Parent then
@@ -257,6 +372,16 @@ function SignalService.Init(points: { SpawnPoint })
 	Players.PlayerRemoving:Connect(function(player)
 		states[player] = nil
 		pushedRolls[player] = nil
+		lastPulse[player] = nil
+	end)
+
+	task.spawn(function()
+		while true do
+			task.wait(Config.Skittish.CheckSeconds)
+			for player, state in states do
+				checkFlee(player, state)
+			end
+		end
 	end)
 
 	-- Streak idle-end, zone events, skills and purification change the roll tags: re-push when any
@@ -316,6 +441,13 @@ function SignalService.Refresh(player: Player)
 	if state then
 		push(player, state)
 	end
+end
+
+-- A bind is starting on `signalId`: a skittish spirit gets its chance to bolt first (the distance
+-- loop may not have run since the player arrived). True = it bolted, the bind must not start.
+function SignalService.CheckFlee(player: Player, signalId: number): boolean
+	local state = states[player]
+	return state ~= nil and checkFlee(player, state, signalId)
 end
 
 function SignalService.Get(player: Player, signalId: number): Signal?

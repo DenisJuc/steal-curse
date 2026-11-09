@@ -262,6 +262,11 @@ local function onBegin(player: Player, signalId: any)
 		reply(player, { Ok = false, Reason = "TooFar" })
 		return
 	end
+	-- Skittish spirits: one that would bolt at this distance bolts now instead of being bound.
+	if SignalService.CheckFlee(player, signal.Id) then
+		reply(player, { Ok = false, Reason = "Fled" })
+		return
+	end
 
 	local area = WorldLayout.areaAt(Config.Areas, Config.World, signal.Position.X, signal.Position.Z)
 	local bind = {
