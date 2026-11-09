@@ -20,7 +20,7 @@ end
 
 return {
 	{
-		Name = "cost grows by CostGrowth per Rebirth; income and luck multiply for good",
+		Name = "cost grows by CostGrowth per Rebirth; each Rebirth adds the same income and luck for good",
 		Run = function()
 			expect.equal(Rebirth.cost(settings, 0), settings.BaseCost, "first Rebirth")
 			for n = 1, 6 do
@@ -28,9 +28,17 @@ return {
 			end
 			expect.equal(Rebirth.incomeMultiplier(settings, 0), 1, "no Rebirth: x1 income")
 			expect.equal(Rebirth.luckMultiplier(settings, 0), 1, "no Rebirth: x1 luck")
-			expect.equal(Rebirth.incomeMultiplier(settings, 2), settings.IncomeGrowth ^ 2, "two Rebirths income")
-			expect.near(Rebirth.luckMultiplier(settings, 2), settings.LuckGrowth ^ 2, 1e-12, "two Rebirths luck")
-			expect.truthy(settings.IncomeGrowth > 1 and settings.LuckGrowth > 1, "Rebirth always helps")
+			expect.near(Rebirth.incomeMultiplier(settings, 2), 1 + 2 * settings.IncomeStep, 1e-12, "two Rebirths income")
+			expect.near(Rebirth.luckMultiplier(settings, 2), 1 + 2 * settings.LuckStep, 1e-12, "two Rebirths luck")
+			expect.truthy(settings.IncomeStep > 0 and settings.LuckStep > 0, "Rebirth always helps")
+			-- Additive: each Rebirth is worth relatively less than the one before.
+			local gain1 = Rebirth.incomeMultiplier(settings, 1) / Rebirth.incomeMultiplier(settings, 0)
+			local gain5 = Rebirth.incomeMultiplier(settings, 5) / Rebirth.incomeMultiplier(settings, 4)
+			expect.truthy(gain5 < gain1, "later Rebirths give a smaller boost")
+			-- The older geometric settings still work (sims use them).
+			local geometric = { BaseCost = 1, CostGrowth = 2, IncomeGrowth = 2, LuckGrowth = 1.5 }
+			expect.equal(Rebirth.incomeMultiplier(geometric, 3), 8, "geometric income")
+			expect.near(Rebirth.luckMultiplier(geometric, 2), 2.25, 1e-12, "geometric luck")
 		end,
 	},
 	{
@@ -103,7 +111,7 @@ return {
 			Rebirth.apply(data, "BPlus")
 			expect.equal(data.Rebirths, 2, "counts up once per apply")
 			expect.equal(data.Skills.CoreLuck, 18, "no skill wipe on R2")
-			expect.near(Rebirth.incomeMultiplier(settings, 2), settings.IncomeGrowth ^ 2, 1e-12, "perm income")
+			expect.near(Rebirth.incomeMultiplier(settings, 2), 1 + 2 * settings.IncomeStep, 1e-12, "perm income")
 		end,
 	},
 	{

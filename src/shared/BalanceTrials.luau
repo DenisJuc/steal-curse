@@ -409,11 +409,15 @@ end
 function BalanceTrials.rebirthSettings(live: {
 	BaseCost: number,
 	CostGrowth: number,
-	IncomeGrowth: number,
-	LuckGrowth: number,
+	IncomeStep: number?,
+	LuckStep: number?,
+	IncomeGrowth: number?,
+	LuckGrowth: number?,
 }): typeof(live)
 	local trial = BalanceTrials.current()
-	if not trial or not trial.LuckGrowth then
+	-- An additive live curve (LuckStep) already has its own gentle luck; the trial's LuckGrowth
+	-- only softened the older geometric curve.
+	if not trial or not trial.LuckGrowth or live.LuckStep then
 		return live
 	end
 	-- Phase 3/4: keep live BaseCost (400M) — do not cut from Fusion stub lifts.

@@ -245,15 +245,18 @@ local function fillGround(terrain: Terrain, rng: Random, seed: number, shape: Wi
 		Vector3.new(plazaSize[1] - 2, 12, plazaSize[2] - 2),
 		Enum.Material.Air
 	)
-	-- Grass decoration pokes through the thin plot floors, so plots stand on bare slate.
+	-- Grass decoration pokes through the thin plot floors, so plots stand on bare slate. The slate
+	-- and the clearing run across the strips between neighbouring plots too (PlotBuilder paves
+	-- them with aprons), so no wild grass shows between two side walls.
 	local plots = Config.Plots
+	local across = plots.Street.PlotSpacing
 	for index = 1, plots.Count do
 		local x, z = WorldLayout.plotPosition(plots, index)
 		local fx, fz = WorldLayout.plotFacing(plots, index)
 		local facing = Vector3.new(fx, 0, fz)
 		terrain:FillBlock(
 			CFrame.lookAt(Vector3.new(x, -GROUND_DEPTH / 2, z), Vector3.new(x, -GROUND_DEPTH / 2, z) + facing),
-			Vector3.new(plots.Size + 4, GROUND_DEPTH, plots.Size + 4),
+			Vector3.new(math.max(plots.Size + 4, across), GROUND_DEPTH, plots.Size + 4),
 			Enum.Material.Slate
 		)
 		-- Smoothing puts a full top voxel's surface ~2 studs up, over the plot floor (top 1.26)
@@ -261,7 +264,7 @@ local function fillGround(terrain: Terrain, rng: Random, seed: number, shape: Wi
 		local center = Vector3.new(x, 2, z)
 		terrain:FillBlock(
 			CFrame.lookAt(center, center + facing),
-			Vector3.new(plots.Size - 2, 12, plots.Size - 2),
+			Vector3.new(math.max(plots.Size - 2, across), 12, plots.Size - 2),
 			Enum.Material.Air
 		)
 	end

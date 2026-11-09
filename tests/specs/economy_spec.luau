@@ -200,6 +200,8 @@ return {
 		end,
 	},
 	{
+		-- 2026-11-09: with the cheap first Rebirth (500K) this sim saves for it before buying slot 4,
+		-- so slot 4 can slip past 10 minutes.
 		Name = "pacing: luck stays modest early and pedestal 4 comes within a few minutes",
 		Run = function()
 			expect.truthy(EconomySim.allPriced(), "every relic has an income")
@@ -208,12 +210,13 @@ return {
 				local five = snapshotAt(result, 5)
 				expect.truthy(five.Luck <= 20, `seed {seed}: luck x{five.Luck} at 5 min`)
 				local slot4 = result.SlotBoughtAt[4]
-				expect.truthy(slot4 ~= nil and slot4 <= 10 * 60, `seed {seed}: pedestal 4 at {(slot4 or 0) / 60} min`)
+				expect.truthy(slot4 ~= nil and slot4 <= 12 * 60, `seed {seed}: pedestal 4 at {(slot4 or 0) / 60} min`)
 			end
 		end,
 	},
 	{
-		Name = "pacing: millions by 20 min, first Rebirth in 20-45 min, billions by 1 h, 100B+ by 2 h",
+		-- First Rebirth early since curve G (2026-11-09: 500K, x8 per Rebirth): 5-30 min in this sim (the core-loop sim says ~17).
+		Name = "pacing: millions by 20 min, first Rebirth in 5-30 min, billions by 1 h, 100B+ by 2 h",
 		Run = function()
 			for _, seed in SEEDS do
 				local result = sim(seed)
@@ -222,7 +225,7 @@ return {
 				local first = result.FirstRebirthAt
 				expect.truthy(first ~= nil, `seed {seed}: no Rebirth in 2 hours`)
 				expect.truthy(
-					(first :: number) >= 20 * 60 and (first :: number) <= 45 * 60,
+					(first :: number) >= 5 * 60 and (first :: number) <= 30 * 60,
 					`seed {seed}: first Rebirth at {(first :: number) / 60} min`
 				)
 				expect.truthy(snapshotAt(result, 60).LifetimeCE >= 1e9, `seed {seed}: billions by 1 h`)

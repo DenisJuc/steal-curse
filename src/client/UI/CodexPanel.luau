@@ -2,8 +2,8 @@
 -- unlocks, set titles, prestige titles), earned titles and one card per relic with its 3D model
 -- and, once discovered, its base income per second. Unknown relics show as a black silhouette of the model with only their tier and base odds. Seen mutations appear as colored dots
 -- on the relic's card (no separate mutation Codex). Relics are tabbed Normal / Huge / Titanic
--- and grouped by rarity like an index. Two tabs: Relics (the index, first) and Rewards
--- (milestones, titles and Claim all).
+-- and grouped by rarity like an index. Three tabs: Relics (the index, first), Rewards
+-- (milestones, titles and Claim all) and Zones (curse progress, mastery, lore; see ZonesPage).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,6 +19,7 @@ local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
 local RelicViewport = require(script.Parent.RelicViewport)
 local UIKit = require(script.Parent.UIKit)
+local ZonesPage = require(script.Parent.ZonesPage)
 local Sounds = require(script.Parent.Parent.Sounds)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -38,6 +39,17 @@ local KIND_HEADINGS = {
 local REFRESH_SECONDS = 1
 local DONE_COLOR = Color3.fromRGB(120, 230, 140)
 local CARD_SIZE = Vector2.new(106, 104)
+-- Render box (px) and how much of it the relic fills, per size tab. Huge and Titanic get taller
+-- cards and bigger boxes so the relic reads about 1.7x and 2.4x the Normal one (2026-11-09:
+-- framing alone was clipped by the fixed 56 px box and the jump was hard to see).
+local RENDER_BOX = {
+	Normal = { Box = 56, Fill = 0.72 },
+	Huge = { Box = 76, Fill = 0.9 },
+	Titanic = { Box = 98, Fill = 0.98 },
+}
+local function cardHeight(sizeId: string?): number
+	return CARD_SIZE.Y - 56 + RENDER_BOX[sizeId or "Normal"].Box
+end
 local BAR_HEIGHT = 6
 local SIZE_TABS = { "Normal", "Huge", "Titanic" }
 local SIZE_COLORS = {
@@ -71,13 +83,25 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		list.ScrollBarImageColor3 = colors.Trim
 		return list
 	end
-	-- Relics first (the index), rewards on their own tab.
+	-- Relics first (the index), rewards on their own tab, then the zones (curse progress, mastery
+	-- and shrine lore, moved here from the old Journal).
 	local relicsBody = pageList("RelicsPage")
 	local body = pageList("RewardsPage")
 	body.Visible = false
-	local _, pageButtons = UIKit.tabBar(content, { { Id = "Relics", Text = "Relics" }, { Id = "Rewards", Text = "Rewards" } }, "Relics", function(id)
+	local zonesBody = pageList("ZonesPage")
+	zonesBody.Visible = false
+	local pageTabs = {
+		{ Id = "Relics", Text = "Relics" },
+		{ Id = "Rewards", Text = "Rewards" },
+		{ Id = "Zones", Text = "Zones" },
+	}
+	local _, pageButtons = UIKit.tabBar(content, pageTabs, "Relics", function(id)
 		relicsBody.Visible = id == "Relics"
 		body.Visible = id == "Rewards"
+		zonesBody.Visible = id == "Zones"
+		if id == "Zones" then
+			ZonesPage.render(zonesBody)
+		end
 	end)
 	local order = 0
 	-- One render per relic, kept across refreshes; unknown relics tint it black.
@@ -252,10 +276,13 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		}, { UIKit.corner(8), UIKit.stroke(tierColor, 1.5, if known then 0.1 else 0.6) })
 		UIKit.skinCard(card)
 		-- Huge / Titanic tabs render the relic bigger in its card (RelicViewport frames by size).
+		local box = RENDER_BOX[sizeId or "Normal"]
 		local render = renders.Get(`{relicId}|{sizeId or ""}`, relicId, sizeId)
+		RelicViewport.refit(render, box.Fill)
 		render.AnchorPoint = Vector2.new(0.5, 0)
 		render.Position = UDim2.new(0.5, 0, 0, 4)
-		render.Size = UDim2.fromOffset(56, 56)
+		render.Size = UDim2.fromOffset(box.Box, box.Box)
+		local below = box.Box - 56
 		render.ImageColor3 = if known then Color3.new(1, 1, 1) else Color3.new(0, 0, 0)
 		render.Parent = card
 		if known and sizeId then
@@ -276,7 +303,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextColor3 = if known then tierColor else colors.SubText,
-			Position = UDim2.fromOffset(4, 62),
+			Position = UDim2.fromOffset(4, 62 + below),
 			Size = UDim2.new(1, -8, 0, 18),
 			Parent = card,
 		})
@@ -286,7 +313,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			TextSize = 15,
 			TextXAlignment = Enum.TextXAlignment.Center,
 			TextColor3 = if known then colors.Text else colors.SubText,
-			Position = UDim2.fromOffset(4, 82),
+			Position = UDim2.fromOffset(4, 82 + below),
 			Size = UDim2.new(1, -8, 0, 18),
 			Parent = card,
 		})
@@ -381,7 +408,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 				Parent = list,
 			}, {
 				UIKit.create("UIGridLayout", {
-					CellSize = UDim2.fromOffset(CARD_SIZE.X, CARD_SIZE.Y),
+					CellSize = UDim2.fromOffset(CARD_SIZE.X, cardHeight(sizeId)),
 					CellPadding = UDim2.fromOffset(6, 6),
 					SortOrder = Enum.SortOrder.LayoutOrder,
 				}),
@@ -548,6 +575,9 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 	end
 
 	local function load()
+		if zonesBody.Visible then
+			ZonesPage.render(zonesBody)
+		end
 		task.spawn(function()
 			local ok, snapshot = pcall(function()
 				return GetCodex:InvokeServer()

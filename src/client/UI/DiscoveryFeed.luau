@@ -299,7 +299,7 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 			end
 			makeLine(list, title, subtitle, UIKit.Colors.SubText, false, true)
 		elseif hidden > 0 then
-			makeLine(list, `+{hidden} more`, "see Journal", UIKit.Colors.SubText, false, true)
+			makeLine(list, `+{hidden} more`, "", UIKit.Colors.SubText, false, true)
 		end
 	end)
 end

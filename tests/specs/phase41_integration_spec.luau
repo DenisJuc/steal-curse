@@ -65,7 +65,7 @@ return {
 				expect.equal(BalanceTrials.collectionEnabled(), true, "collection on")
 				expect.equal(BalanceTrials.boardGlobalFusionIncome(), true, "P4 board global")
 				expect.equal(BalanceTrials.rebirthModel(), "BPlus", "B+")
-				expect.equal(Config.Rebirth.BaseCost, 4e8, "400M BaseCost")
+				expect.equal(Config.Rebirth.BaseCost, 5e5, "500K BaseCost")
 
 				local id = firstCommon()
 				local state = CollectionMath.defaults()
@@ -155,7 +155,7 @@ return {
 				expect.equal(data.Collection.Fusion[id].Rank, 2, "Fusion kept")
 				expect.equal(data.Collection.Fusion[id].Charm, "Workshop", "Charm kept")
 				expect.equal(data.Collection.Essence, 77, "Essence kept")
-				expect.equal(Config.Rebirth.BaseCost, 4e8, "BaseCost unchanged")
+				expect.equal(Config.Rebirth.BaseCost, 5e5, "BaseCost unchanged")
 			end)
 
 			BalanceTrials.AllowNonStudioActive = prevAllow

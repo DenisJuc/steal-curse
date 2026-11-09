@@ -1,6 +1,6 @@
 -- Top-left column: the Spirit Resonator box (totals; the charge lives on the ROLL button), then
 -- the Cursed Energy coin counter, then Pedestals, Luck, Rebirth, Collection (Essence chip;
--- fuse-ready badge; Studio prototype), Codex, Journal and Settings. Backpack and Upgrades sit in
+-- fuse-ready badge; Studio prototype), Codex and Settings. Backpack and Upgrades sit in
 -- the bottom RollBar. On small (phone) screens the buttons wrap into rows of three. Reads player
 -- attributes only; one UIScale keeps the whole column readable on phones.
 -- CE rolls up instead of jumping; a windfall (more than a few seconds of passive income at once,
@@ -26,7 +26,6 @@ export type Callbacks = {
 	OnRebirth: () -> (),
 	OnCollection: (() -> ())?,
 	OnCodex: () -> (),
-	OnJournal: () -> (),
 	OnSettings: () -> (),
 }
 
@@ -34,7 +33,7 @@ local ICON_BUTTON_SIZE = 72
 local ICON_GAP = 6
 -- Rows also leave room for the caption hanging under each button.
 local ROW_GAP = 16
--- Journal and Settings: small pills under the CE counter instead of big tiles (HUD declutter,
+-- Settings: a small pill under the CE counter instead of big tiles (HUD declutter,
 -- 2026-11-08), so the big tiles are only the four everyday buttons.
 local PILL_SIZE = Vector2.new(132, 40)
 local CE_HEIGHT = 52
@@ -211,7 +210,7 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		end
 	end)
 
-	-- Journal + Settings pills right under the CE counter.
+	-- Settings pill right under the CE counter.
 	local pills = UIKit.create("Frame", {
 		Name = "Pills",
 		LayoutOrder = 4,
@@ -385,9 +384,6 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		callbacks.OnCodex()
 	end)
 	codexChip.Visible = true
-
-	local journalButton = pillButton(pills, "JournalButton", 1, "Journal", "Journal")
-	journalButton.Activated:Connect(callbacks.OnJournal)
 
 	-- Icon only: a gear needs no word (2026-11-09).
 	local settingsButton = pillButton(pills, "SettingsButton", 2, "", "Settings")

@@ -271,7 +271,11 @@ Config.Offline = {
 
 -- Rebirth (Shared/Rebirth, RebirthService): pay Rebirth.cost(n) CE to reset CE, pedestal levels and
 -- skill ranks; relics, pedestal slots, Codex, titles, Showcases, lanterns, mastery and potions stay.
--- Each Rebirth multiplies income by IncomeGrowth and luck by LuckGrowth, for good.
+-- Each Rebirth adds IncomeStep to the income multiplier and LuckStep to the luck multiplier, for
+-- good (x1.5 / x1.1 after one, x2 / x1.2 after two...), and the next one costs CostGrowth x more.
+-- 2026-11-09 (Rosselle approved "curve G"): cheap first Rebirths (~17 min, then 25, 35, 41, 54 min)
+-- that space out later (~1.8 h, ~4.4 h); see tests/rebirthPacing. Was 400M x4, income x2, luck
+-- x1.5 per Rebirth (first Rebirth about an hour in).
 -- Game pass ids from the Creator Dashboard (Monetization > Passes). 0 = not on sale yet: nobody
 -- owns it except through the Studio /gamepass command.
 -- Game passes: name -> pass id (0 = not on sale yet; ids come from the Creator Dashboard).
@@ -363,10 +367,10 @@ Config.Group = {
 }
 
 Config.Rebirth = {
-	BaseCost = 4e8,
-	CostGrowth = 4,
-	IncomeGrowth = 2,
-	LuckGrowth = 1.5,
+	BaseCost = 5e5,
+	CostGrowth = 8,
+	IncomeStep = 0.5,
+	LuckStep = 0.1,
 }
 
 -- Endgame luck stack reference values (GDD 5.2 / 5.3), used by balance reports and tests.
@@ -1026,9 +1030,8 @@ Config.Hub = {
 		{ Menu = "Codex", Label = "Codex Archive", At = { -64, -27 }, Prop = "CodexLectern" },
 		{ Menu = "Skills", Label = "Rune Monolith", At = { -64, -9 }, Prop = "RuneMonolith" },
 		{ Menu = "Wardrobe", Label = "Spirit Wardrobe", At = { -64, 27 } },
-		{ Menu = "Relics", Label = "Relic Keeper", At = { 64, -18 } },
-		{ Menu = "Journal", Label = "Journal Board", At = { 64, 0 } },
-		{ Menu = "Bounties", Label = "Bounty Board", At = { 64, 18 } },
+		{ Menu = "Relics", Label = "Relic Keeper", At = { 64, -12 } },
+		{ Menu = "Bounties", Label = "Bounty Board", At = { 64, 12 } },
 	},
 	-- Leaderboard tablets beside the street mouth, facing down the street (hub space {x, z}).
 	Leaderboards = { Seals = { -40, -34 }, Rarest = { 40, -34 } },

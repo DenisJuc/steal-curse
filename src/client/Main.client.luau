@@ -16,7 +16,6 @@ local BuffTimers = require(script.Parent.UI.BuffTimers)
 local CodexPanel = require(script.Parent.UI.CodexPanel)
 local CollectionPanel = require(script.Parent.UI.CollectionPanel)
 local InventoryPanel = require(script.Parent.UI.InventoryPanel)
-local JournalPanel = require(script.Parent.UI.JournalPanel)
 local MenuMotion = require(script.Parent.UI.MenuMotion)
 local Onboarding = require(script.Parent.UI.Onboarding)
 local PlaytestAnalyticsPanel = require(script.Parent.UI.PlaytestAnalyticsPanel)
@@ -126,7 +125,6 @@ end)
 local skillPanel = if Config.SkillTreeUI then SkillTreePanel.Start(screen) else SkillListPanel.Start(screen)
 local codexPanel = CodexPanel.Start(screen)
 local collectionPanel = CollectionPanel.Start(screen)
-local journalPanel = JournalPanel.Start(screen)
 local bountyPanel = BountyPanel.Start(screen)
 local wardrobePanel = WardrobePanel.Start(screen)
 local settingsPanel = SettingsPanel.Start(screen)
@@ -154,7 +152,6 @@ menus = {
 	skillPanel,
 	codexPanel,
 	collectionPanel,
-	journalPanel,
 	bountyPanel,
 	wardrobePanel,
 	settingsPanel,
@@ -177,7 +174,6 @@ local openers = {
 	Skills = toggleOnly(skillPanel),
 	Collection = toggleOnly(collectionPanel),
 	Codex = toggleOnly(codexPanel),
-	Journal = toggleOnly(journalPanel),
 	Bounties = toggleOnly(bountyPanel),
 	Wardrobe = toggleOnly(wardrobePanel),
 	Settings = toggleOnly(settingsPanel),
@@ -195,7 +191,6 @@ local hud = HUD.Start(screen, {
 	-- Studio Core Loop: Collection / Fusion Board hidden (implementation kept).
 	OnCollection = if coreLoop then nil else openers.Collection,
 	OnCodex = openers.Codex,
-	OnJournal = openers.Journal,
 	OnSettings = openers.Settings,
 })
 local rollBar = RollBar.Start(screen, {

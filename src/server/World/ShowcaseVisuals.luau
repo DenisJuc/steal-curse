@@ -622,17 +622,25 @@ function ShowcaseVisuals.BuildPreviews()
 		for level = 1, ShowcaseConfig.MaxLevel do
 			local model = Instance.new("Model")
 			model.Name = `{showcase.Id}_{level}`
-			local dais = BuildUtil.cylinder(model, CFrame.new(0, -0.6, 0), 1.2, 16, {
+			-- Same stack as the plot podium: stone dais, a glowing rim disc, then a slightly smaller
+			-- stone cap on top. No two top faces share a height (the rim used to sit flush with the
+			-- dais top and flickered through it like holes).
+			local dais = BuildUtil.cylinder(model, CFrame.new(0, -0.8, 0), 1.2, 16, {
 				Name = "PreviewDais",
 				Material = Enum.Material.Basalt,
 				Color = Color3.fromRGB(30, 27, 36),
 			})
 			model.PrimaryPart = dais
-			BuildUtil.cylinder(model, CFrame.new(0, -0.05, 0), 0.1, 16.2, {
+			BuildUtil.cylinder(model, CFrame.new(0, -0.15, 0), 0.1, 16.2, {
 				Name = "PreviewEdge",
 				Material = Enum.Material.Neon,
 				Color = accent,
 				Transparency = 0.5,
+			})
+			BuildUtil.cylinder(model, CFrame.new(0, -0.05, 0), 0.1, 15.8, {
+				Name = "PreviewCap",
+				Material = Enum.Material.Basalt,
+				Color = Color3.fromRGB(30, 27, 36),
 			})
 			;(builders[showcase.Style] or buildStance)(model, at, accent, level)
 			buildLevelEffects(model, at, level, accent)

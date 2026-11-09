@@ -352,6 +352,22 @@ local function buildCourtyardFloor(parent: Instance, at: (number, number, number
 	local size = Config.Plots.Size
 	local half = size / 2
 
+	-- Side aprons: neighbouring plots stand PlotSpacing apart, so the strip between two side walls
+	-- used to show bumpy wild grass. Each plot paves half of that strip on both sides (top just
+	-- under the Base top so nothing shares a face); WildBuilder clears the terrain above it.
+	local apron = (Config.Plots.Street.PlotSpacing - size) / 2
+	if apron > 0 then
+		for _, side in { -1, 1 } do
+			BuildUtil.part(parent, {
+				Name = "Apron",
+				Size = Vector3.new(apron + 0.5, 1, size),
+				CFrame = at(side * (half + apron / 2 - 0.25), 0.45, 0),
+				Material = Enum.Material.Slate,
+				Color = STONE_DARK,
+			})
+		end
+	end
+
 	-- Inner limestone courtyard (Base is the thick slate pad underneath).
 	BuildUtil.part(parent, {
 		Name = "Floor",

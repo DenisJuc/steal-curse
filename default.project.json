@@ -94,9 +94,6 @@
         "Announce": {
           "$className": "RemoteEvent"
         },
-        "GetJournal": {
-          "$className": "RemoteFunction"
-        },
         "SetAfk": {
           "$className": "RemoteEvent"
         },

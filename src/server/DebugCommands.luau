@@ -1201,7 +1201,7 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			allOk = check(BalanceTrials.collectionEnabled(), "Collection enabled") and allOk
 			allOk = check(BalanceTrials.boardGlobalFusionIncome(), "SoftCap_P4 board-global income") and allOk
 			allOk = check(BalanceTrials.rebirthModel() == "BPlus", "B+ Rebirth model") and allOk
-			allOk = check(Config.Rebirth.BaseCost == 4e8, "BaseCost 400M") and allOk
+			allOk = check(Config.Rebirth.BaseCost == 5e5, "BaseCost 500K") and allOk
 
 			local data = DataService.Get(player)
 			if not data then

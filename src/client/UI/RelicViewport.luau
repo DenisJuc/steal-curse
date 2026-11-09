@@ -70,6 +70,15 @@ function RelicViewport.show(viewport: ViewportFrame, relicId: string, sizeId: st
 	viewport:SetAttribute("Size", sizeId or "")
 end
 
+-- Re-frames the relic already shown in `viewport` so it fills `fill` of the frame (menus that
+-- size their render box per relic size, like the Codex, pick their own fill).
+function RelicViewport.refit(viewport: ViewportFrame, fill: number)
+	local part = viewport:FindFirstChildWhichIsA("BasePart")
+	if part then
+		frame(viewport, part, fill)
+	end
+end
+
 -- Turns the shown relic around its vertical axis (detail panel spin).
 function RelicViewport.spin(viewport: ViewportFrame, radians: number)
 	local part = viewport:FindFirstChildWhichIsA("BasePart")

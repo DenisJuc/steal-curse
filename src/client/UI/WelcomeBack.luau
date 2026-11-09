@@ -200,7 +200,7 @@ function WelcomeBackPanel.Start(screen: ScreenGui): { SetVisible: (boolean) -> (
 			if #afk.Unlocks == 0 then
 				addRow(1, "Nothing new this time", "Your relics and shrine kept working while you were away.", colors.SubText)
 			elseif afk.MoreUnlocks > 0 then
-				addRow(#afk.Unlocks + 1, `...and {afk.MoreUnlocks} more`, "See the Codex and the Journal for everything.", colors.SubText)
+				addRow(#afk.Unlocks + 1, `...and {afk.MoreUnlocks} more`, "See the Codex for everything.", colors.SubText)
 			end
 		end
 		UIKit.show(panel)

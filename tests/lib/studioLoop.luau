@@ -173,6 +173,8 @@ function StudioLoop.run(options: {
 	local rebirthSettings = {
 		BaseCost = Config.Rebirth.BaseCost,
 		CostGrowth = Config.Rebirth.CostGrowth,
+		IncomeStep = Config.Rebirth.IncomeStep,
+		LuckStep = Config.Rebirth.LuckStep,
 		IncomeGrowth = Config.Rebirth.IncomeGrowth,
 		LuckGrowth = options.LuckGrowth,
 	}

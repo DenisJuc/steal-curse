@@ -39,7 +39,7 @@ return {
 			expect.equal(BalanceTrials.pedestalMasteryEnabled(), false, "mastery off outside Studio")
 			expect.equal(BalanceTrials.coreLuckCostOverride(), nil, "no cost override")
 			local live = BalanceTrials.rebirthSettings(Config.Rebirth)
-			expect.equal(live.LuckGrowth, Config.Rebirth.LuckGrowth, "live luck growth")
+			expect.equal(live.LuckStep, Config.Rebirth.LuckStep, "live luck step")
 		end,
 	},
 	{
@@ -79,8 +79,9 @@ return {
 			local expectCost = Formulas.coreLuckCostSoft(10, c.LuckCostBase, c.LuckCostGrowth, c.SoftLuckCostK, c.SoftLuckCostPower)
 			expect.equal(cost, expectCost, "soft cost")
 			local reb = BalanceTrials.rebirthSettings(Config.Rebirth)
-			expect.equal(reb.LuckGrowth, 1.25, "trial luck")
-			expect.equal(reb.IncomeGrowth, Config.Rebirth.IncomeGrowth, "income unchanged")
+			-- The live curve is additive, so the trial's geometric LuckGrowth no longer applies.
+			expect.equal(reb.LuckStep, Config.Rebirth.LuckStep, "live luck step kept")
+			expect.equal(reb.IncomeStep, Config.Rebirth.IncomeStep, "income unchanged")
 			expect.equal(BalanceTrials.collectionEnabled(), true, "collection on with allow flag")
 			BalanceTrials.AllowNonStudioActive = prevAllow
 			BalanceTrials.Active = prevActive

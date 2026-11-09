@@ -3,7 +3,7 @@
 -- Medium/Large finds: an overlay card with the relic model, rarity flash and sound; Large adds a
 -- dim backdrop, light rays and a camera zoom. Any click or tap skips the reveal on screen. A mutation is revealed as a
 -- second stage after the base relic. Overlays queue in arrival order (Presentation queue); extra
--- ones are coalesced into "+N more in your Journal". Nothing here touches scanning or movement.
+-- ones are coalesced into "+N more rare finds". Nothing here touches scanning or movement.
 -- Legendary and rarer finds always get the overlay (unless Reveals is Off), with a full-width band
 -- behind the card (rarity name, "1 in N") that grows with the tier, and the world dimmed. These have
 -- no Skip button: they stay on screen until the player clicks or taps anywhere.
@@ -529,7 +529,7 @@ local function play(entry: Presentation.Entry, dropped: number)
 		note = `{worth}  ·  {SOURCE_TEXT[result.Source]}`
 	end
 	if dropped > 0 then
-		note = `+{dropped} more rare find{if dropped == 1 then "" else "s"} in your Journal`
+		note = `+{dropped} more rare find{if dropped == 1 then "" else "s"}`
 	end
 	ui.NoteLabel.Text = note
 	ui.Rays.Visible = not low

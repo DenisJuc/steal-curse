@@ -112,12 +112,12 @@ local GATES: { Gate } = {
 		end,
 	},
 	{
-		Id = "Journal",
-		Label = "Journal",
+		Id = "Rebirth",
+		Label = "Rebirth",
 		Rule = { Stat = "Scans", At = 60 },
-		Title = "JOURNAL UNLOCKED",
-		Text = "Your best finds and records",
-		Names = { "JournalButtonSlot", "RebirthButtonSlot" },
+		Title = "REBIRTH UNLOCKED",
+		Text = "Start over stronger",
+		Names = { "RebirthButtonSlot" },
 		Targets = {},
 		When = function(s)
 			return s.Scans >= 60
@@ -149,8 +149,7 @@ HudUnlocks.MenuGate = {
 	Shrine = "Pedestals",
 	Codex = "Codex",
 	Collection = "Codex",
-	Journal = "Journal",
-	Rebirth = "Journal",
+	Rebirth = "Rebirth",
 } :: { [string]: string }
 
 -- True once the saved stats have been judged (locks are known).
