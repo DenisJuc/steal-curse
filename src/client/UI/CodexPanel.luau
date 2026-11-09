@@ -317,17 +317,11 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		local tierColor = UIKit.tierColor(relic.Tier)
 		local card = UIKit.create("Frame", {
 			LayoutOrder = index,
-			ClipsDescendants = true,
-		}, { UIKit.corner(10) })
-		-- Rarity card (UI pass 2026-11-09): found relics glow in their tier colour like the Shop
-		-- cards; unfound ones stay dark with a faint tier edge.
-		local glow = UIKit.skinRarityCard(card, tierColor, not known, known and UIKit.tierShines(relic.Tier))
+			BackgroundColor3 = if known then colors.Card else colors.Track,
+		}, { UIKit.corner(8), UIKit.stroke(tierColor, 1.5, if known then 0.1 else 0.6) })
+		UIKit.skinCard(card)
 		-- Huge / Titanic tabs render the relic bigger in its card (RelicViewport frames by size).
 		local box = RENDER_BOX[sizeId or "Normal"]
-		if glow then
-			glow.Position = UDim2.new(0.5, 0, 0, 4 + box.Box / 2)
-			glow.Size = UDim2.fromOffset(box.Box * 1.1, box.Box * 1.1)
-		end
 		local render = renders.Get(`{relicId}|{sizeId or ""}`, relicId, sizeId)
 		RelicViewport.refit(render, box.Fill)
 		render.AnchorPoint = Vector2.new(0.5, 0)
@@ -353,9 +347,7 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			TextSize = 16,
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			-- White on the tinted card (the card colour now says the rarity).
-			TextColor3 = if known then colors.Text else colors.SubText,
-			TextStrokeTransparency = if known then 0.55 else 1,
+			TextColor3 = if known then tierColor else colors.SubText,
 			Position = UDim2.fromOffset(4, 62 + below),
 			Size = UDim2.new(1, -8, 0, 18),
 			Parent = card,
