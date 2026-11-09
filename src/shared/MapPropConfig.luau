@@ -86,6 +86,16 @@ MapPropConfig.Props = {
 	WoodenBridge       = { Size = { 8, 4, 26 },   Collide = "Box",  Collider = { 7, 1, 26 }, Fit = "Length", Fallback = "Bridge" },
 	Signpost           = { Size = { 6, 9, 2 },    Collide = "Box",  Collider = { 1, 9, 1 }, Fallback = "Signpost" },
 	FallenLog          = { Size = { 5, 4, 16 },   Collide = "Box",  Collider = { 3, 3, 15 }, Fit = "Length", Fallback = "Log" },
+	-- Creator Store imports, 2026-11-08 (free, scripts and lights stripped; CREDITS.md): street and
+	-- plaza lanterns, a taller bamboo for the Bamboo garden, mossy rocks and a flat slab for the town.
+	ToroLantern        = { Size = { 3, 7, 3 },    Collide = "Box",  Fallback = "Lantern", Light = WARM },
+	MossLantern        = { Size = { 3.2, 7, 3.3 }, Collide = "Box", Fallback = "Lantern", Light = WARM },
+	BambooTall         = { Size = { 13, 18, 12 }, Collide = "Box",  Collider = { 4, 18, 4 }, Fallback = "DeadTree" },
+	MossRock1          = { Size = { 5, 4, 5 },    Collide = "Box",  Fallback = "Rocks" },
+	MossRock2          = { Size = { 3.2, 5, 3.2 }, Collide = "Box", Fallback = "Rocks" },
+	MossRock3          = { Size = { 6, 4.2, 4.3 }, Collide = "Box", Fallback = "Rocks" },
+	MossRock4          = { Size = { 6, 3.2, 5.2 }, Collide = "Box", Fallback = "Rocks" },
+	MossSlab           = { Size = { 5, 0.8, 4 },  Collide = "None", Fallback = "Rocks" },
 } :: { [string]: Prop }
 
 -- Shapes the server knows how to build without an imported model.

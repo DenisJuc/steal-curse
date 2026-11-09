@@ -106,7 +106,7 @@ local function buildCenter(hub: Model)
 	end
 	local glow = Config.Plots.Street.LanternLight
 	for _, position in spots do
-		local lantern = MapProps.build(hub, "StoneLantern", CFrame.lookAt(position, Vector3.new(0, 1, 0)))
+		local lantern = MapProps.build(hub, "MossLantern", CFrame.lookAt(position, Vector3.new(0, 1, 0)))
 		for _, descendant in if lantern then lantern:GetDescendants() else {} do
 			if descendant:IsA("PointLight") then
 				descendant.Range = glow.Range

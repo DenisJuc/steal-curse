@@ -310,7 +310,11 @@ local DRESSING = {
 	{ Prop = "BambooGrove", Weight = 4 },
 	{ Prop = "BambooGrove2", Weight = 4 },
 	{ Prop = "HomeBlossomTree", Weight = 2 },
-	{ Prop = "MossyRocks", Weight = 3 },
+	{ Prop = "MossRock1", Weight = 1 },
+	{ Prop = "MossRock2", Weight = 1 },
+	{ Prop = "MossRock3", Weight = 1 },
+	{ Prop = "MossRock4", Weight = 1 },
+	{ Prop = "MossSlab", Weight = 1 },
 	{ Prop = "FernBush", Weight = 4 },
 	{ Prop = "SpiderLilyPatch", Weight = 3 },
 	{ Prop = "StoneLantern", Weight = 1 },
@@ -405,7 +409,7 @@ local function buildTown(terrain: Terrain, folder: Instance)
 		for _, side in { -1, 1 } do
 			local x, z = WorldLayout.fromStreet(street, distance, side * (street.HalfWidth - 2))
 			local position = Vector3.new(x, TOWN_SURFACE, z)
-			brighten(MapProps.build(folder, "StoneLantern", CFrame.lookAt(position, position + Vector3.new(-nx * side, 0, -nz * side))), street.LanternLight)
+			brighten(MapProps.build(folder, "ToroLantern", CFrame.lookAt(position, position + Vector3.new(-nx * side, 0, -nz * side))), street.LanternLight)
 		end
 	end
 	local gx, gz = WorldLayout.fromStreet(street, startAt + 2, 0)
