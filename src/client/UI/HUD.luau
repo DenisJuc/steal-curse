@@ -36,6 +36,9 @@ local ICON_GAP = 6
 -- Rows also leave room for the caption hanging under each button.
 local ROW_GAP = 16
 local COMPACT_PER_ROW = 3
+-- Journal and Settings: small pills under the CE counter instead of big tiles (HUD declutter,
+-- 2026-11-08), so the big tiles are only the four everyday buttons.
+local PILL_SIZE = Vector2.new(132, 40)
 local CE_HEIGHT = 52
 -- A CE gain bigger than this many seconds of passive income counts as a windfall.
 local WINDFALL_SECONDS = 5
@@ -72,6 +75,27 @@ local function iconButton(
 	local chip = UIKit.iconChip(button)
 	chip.Visible = false
 	return button, label, chip
+end
+
+-- Small pill button: icon + name, for the rarely used entries. Same Name / slot names as the old
+-- tiles, so HudUnlocks and other lookups keep working.
+local function pillButton(parent: Instance, name: string, order: number, caption: string, iconKey: string): TextButton
+	local slot = UIKit.slot(parent, name .. "Slot", UDim2.fromOffset(PILL_SIZE.X, PILL_SIZE.Y), order)
+	local button = UIKit.create("TextButton", {
+		Name = name,
+		Text = caption,
+		Font = UIKit.Font,
+		TextSize = 18,
+		TextColor3 = UIKit.Colors.Text,
+		TextStrokeTransparency = 0.5,
+		AutoButtonColor = false,
+		Parent = slot,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	UIKit.fill(button)
+	UIKit.skinPanel(button)
+	Motion.button(button)
+	Icons.inline(button, iconKey, 26)
+	return button
 end
 
 function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (boolean) -> () }
@@ -238,9 +262,24 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 		end
 	end)
 
+	-- Journal + Settings pills right under the CE counter.
+	local pills = UIKit.create("Frame", {
+		Name = "Pills",
+		LayoutOrder = 3,
+		Size = UDim2.fromOffset(PILL_SIZE.X * 2 + 8, PILL_SIZE.Y),
+		BackgroundTransparency = 1,
+		Parent = column,
+	}, {
+		UIKit.create("UIListLayout", {
+			FillDirection = Enum.FillDirection.Horizontal,
+			SortOrder = Enum.SortOrder.LayoutOrder,
+			Padding = UDim.new(0, 8),
+		}),
+	})
+
 	local buttons = UIKit.create("Frame", {
 		Name = "Buttons",
-		LayoutOrder = 3,
+		LayoutOrder = 4,
 		BackgroundTransparency = 1,
 		Parent = column,
 	})
@@ -276,7 +315,7 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	refreshLuck()
 
 	-- Rebirth: shines and turns jade once the next Rebirth is affordable; the chip counts Rebirths.
-	local rebirthButton, rebirthCaption, rebirthChip = iconButton(buttons, "RebirthButton", 5, "Rebirth", "Rebirth")
+	local rebirthButton, rebirthCaption, rebirthChip = iconButton(buttons, "RebirthButton", 8, "Rebirth", "Rebirth")
 	rebirthButton.Activated:Connect(callbacks.OnRebirth)
 	local rebirthStroke = rebirthButton:FindFirstChildOfClass("UIStroke")
 	local rebirthReady = false
@@ -373,18 +412,20 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	end)
 	codexChip.Visible = true
 
-	local journalButton = iconButton(buttons, "JournalButton", 8, "Journal", "Journal")
+	local journalButton = pillButton(pills, "JournalButton", 1, "Journal", "Journal")
 	journalButton.Activated:Connect(callbacks.OnJournal)
 
-	local settingsButton = iconButton(buttons, "SettingsButton", 9, "Settings", "Settings")
+	local settingsButton = pillButton(pills, "SettingsButton", 2, "Settings", "Settings")
 	settingsButton.Activated:Connect(callbacks.OnSettings)
 
+	-- Big tiles: Pedestals, Luck, Codex, Rebirth (+ Collection in the collection trial).
 	local function liveButtonCount(): number
-		return if collectionVisible then 7 else 6
+		return if collectionVisible then 5 else 4
 	end
 	local function layoutButtons(compact: boolean)
-		local perRow = if compact then COMPACT_PER_ROW else 1
 		local count = liveButtonCount()
+		-- Phones: a 2 x 2 block for the four tiles (3 per row with Collection).
+		local perRow = if not compact then 1 elseif count <= 4 then 2 else COMPACT_PER_ROW
 		local rows = math.ceil(count / perRow)
 		grid.FillDirectionMaxCells = perRow
 		buttons.Size = UDim2.fromOffset(
