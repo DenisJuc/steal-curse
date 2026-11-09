@@ -23,7 +23,10 @@ local Settings = require(script.Parent.Parent.Settings)
 local ChainRig = require(script.Parent.Parent.Effects.ChainRig)
 local HuntFX = require(script.Parent.Parent.Effects.HuntFX)
 local SealBurst = require(script.Parent.Parent.Effects.SealBurst)
-local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
+local Ambience = require(script.Parent.Parent.Effects.Ambience)
+local Icons = require(script.Parent.Parent.UI.Icons)
+local Motion = require(script.Parent.Parent.UI.Motion)
+local UIKit = require(script.Parent.Parent.UI.UIKit)
 
 local IntroController = {}
 
@@ -223,6 +226,52 @@ function IntroController.Run(screen: ScreenGui)
 	actionStroke.Thickness = 4
 	actionStroke.Color = SPIRIT_COLOR
 	actionStroke.Parent = action
+	UIKit.skinButton(skip, "Dark")
+	action.Text = ""
+	local actionGradient = Instance.new("UIGradient")
+	actionGradient.Rotation = 90
+	actionGradient.Color = ColorSequence.new(Color3.fromRGB(70, 110, 170), Color3.fromRGB(24, 30, 60))
+	actionGradient.Parent = action
+	local actionIcon = Instance.new("ImageLabel")
+	actionIcon.BackgroundTransparency = 1
+	actionIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+	actionIcon.Position = UDim2.fromScale(0.5, 0.42)
+	actionIcon.Size = UDim2.fromScale(0.6, 0.6)
+	actionIcon.ZIndex = 4
+	actionIcon.Parent = action
+	local function iconFor(key: string)
+		local made = Icons.image(gui, key, 64)
+		if made then
+			actionIcon.Image = made.Image
+			made:Destroy()
+		end
+	end
+	iconFor("Pulse")
+	local actionLabel = Instance.new("TextLabel")
+	actionLabel.BackgroundTransparency = 1
+	actionLabel.AnchorPoint = Vector2.new(0.5, 1)
+	actionLabel.Position = UDim2.new(0.5, 0, 1, -10)
+	actionLabel.Size = UDim2.new(1, 0, 0, 24)
+	actionLabel.Font = Enum.Font.FredokaOne
+	actionLabel.TextSize = 20
+	actionLabel.TextColor3 = Color3.new(1, 1, 1)
+	actionLabel.TextStrokeTransparency = 0.3
+	actionLabel.Text = "PULSE"
+	actionLabel.ZIndex = 4
+	actionLabel.Parent = action
+	local keyChip = Instance.new("TextLabel")
+	keyChip.AnchorPoint = Vector2.new(0.5, 0.5)
+	keyChip.Position = UDim2.fromScale(0.85, 0.15)
+	keyChip.Size = UDim2.fromOffset(34, 34)
+	keyChip.BackgroundColor3 = Color3.fromRGB(20, 16, 30)
+	keyChip.Font = Enum.Font.FredokaOne
+	keyChip.TextSize = 20
+	keyChip.TextColor3 = GOLD
+	keyChip.Text = "Q"
+	keyChip.ZIndex = 5
+	keyChip.Visible = UserInputService.KeyboardEnabled
+	keyChip.Parent = action
+	Instance.new("UICorner", keyChip).CornerRadius = UDim.new(1, 0)
 	local holdFill = Instance.new("Frame")
 	holdFill.AnchorPoint = Vector2.new(0.5, 1)
 	holdFill.Position = UDim2.fromScale(0.5, 1)
@@ -248,6 +297,126 @@ function IntroController.Run(screen: ScreenGui)
 	local function goal(line: string)
 		objective.Text = line
 		tween(objective, 0.4, { TextTransparency = 0 })
+	end
+
+	-- Anime-opening toolkit: letterbox bars, radial speed lines, an impact frame, a title card and
+	-- a seal stamp.
+	local barTop = frame({ Size = UDim2.fromScale(1, 0), BackgroundColor3 = Color3.new(0, 0, 0), ZIndex = 3 })
+	local barBottom = frame({
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.fromScale(0, 1),
+		Size = UDim2.fromScale(1, 0),
+		BackgroundColor3 = Color3.new(0, 0, 0),
+		ZIndex = 3,
+	})
+	local function bars(on: boolean)
+		local h = if on then 0.11 else 0
+		tween(barTop, 0.45, { Size = UDim2.fromScale(1, h) }, Enum.EasingStyle.Quart)
+		tween(barBottom, 0.45, { Size = UDim2.fromScale(1, h) }, Enum.EasingStyle.Quart)
+	end
+	local function speedLines(seconds: number, color: Color3)
+		local lines = {}
+		for i = 1, 34 do
+			local line = frame({ AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = color, ZIndex = 2 })
+			lines[i] = { Frame = line, Angle = (i + math.random()) / 34 * math.pi * 2 }
+		end
+		local t = 0
+		while t < seconds do
+			t += RunService.RenderStepped:Wait()
+			local size = gui.AbsoluteSize
+			local reach = math.max(size.X, size.Y) * 0.5
+			for _, entry in lines do
+				local r = reach * (0.55 + math.random() * 0.45)
+				local length = reach * (0.2 + math.random() * 0.35)
+				entry.Frame.Position = UDim2.new(0.5, math.cos(entry.Angle) * r, 0.5, math.sin(entry.Angle) * r)
+				entry.Frame.Size = UDim2.fromOffset(length, 2 + math.random() * 3)
+				entry.Frame.Rotation = math.deg(entry.Angle)
+				entry.Frame.BackgroundTransparency = 0.25 + math.random() * 0.6 + math.max(0, t - seconds + 0.4) * 2
+			end
+		end
+		for _, entry in lines do
+			entry.Frame:Destroy()
+		end
+	end
+	local function impactFrame()
+		-- One black-and-white, high-contrast frame: the classic anime hit.
+		local hit = Instance.new("ColorCorrectionEffect")
+		hit.Saturation = -1
+		hit.Contrast = 1
+		hit.Brightness = 0.25
+		hit.Parent = game:GetService("Lighting")
+		task.delay(0.1, function()
+			hit:Destroy()
+		end)
+	end
+	local function titleCard()
+		bars(true)
+		local kanji = text({
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.45),
+			Size = UDim2.fromScale(0.5, 0.75),
+			Text = "狐",
+			TextScaled = true,
+			TextColor3 = Color3.fromRGB(150, 225, 255),
+			TextTransparency = 1,
+			TextStrokeTransparency = 1,
+			ZIndex = 6,
+		})
+		local name = text({
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.35, 0.44),
+			Size = UDim2.new(1, 0, 0, 90),
+			Text = "SEAL A CURSE",
+			TextSize = 86,
+			TextColor3 = GOLD,
+			TextTransparency = 1,
+			TextStrokeTransparency = 1,
+			ZIndex = 7,
+		})
+		local episode = text({
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.65, 0.55),
+			Size = UDim2.new(1, 0, 0, 34),
+			Text = "EPISODE 1: THE FOX IN THE FOG",
+			TextSize = 28,
+			TextTransparency = 1,
+			TextStrokeTransparency = 1,
+			ZIndex = 7,
+		})
+		Sounds.Play("EventStart")
+		tween(kanji, 0.6, { TextTransparency = 0.82 })
+		tween(name, 0.5, { Position = UDim2.fromScale(0.5, 0.44), TextTransparency = 0, TextStrokeTransparency = 0.2 }, Enum.EasingStyle.Back)
+		task.wait(0.25)
+		tween(episode, 0.5, { Position = UDim2.fromScale(0.5, 0.55), TextTransparency = 0, TextStrokeTransparency = 0.4 }, Enum.EasingStyle.Back)
+		task.wait(2.1)
+		tween(name, 0.35, { Position = UDim2.fromScale(0.62, 0.44), TextTransparency = 1, TextStrokeTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		tween(episode, 0.35, { Position = UDim2.fromScale(0.38, 0.55), TextTransparency = 1, TextStrokeTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		tween(kanji, 0.5, { TextTransparency = 1 })
+		task.wait(0.5)
+		kanji:Destroy()
+		name:Destroy()
+		episode:Destroy()
+		bars(false)
+	end
+	local function stamp(): TextLabel
+		local mark = text({
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.42),
+			Size = UDim2.fromScale(0.9, 1.2),
+			Text = "封",
+			TextScaled = true,
+			Rotation = -18,
+			TextColor3 = Color3.fromRGB(230, 50, 50),
+			TextStrokeColor3 = Color3.fromRGB(40, 0, 0),
+			TextStrokeTransparency = 0,
+			TextTransparency = 0.4,
+			ZIndex = 7,
+		})
+		tween(mark, 0.22, { Size = UDim2.fromScale(0.3, 0.42), Rotation = -6, TextTransparency = 0 }, Enum.EasingStyle.Back)
+		task.wait(0.2)
+		Sounds.Play("Lock")
+		HuntFX.shake(1, 0.4)
+		return mark
 	end
 
 	-- World ------------------------------------------------------------------------------------
@@ -425,6 +594,7 @@ function IntroController.Run(screen: ScreenGui)
 	local forward = IntroLayout.Origin.LookVector
 	camera.CameraType = Enum.CameraType.Scriptable
 	camera.CFrame = CFrame.lookAt(head, head + forward * 4 + Vector3.new(0, 10, 0))
+	bars(true)
 	black.BackgroundTransparency = 1
 	Sounds.Play("DistantWhisper")
 	-- Two heavy blinks, then the eyes stay open.
@@ -472,6 +642,10 @@ function IntroController.Run(screen: ScreenGui)
 	if ended then
 		return
 	end
+	titleCard()
+	if ended then
+		return
+	end
 	say("A cursed spirit! It's getting away...", 3)
 	camera.CameraType = Enum.CameraType.Custom
 	if control then
@@ -502,8 +676,15 @@ function IntroController.Run(screen: ScreenGui)
 		if not here then
 			return
 		end
-		-- The game's own Spirit Sight pulse: shockwave, shake, fog lift, light flash, burst.
-		SpiritSight.Pulse(here)
+		-- The Spirit Sight pulse look (shockwave, shake, fog lift, burst) without its world side
+		-- effects: the real pulse also pings every spirit and landmark on the main map.
+		Sounds.Play("Pulse")
+		HuntFX.shockwave(here.Position - Vector3.new(0, 2.8, 0), SPIRIT_COLOR, 120, 1)
+		HuntFX.shake(0.25, 0.35)
+		Ambience.Reveal()
+		if not Settings.LowEffects() then
+			HuntFX.burst(here.Position, SPIRIT_COLOR, 25, 14)
+		end
 		revealUntil = os.clock() + CFG.RevealSeconds
 		Sounds.Play("SignalPing", spirit)
 		if not pillar then
@@ -569,6 +750,8 @@ function IntroController.Run(screen: ScreenGui)
 		binding = true
 		action.Visible = false
 		objective.Visible = false
+		bars(true)
+		task.spawn(speedLines, 3.1, Color3.fromRGB(255, 240, 210))
 		if control then
 			control:Disable()
 		end
@@ -668,11 +851,17 @@ function IntroController.Run(screen: ScreenGui)
 			camera.FieldOfView = 70 - t * 6
 			halo.Size = Vector3.one * (4 + math.sin(t * 30) * 1.2)
 		end
-		-- Flash, shockwave, sealed.
+		-- The spirit implodes, one impact frame, then the flash.
 		Sounds.Play("SealSuck")
+		tween(spirit, 0.35, { Size = Vector3.one * 0.2 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		tween(halo, 0.35, { Size = Vector3.one * 0.4 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+		camera.FieldOfView = 48
+		task.wait(0.35)
+		impactFrame()
 		Sounds.Play("Thunder")
-		tween(flash, 0.12, { BackgroundTransparency = 0 })
-		task.wait(0.15)
+		task.wait(0.1)
+		tween(flash, 0.08, { BackgroundTransparency = 0 })
+		task.wait(0.1)
 		if rig then
 			rig.Restore()
 			rig = nil
@@ -699,13 +888,17 @@ function IntroController.Run(screen: ScreenGui)
 				tween(item, 0.8, { Transparency = 1 })
 			end
 		end
-		tween(flash, 1.4, { BackgroundTransparency = 1 })
+		tween(flash, 1.2, { BackgroundTransparency = 1 })
+		tween(camera, 1.2, { FieldOfView = 62 }, Enum.EasingStyle.Quart)
+		local mark = stamp()
 		Sounds.Play("Shine")
 		big.Text = "SEALED!"
+		big.Position = UDim2.fromScale(0.5, 0.66)
 		tween(big, 0.3, { TextTransparency = 0, TextStrokeTransparency = 0.3 }, Enum.EasingStyle.Back)
-		say("The spirit is bound into a relic. Your shrine awaits.", 3.5)
-		task.wait(3)
+		say("The fox spirit is bound into a relic. Your shrine awaits.", 3.5)
+		task.wait(2.8)
 		tween(big, 0.6, { TextTransparency = 1, TextStrokeTransparency = 1 })
+		tween(mark, 0.6, { TextTransparency = 1, TextStrokeTransparency = 1 })
 		endIntro("Finish")
 	end
 
@@ -814,8 +1007,20 @@ function IntroController.Run(screen: ScreenGui)
 				end
 			end
 			canBind = final and not fleeing and distance < CFG.BindDistance and (pulsedNow or holding())
-			action.Text = if canBind then (if keyboard then "HOLD\nE" else "HOLD\nTO BIND") else (if keyboard then "PULSE\nQ" else "PULSE")
+			local mode = if canBind then "Bind" else "Pulse"
+			if action:GetAttribute("Mode") ~= mode then
+				action:SetAttribute("Mode", mode)
+				iconFor(mode)
+				actionLabel.Text = if canBind then "HOLD TO BIND" else "PULSE"
+				keyChip.Text = if canBind then "E" else "Q"
+				actionGradient.Color = if canBind
+					then ColorSequence.new(Color3.fromRGB(200, 150, 70), Color3.fromRGB(70, 36, 30))
+					else ColorSequence.new(Color3.fromRGB(70, 110, 170), Color3.fromRGB(24, 30, 60))
+				Motion.pop(action, 0, 0.8)
+			end
 			actionStroke.Color = if canBind then GOLD else SPIRIT_COLOR
+			-- Cooldown: the icon dims until the next pulse is ready.
+			actionIcon.ImageTransparency = if not canBind and os.clock() - lastPulse < CFG.PulseCooldown then 0.6 else 0
 			if final and not fleeing then
 				goal(if canBind
 					then (if keyboard then "Hold E to bind the spirit!" else "Hold the button to bind it!")
