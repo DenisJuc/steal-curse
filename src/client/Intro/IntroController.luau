@@ -19,6 +19,11 @@ local UserInputService = game:GetService("UserInputService")
 local Config = require(ReplicatedStorage.Shared.Config)
 local IntroLayout = require(ReplicatedStorage.Shared.IntroLayout)
 local Sounds = require(script.Parent.Parent.Sounds)
+local Settings = require(script.Parent.Parent.Settings)
+local ChainRig = require(script.Parent.Parent.Effects.ChainRig)
+local HuntFX = require(script.Parent.Parent.Effects.HuntFX)
+local SealBurst = require(script.Parent.Parent.Effects.SealBurst)
+local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
 
 local IntroController = {}
 
@@ -294,6 +299,7 @@ function IntroController.Run(screen: ScreenGui)
 
 	local spiritPos = IntroLayout.world(Vector3.new(-14, SPIRIT_LIFT + 2, -10))
 	local visible = 0
+	local jitter = 0
 	local function setVisible(amount: number)
 		visible = amount
 		spirit.Transparency = 1 - amount
@@ -309,7 +315,8 @@ function IntroController.Run(screen: ScreenGui)
 		RunService.Heartbeat:Connect(function(dt)
 			clock += dt
 			local bob = Vector3.new(0, math.sin(clock * 3) * 0.4, 0)
-			spirit.CFrame = CFrame.new(spiritPos + bob)
+			local shake = if jitter > 0 then Vector3.new(math.random() - 0.5, math.random() - 0.5, math.random() - 0.5) * jitter else Vector3.zero
+			spirit.CFrame = CFrame.new(spiritPos + bob + shake)
 			halo.CFrame = spirit.CFrame
 			halo.Size = Vector3.one * (4 + math.sin(clock * 6) * 0.4)
 		end)
@@ -347,6 +354,16 @@ function IntroController.Run(screen: ScreenGui)
 		end
 		folder:Destroy()
 		grade:Destroy()
+		-- Chains left over from a bind interrupted by Skip.
+		local chains = workspace:FindFirstChild("BindChains")
+		if chains then
+			chains:Destroy()
+		end
+		local character = player.Character
+		local hand = character and character:FindFirstChild("BindHand", true)
+		if hand then
+			hand:Destroy()
+		end
 		if glow then
 			glow:Destroy()
 		end
@@ -470,6 +487,9 @@ function IntroController.Run(screen: ScreenGui)
 	local revealUntil = 0
 	local binding = false
 	local holdStart: number? = nil
+	local lastHint = 0
+	local rig: any = nil
+	local beats = 0
 	local beam: Beam? = nil
 	local pillar: Part? = nil
 
@@ -482,19 +502,8 @@ function IntroController.Run(screen: ScreenGui)
 		if not here then
 			return
 		end
-		Sounds.Play("Pulse")
-		local ring = part(folder, {
-			Shape = Enum.PartType.Cylinder,
-			Size = Vector3.new(0.3, 4, 4),
-			CFrame = CFrame.new(here.Position - Vector3.new(0, 2.6, 0)) * CFrame.Angles(0, 0, math.rad(90)),
-			Material = Enum.Material.Neon,
-			Color = SPIRIT_COLOR,
-			Transparency = 0.2,
-		})
-		tween(ring, 0.9, { Size = Vector3.new(0.3, 90, 90), Transparency = 1 })
-		task.delay(1, function()
-			ring:Destroy()
-		end)
+		-- The game's own Spirit Sight pulse: shockwave, shake, fog lift, light flash, burst.
+		SpiritSight.Pulse(here)
 		revealUntil = os.clock() + CFG.RevealSeconds
 		Sounds.Play("SignalPing", spirit)
 		if not pillar then
@@ -644,6 +653,13 @@ function IntroController.Run(screen: ScreenGui)
 			local dt = RunService.RenderStepped:Wait()
 			t += dt
 			placeRing(dt)
+			jitter = 0.6 + t * 0.3
+			if rig then
+				ChainRig.Update(rig, CFG.BindSeconds + t, 1, 1, 0.5 + 0.5 * math.abs(math.sin(t * 9)))
+				if math.floor(t * 2.5) ~= math.floor((t - dt) * 2.5) then
+					ChainRig.Snap(rig)
+				end
+			end
 			local a = angle0 + t * 0.7
 			local radius = 20 - t * 2
 			local eye = center + Vector3.new(math.cos(a) * radius, 9 - t * 1.2, math.sin(a) * radius)
@@ -657,6 +673,16 @@ function IntroController.Run(screen: ScreenGui)
 		Sounds.Play("Thunder")
 		tween(flash, 0.12, { BackgroundTransparency = 0 })
 		task.wait(0.15)
+		if rig then
+			rig.Restore()
+			rig = nil
+		end
+		jitter = 0
+		ChainRig.SealFlash(center, 7)
+		SealBurst.Play(center, Config.Intro.FirstSeal, { Low = Settings.LowEffects(), Personal = true })
+		HuntFX.shockwave(ground, GOLD, 70, 1.1)
+		HuntFX.burst(center, GOLD, 40, 22)
+		HuntFX.shake(0.7, 0.6)
 		setVisible(0)
 		halo.Transparency = 1
 		local wave = part(folder, {
@@ -688,14 +714,30 @@ function IntroController.Run(screen: ScreenGui)
 		return holdStart ~= nil
 	end
 	local function startHold()
-		if binding or ended then
+		if binding or ended or holdStart then
 			return
 		end
 		holdStart = os.clock()
+		beats = 0
+		local character = player.Character
+		if character then
+			-- The game's bind chains: they leave your hand, writhe, and snap taut on each beat.
+			rig = ChainRig.Attach(character, spiritAttach, { Color = Color3.fromRGB(190, 150, 255), Count = 4, Low = Settings.LowEffects() })
+		end
+		Sounds.Play("ChainRattle", spirit)
+		Sounds.Play("BindRiser")
 	end
-	local function stopHold()
+	local function stopHold(keepChains: boolean?)
 		holdStart = nil
 		holdFill.Size = UDim2.fromScale(1, 0)
+		jitter = 0
+		if rig and not keepChains then
+			rig.Restore()
+			rig = nil
+			if not binding then
+				Sounds.Play("Cancel")
+			end
+		end
 	end
 	local canBind = false
 	action.InputBegan:Connect(function(input)
@@ -750,33 +792,58 @@ function IntroController.Run(screen: ScreenGui)
 			local distance = (here.Position - spiritPos).Magnitude
 			local final = stage == #IntroLayout.Spots
 			-- Glow: always while fleeing or cornered, otherwise only after a pulse.
-			local revealed = fleeing or final or os.clock() < revealUntil
-			local target = if fleeing then 1 elseif final then 0.85 elseif revealed then 0.9 else 0
+			local revealed = fleeing or os.clock() < revealUntil or holding()
+			local target = if fleeing then 1 elseif revealed then 0.9 elseif final then 0.12 else 0
 			setVisible(visible + (target - visible) * 0.15)
 			if pillar then
 				pillar.CFrame = CFrame.new(spiritPos + Vector3.new(0, 38, 0)) * CFrame.Angles(0, 0, math.rad(90))
-				pillar.Transparency = if revealed and not fleeing and not final then 0.55 else 1
+				pillar.Transparency = if revealed and not fleeing and not holding() then 0.55 else 1
 			end
 			if beam then
-				beam.Enabled = revealed and not fleeing and not final and distance > 10
+				beam.Enabled = revealed and not fleeing and not holding() and distance > 10
 			end
+			-- It only notices you once you have pulsed: walking up blind does nothing but whisper.
+			local pulsedNow = os.clock() < revealUntil
 			if not final and not fleeing and distance < CFG.FleeDistance then
-				flee()
+				if pulsedNow then
+					flee()
+				elseif os.clock() - lastHint > 5 then
+					lastHint = os.clock()
+					Sounds.Play("SignalWhisper", spirit)
+					say(if keyboard then "Something is here... press Q to Pulse!" else "Something is here... tap Pulse!", 2.5)
+				end
 			end
-			canBind = final and not fleeing and distance < CFG.BindDistance
+			canBind = final and not fleeing and distance < CFG.BindDistance and (pulsedNow or holding())
 			action.Text = if canBind then (if keyboard then "HOLD\nE" else "HOLD\nTO BIND") else (if keyboard then "PULSE\nQ" else "PULSE")
 			actionStroke.Color = if canBind then GOLD else SPIRIT_COLOR
 			if final and not fleeing then
-				goal(if canBind then (if keyboard then "Hold E to bind the spirit!" else "Hold the button to bind it!") else "It's cornered at the shrine! Get close.")
+				goal(if canBind
+					then (if keyboard then "Hold E to bind the spirit!" else "Hold the button to bind it!")
+					elseif distance < CFG.BindDistance then (if keyboard then "It's hiding! Press Q to Pulse, then hold E" else "It's hiding! Pulse, then hold to bind")
+					else "It's cornered at the shrine! Get close.")
 			end
 			if holding() then
 				if not canBind then
 					stopHold()
 				else
-					local progress = (os.clock() - (holdStart :: number)) / CFG.BindSeconds
+					local held = os.clock() - (holdStart :: number)
+					local progress = held / CFG.BindSeconds
 					holdFill.Size = UDim2.fromScale(1, math.clamp(progress, 0, 1))
+					local beatAt = ({ 0.35, 0.7 })[beats + 1]
+					if beatAt and progress >= beatAt then
+						beats += 1
+						Sounds.Play("ChainTighten", spirit)
+						if rig then
+							ChainRig.Snap(rig)
+						end
+						HuntFX.shake(0.2, 0.25)
+					end
+					jitter = progress * 0.9
+					if rig then
+						ChainRig.Update(rig, held, math.clamp(progress, 0, 1), math.min(1, held / 0.2), math.abs(math.sin(held * 7)) * progress)
+					end
 					if progress >= 1 then
-						stopHold()
+						stopHold(true)
 						task.spawn(catch)
 					end
 				end

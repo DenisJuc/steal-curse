@@ -33,7 +33,8 @@ gui.Parent = playerGui
 
 local back = Instance.new("Frame")
 back.Size = UDim2.fromScale(1, 1)
-back.BackgroundColor3 = Color3.fromRGB(8, 6, 14)
+-- White so the gradient's colours show as they are.
+back.BackgroundColor3 = Color3.new(1, 1, 1)
 back.BorderSizePixel = 0
 back.Parent = gui
 local gradient = Instance.new("UIGradient")
@@ -56,8 +57,35 @@ local function label(text: string, size: number, y: number, color: Color3): Text
 	return item
 end
 
+-- A slowly turning seal behind the title: a ring of glowing dots and an inner ring turning the
+-- other way (no image assets needed).
+local function sealRing(count: number, radius: number, dot: number, color: Color3): Frame
+	local ring = Instance.new("Frame")
+	ring.AnchorPoint = Vector2.new(0.5, 0.5)
+	ring.Position = UDim2.fromScale(0.5, 0.38)
+	ring.Size = UDim2.fromOffset(radius * 2, radius * 2)
+	ring.BackgroundTransparency = 1
+	ring.Parent = back
+	for i = 1, count do
+		local a = i / count * math.pi * 2
+		local d = Instance.new("Frame")
+		d.AnchorPoint = Vector2.new(0.5, 0.5)
+		d.Position = UDim2.new(0.5, math.cos(a) * radius, 0.5, math.sin(a) * radius)
+		d.Size = UDim2.fromOffset(dot, if i % 3 == 0 then dot * 2.4 else dot)
+		d.Rotation = math.deg(a) + 90
+		d.BackgroundColor3 = color
+		d.BackgroundTransparency = if i % 3 == 0 then 0.1 else 0.45
+		d.BorderSizePixel = 0
+		d.Parent = ring
+		Instance.new("UICorner", d).CornerRadius = UDim.new(1, 0)
+	end
+	return ring
+end
+local outerRing = sealRing(36, 150, 6, Color3.fromRGB(190, 150, 255))
+local innerRing = sealRing(18, 112, 5, GOLD)
 local title = label("SEAL A CURSE", 54, 0.38, GOLD)
-local tip = label("The spirits are stirring...", 20, 0.5, Color3.fromRGB(210, 200, 235))
+title.ZIndex = 2
+local tip = label("The spirits are stirring...", 20, 0.56, Color3.fromRGB(210, 200, 235))
 
 local track = Instance.new("Frame")
 track.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -131,6 +159,15 @@ task.delay(SKIP_AFTER, function()
 	skip.Visible = not closed
 end)
 task.delay(MAX_SECONDS, close)
+task.spawn(function()
+	local t = 0
+	while not closed do
+		t += task.wait()
+		outerRing.Rotation = t * 12
+		innerRing.Rotation = -t * 20
+		title.TextSize = 54 + math.sin(t * 2) * 2
+	end
+end)
 task.spawn(function()
 	local index = 1
 	while not closed do
