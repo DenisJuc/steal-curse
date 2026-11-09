@@ -366,7 +366,7 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 		local fold = UIKit.button({
 			Name = "Advanced",
 			LayoutOrder = nextOrder(),
-			Text = if advancedOpen then "Advanced  \u{25BE}" else "Advanced  \u{25B8}",
+			Text = if advancedOpen then "Fewer rules  -" else "More rules  +",
 			TextSize = 18,
 			Size = UDim2.new(1, -10, 0, 36),
 			Parent = body,
