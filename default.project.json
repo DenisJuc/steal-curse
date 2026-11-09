@@ -21,6 +21,9 @@
         "$path": "assets/VFX"
       },
       "Remotes": {
+        "IntroEvent": {
+          "$className": "RemoteEvent"
+        },
         "$className": "Folder",
         "DiscoveryResult": {
           "$className": "RemoteEvent"
@@ -175,6 +178,12 @@
       },
       "MapProps": {
         "$path": "assets/MapProps"
+      }
+    },
+
+    "ReplicatedFirst": {
+      "Loading": {
+        "$path": "src/first"
       }
     },
 

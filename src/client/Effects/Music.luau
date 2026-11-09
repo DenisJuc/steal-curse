@@ -65,8 +65,11 @@ function Music.Start()
 	decks.Town = newDeck("Town", cfg.Town) :: Deck
 	decks.Wild = newDeck("Wild", cfg.Wild) :: Deck
 
+	local player = game:GetService("Players").LocalPlayer
 	RunService.Heartbeat:Connect(function(dt)
-		local master = Settings.MusicVolume() * cfg.Volume
+		-- Silent under the loading screen (it plays Config.Music.Loading itself).
+		local loaded = player:GetAttribute("LoadingDone") == true
+		local master = if loaded then Settings.MusicVolume() * cfg.Volume else 0
 		local wild = math.clamp(Ambience.WildWeight(), 0, 1)
 		local t = math.clamp(dt / cfg.FadeSeconds * 3, 0, 1)
 		for name, deck in decks do

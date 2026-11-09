@@ -109,6 +109,10 @@ local function check(player: Player)
 	if not (root and root:IsA("BasePart")) then
 		return
 	end
+	-- The intro hunt's glade lies far out in the wild on purpose (IntroService).
+	if player:GetAttribute("InIntro") == true then
+		return
+	end
 	local position = root.Position
 	local luck = ZoneGateService.Luck(player)
 	if ZoneGates.allowedAt(CONTEXT, luck, position.X, position.Z) then

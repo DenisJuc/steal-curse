@@ -11,6 +11,7 @@ local HubBuilder = require(script.Parent.HubBuilder)
 local PlotBuilder = require(script.Parent.PlotBuilder)
 local ShrineMaterialsBuilder = require(script.Parent.ShrineMaterialsBuilder)
 local WildBuilder = require(script.Parent.WildBuilder)
+local IntroBuilder = require(script.Parent.IntroBuilder)
 
 local MapBuilder = {}
 
@@ -144,6 +145,9 @@ function MapBuilder.Build(): Map
 
 	local started = os.clock()
 	local wild = WildBuilder.Build(folder)
+	if Config.Intro.Enabled then
+		IntroBuilder.Build(folder)
+	end
 
 	local lightened = lighten(folder)
 

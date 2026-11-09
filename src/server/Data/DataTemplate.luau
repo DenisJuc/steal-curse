@@ -37,6 +37,8 @@ export type Pedestal = {
 
 export type Data = {
 	DataVersion: number,
+	-- The first-minute intro hunt has been played or skipped (IntroService).
+	IntroDone: boolean,
 	TotalScans: number,
 	TotalCaptures: number,
 	NextUid: number,
@@ -175,6 +177,7 @@ export type Data = {
 
 DataTemplate.Template = {
 	DataVersion = DataTemplate.Version,
+	IntroDone = false,
 	TotalScans = 0,
 	TotalCaptures = 0,
 	NextUid = 1,

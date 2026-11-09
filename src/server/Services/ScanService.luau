@@ -67,6 +67,10 @@ end
 
 -- Auto Roll fires full charges by itself. AFK players always auto-roll so idling stays fair.
 function ScanService.IsAutoRoll(player: Player): boolean
+	-- Nothing rolls during the intro hunt (IntroService), not even for an idle player.
+	if player:GetAttribute("InIntro") == true then
+		return false
+	end
 	if player:GetAttribute("Afk") == true then
 		return true
 	end

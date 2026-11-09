@@ -193,6 +193,8 @@ function LuckTag.Start()
 				shown[player] = entry
 			end
 			assert(entry, "luck tag entry")
+			-- Hidden during the intro hunt (its cinematic shows the world, not stats).
+			entry.Gui.Enabled = player:GetAttribute("InIntro") ~= true
 			-- Above the earned title when there is one (both centre 2.6 studs over the head).
 			local title = player:GetAttribute("Title")
 			local lift = BASE_LIFT
