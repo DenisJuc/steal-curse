@@ -88,6 +88,10 @@ type Signal = {
 	-- Skittish spirits: set while it flies from FlyFrom to Base (Bolt), from clock FlyStart.
 	FlyFrom: Vector3?,
 	FlyStart: number?,
+	-- The glowing streak it leaves while flying (two world attachments that follow the spirit).
+	Trail: Trail?,
+	TrailTop: Attachment?,
+	TrailBottom: Attachment?,
 }
 
 type Bound = {
@@ -150,6 +154,61 @@ local function placeAnchors(signal: Signal)
 	signal.Anchor.Position = signal.Base
 	signal.Foot.Position = Vector3.new(signal.Base.X, signal.Ground, signal.Base.Z)
 	signal.Top.Position = Vector3.new(signal.Base.X, signal.Ground + PILLAR_HEIGHT, signal.Base.Z)
+end
+
+-- Skittish spirits: a bright ribbon behind a bolting spirit so the eye can follow where it went.
+-- Half its width in studs, and how long each bit of it lingers.
+local TRAIL_HALF_WIDTH = 1.3
+local TRAIL_SECONDS = 0.9
+
+local function placeTrail(signal: Signal, at: Vector3)
+	if signal.TrailTop and signal.TrailBottom then
+		signal.TrailTop.Position = at + Vector3.new(0, TRAIL_HALF_WIDTH, 0)
+		signal.TrailBottom.Position = at - Vector3.new(0, TRAIL_HALF_WIDTH, 0)
+	end
+end
+
+-- Stops the streak; what is drawn fades out, then the pieces go.
+local function endTrail(signal: Signal)
+	local trail, top, bottom = signal.Trail, signal.TrailTop, signal.TrailBottom
+	signal.Trail, signal.TrailTop, signal.TrailBottom = nil, nil, nil
+	if trail then
+		trail.Enabled = false
+	end
+	task.delay(TRAIL_SECONDS + 0.1, function()
+		if top then
+			top:Destroy()
+		end
+		if bottom then
+			bottom:Destroy()
+		end
+	end)
+end
+
+local function startTrail(signal: Signal, at: Vector3)
+	endTrail(signal)
+	local top = terrainAttachment("BoltTrailTop", at)
+	local bottom = terrainAttachment("BoltTrailBottom", at)
+	signal.TrailTop, signal.TrailBottom = top, bottom
+	placeTrail(signal, at)
+	local trail = Instance.new("Trail")
+	trail.Attachment0 = top
+	trail.Attachment1 = bottom
+	trail.Color = ColorSequence.new(Color3.new(1, 1, 1), SIGNAL_COLOR)
+	trail.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(0.5, 0.35),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	-- Thick at the spirit, thinning to a point behind it.
+	trail.WidthScale = NumberSequence.new(1, 0.15)
+	trail.Lifetime = TRAIL_SECONDS
+	trail.MinLength = 0.05
+	trail.LightEmission = 1
+	trail.LightInfluence = 0
+	trail.FaceCamera = true
+	trail.Parent = top
+	signal.Trail = trail
 end
 
 local function makeSignal(id: number, position: Vector3): Signal
@@ -236,6 +295,7 @@ local function destroySignal(signal: Signal)
 	if bound and bound.Signal == signal then
 		bound = nil
 	end
+	endTrail(signal)
 	signal.Group:Destroy()
 	signal.Anchor:Destroy()
 	signal.Foot:Destroy()
@@ -301,6 +361,8 @@ local function flightPosition(signal: Signal): Vector3?
 	if t >= 1 then
 		signal.FlyFrom = nil
 		signal.FlyStart = nil
+		placeTrail(signal, signal.Base)
+		endTrail(signal)
 		-- It lands with a puff (skipped when the flight ended unseen long ago).
 		if t < 1.6 then
 			HuntFX.shockwave(Vector3.new(signal.Base.X, signal.Ground + 0.2, signal.Base.Z), SIGNAL_COLOR, 12, 0.5)
@@ -308,7 +370,9 @@ local function flightPosition(signal: Signal): Vector3?
 		return nil
 	end
 	local eased = 1 - (1 - t) * (1 - t)
-	return from:Lerp(signal.Base, eased) + Vector3.new(0, math.sin(t * math.pi) * 6, 0)
+	local position = from:Lerp(signal.Base, eased) + Vector3.new(0, math.sin(t * math.pi) * 6, 0)
+	placeTrail(signal, position)
+	return position
 end
 
 local function placeIdle(signal: Signal)
@@ -359,6 +423,7 @@ function SpiritSight.Bolt(id: number, from: Vector3)
 	signal.FlyFrom = from
 	signal.FlyStart = clock
 	if enabled then
+		startTrail(signal, from)
 		HuntFX.burst(from, SIGNAL_COLOR, if Settings.LowEffects() then 10 else 30, 16)
 		Sounds.Play("BranchSnap", signal.Core.Part)
 		Sounds.Play("SignalWhisper", signal.Core.Part, 1.25)
@@ -394,6 +459,7 @@ function SpiritSight.SetEnabled(on: boolean)
 		if not on then
 			signal.Pillar.Enabled = false
 			signal.Flare = 0
+			endTrail(signal)
 		end
 	end
 	setListener(on)

@@ -498,10 +498,13 @@ function HuntController.Start(screen: ScreenGui, startOptions: Options)
 		end
 		SpiritSight.SetSignals(signals)
 		SpiritTags.Sync(spiritTypes, spiritRolls, struckUntil)
+		local hinted = false
 		for _, boltInfo in bolts do
 			SpiritSight.Bolt(boltInfo.Id, boltInfo.From)
+			-- One hint per update: two spirits bolting together must not cover the first explanation.
 			local text = BOLT_TEXT[boltInfo.Kind]
-			if text and SpiritSight.IsEnabled() then
+			if text and not hinted and SpiritSight.IsEnabled() then
+				hinted = true
 				hud.ShowHint(if boltExplained[boltInfo.Kind] then text.Again else text.First, 3.5)
 				boltExplained[boltInfo.Kind] = true
 			end
