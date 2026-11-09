@@ -16,6 +16,11 @@ export type Setting = {
 	Options: { Value }?,
 	Range: Range?,
 	Default: Value,
+	-- Not shown in the Settings menu (2026-11-08 trim): still saved and read, so a player's
+	-- earlier choice keeps working; everyone else stays on the default.
+	Hidden: boolean?,
+	-- Choosing this option also sets these other settings (the menu's one Animations row).
+	Also: { [string]: { [string]: Value } }?,
 }
 
 -- Interface size option -> UI scale multiplier.
@@ -35,10 +40,15 @@ ClientSettings.Schema = {
 	},
 	{
 		Key = "Reveals",
-		Label = "Rare reveals",
-		Help = "Short plays every reveal quickly. Off keeps only the feed and the Journal.",
+		Label = "Animations",
+		Help = "Full: every roll and rare find animates. Fast: quick versions. Off: results show at once.",
 		Options = { "Full", "Short", "Off" },
 		Default = "Full",
+		Also = {
+			Full = { RevealAnimation = "On", RollAnimation = "Full" },
+			Short = { RevealAnimation = "On", RollAnimation = "Fast" },
+			Off = { RevealAnimation = "Off", RollAnimation = "Off" },
+		},
 	},
 	{
 		Key = "RevealAnimation",
@@ -46,6 +56,7 @@ ClientSettings.Schema = {
 		Help = "Off skips the build-up: Legendary and rarer show at once, the rest go to the feed.",
 		Options = { "On", "Off" },
 		Default = "On",
+		Hidden = true,
 	},
 	{
 		Key = "RevealSound",
@@ -53,6 +64,7 @@ ClientSettings.Schema = {
 		Help = "Off mutes the roll landing and rare reveal sounds.",
 		Options = { "On", "Off" },
 		Default = "On",
+		Hidden = true,
 	},
 	{
 		Key = "RollAnimation",
@@ -60,6 +72,7 @@ ClientSettings.Schema = {
 		Help = "The roll above the bottom bar. Fast rolls briefly; Off shows results right away.",
 		Options = { "Full", "Fast", "Off" },
 		Default = "Full",
+		Hidden = true,
 	},
 	{
 		Key = "RollStyle",
@@ -67,6 +80,7 @@ ClientSettings.Schema = {
 		Help = "Omikuji draws a fortune slip and flickers relics on it until one is stamped; Flicker cycles relics on a plate; Flame climbs through rarity colors.",
 		Options = { "Omikuji", "Flicker", "Flame" },
 		Default = "Omikuji",
+		Hidden = true,
 	},
 	{
 		Key = "Camera",
@@ -88,6 +102,7 @@ ClientSettings.Schema = {
 		Help = "Makes every menu and button bigger or smaller.",
 		Options = { "Small", "Medium", "Big" },
 		Default = "Medium",
+		Hidden = true,
 	},
 	{
 		Key = "AfkReports",
@@ -95,6 +110,7 @@ ClientSettings.Schema = {
 		Help = "When you rejoin, shows the CE you earned and everything you unlocked while AFK.",
 		Options = { "On", "Off" },
 		Default = "On",
+		Hidden = true,
 	},
 	{
 		Key = "Hints",
@@ -190,6 +206,9 @@ function ClientSettings.display(key: string, value: Value): string
 	end
 	if key == "Hints" and value == "Unlocks" then
 		return "Tips"
+	end
+	if key == "Reveals" and value == "Short" then
+		return "Fast"
 	end
 	return tostring(value)
 end

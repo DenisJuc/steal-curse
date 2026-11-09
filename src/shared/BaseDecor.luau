@@ -45,7 +45,7 @@ BaseDecor.Gardens = {
 	{ Id = "Bamboo", Name = "Bamboo Grove", Pieces = {
 		{ Prop = "BambooGrove", At = { 0, 2 }, Stage = 1 },
 		{ Prop = "FernBush", At = { 6, -5 }, Stage = 2 },
-		{ Prop = "BambooTall", At = { -7, 3 }, Scale = 0.85, Turn = 90, Stage = 2 },
+		{ Prop = "BambooGrove2", At = { -7, 3 }, Scale = 0.85, Turn = 90, Stage = 2 },
 		{ Prop = "StoneLantern", At = { 5, 7 }, Stage = 3 },
 		{ Prop = "FernBush", At = { -5, -6 }, Scale = 0.8, Stage = 3 },
 	} },

@@ -39,7 +39,7 @@ local SHORT_LABELS = {
 function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (boolean) -> () }
 	local colors = UIKit.Colors
 	local panel, content =
-		UIKit.modal(screen, "SettingsMenu", "SETTINGS", colors.Accent, Vector2.new(560, 620), "Settings")
+		UIKit.modal(screen, "SettingsMenu", "SETTINGS", colors.Accent, Vector2.new(560, 560), "Settings")
 	local list = UIKit.scrollList(content, 6)
 
 	local function row(order: number, label: string, controlWidth: number): Frame
@@ -70,6 +70,9 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 			for _, option in options do
 				if tostring(option) == id then
 					Settings.Set(setting.Key, option)
+					for key, value in (setting.Also and setting.Also[id]) or {} do
+						Settings.Set(key, value)
+					end
 				end
 			end
 		end, {
@@ -205,7 +208,9 @@ function SettingsPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible:
 	end
 
 	for order, setting in ClientSettings.Schema do
-		if setting.Range then
+		if setting.Hidden then
+			continue
+		elseif setting.Range then
 			sliderControl(row(order, setting.Label, SLIDER_WIDTH), setting)
 		else
 			local count = #(setting.Options :: { any })

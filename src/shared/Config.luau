@@ -104,6 +104,8 @@ Config.Sounds = {
 	Mutation = { Id = "rbxasset://sounds/volume_slider.ogg", Volume = 0.36, Speed = 1.9 },
 	-- Interface
 	Hover = { Id = "rbxassetid://139800881181209", Volume = 0.07, Gap = 0.06 },
+	-- Town: wind chimes now and then near you (Config.Ambience.Town.Distant).
+	WindChimes = { Id = "rbxassetid://9120749869", Volume = 0.18 },
 	Click = { Id = "rbxassetid://6895079853", Volume = 0.10, Gap = 0.08 },
 	MenuOpen = { Id = "rbxassetid://74947743572579", Volume = 0.10 },
 	MenuClose = { Id = "rbxassetid://88861317075079", Volume = 0.10 },
@@ -162,20 +164,35 @@ Config.Sounds = {
 -- sound (0.35 = turned down 65% from Roblox's default).
 local STEP = "rbxassetid://92061301674605"
 Config.FootstepVolumeScale = 0.35
+-- 2026-11-08 SFX pass: one looping step per surface family (free Creator Store audio, each
+-- checked to load in Studio). Material variants report their base material (slate tiles = Slate).
+local STEP_GRASS = "rbxassetid://18438190442"
+local STEP_STONE = "rbxassetid://104851661205720"
+local STEP_WOOD = "rbxassetid://102932066102999"
+local STEP_DIRT = "rbxassetid://85618165171747"
 Config.Footsteps = {
-	Grass = STEP,
-	LeafyGrass = STEP,
-	Mud = STEP,
-	Ground = STEP,
-	Rock = STEP,
-	Slate = STEP,
-	Basalt = STEP,
-	Limestone = STEP,
-	Sandstone = STEP,
-	Cobblestone = STEP,
-	Wood = STEP,
-	WoodPlanks = STEP,
+	Grass = STEP_GRASS,
+	LeafyGrass = STEP_GRASS,
+	Mud = STEP_DIRT,
+	Ground = STEP_DIRT,
+	Sand = STEP_DIRT,
+	Pebble = STEP_DIRT,
+	Rock = STEP_STONE,
+	Slate = STEP_STONE,
+	Basalt = STEP_STONE,
+	Limestone = STEP_STONE,
+	Sandstone = STEP_STONE,
+	Cobblestone = STEP_STONE,
+	Brick = STEP_STONE,
+	Concrete = STEP_STONE,
+	Granite = STEP_STONE,
+	Marble = STEP_STONE,
+	Pavement = STEP_STONE,
+	Wood = STEP_WOOD,
+	WoodPlanks = STEP_WOOD,
 } :: { [string]: string }
+-- Unlisted floors (plastic, metal...) keep this default step.
+Config.FootstepDefault = STEP
 
 Config.RemoteLimits = {
 	Default = { Rate = 10, Burst = 20 },
@@ -879,7 +896,9 @@ Config.Ambience = {
 			{ Name = "Motes", Texture = FIREFLY, Color = { 190, 150, 255 }, Rate = 6, Size = 0.3, Lifetime = 6, Speed = 0.5, LightEmission = 1, Drift = { 0, 0.3, 0 } },
 			{ Name = "Mist", Texture = SMOKE, Color = { 150, 140, 185 }, Rate = 2, Size = 9, Lifetime = 10, Speed = 0.4, LightEmission = 0, Transparency = 0.88, Low = true },
 		},
-		SoundId = "",
+		-- Crickets at night (Roblox sound library), and wind chimes now and then (WildSounds).
+		SoundId = "rbxassetid://9112764573",
+		Distant = { "WindChimes" },
 	},
 	Areas = {
 		HauntedForest = {

@@ -16,10 +16,10 @@ local Sounds = require(script.Parent.Parent.Sounds)
 
 local WildSounds = {}
 
-local function playDistant(from: Vector3)
+local function playDistant(from: Vector3, inTown: boolean)
 	local areaId = WorldLayout.areaAt(Config.Areas, Config.World, from.X, from.Z)
-	local preset = (Config.Ambience.Areas :: any)[areaId]
-	local list = preset and preset.Distant
+	local preset = if inTown then Config.Ambience.Town else (Config.Ambience.Areas :: any)[areaId]
+	local list = preset and (preset :: any).Distant
 	if not list or #list == 0 then
 		return
 	end
@@ -61,8 +61,11 @@ function WildSounds.Start()
 		local now = os.clock()
 		if now >= nextSound then
 			nextSound = now + cfg.Every[1] + math.random() * (cfg.Every[2] - cfg.Every[1])
-			if Ambience.WildWeight() > 0.6 then
-				playDistant(root.Position)
+			local wild = Ambience.WildWeight()
+			if wild > 0.6 then
+				playDistant(root.Position, false)
+			elseif wild < 0.2 then
+				playDistant(root.Position, true)
 			end
 		end
 
@@ -84,7 +87,7 @@ function WildSounds.Start()
 		end
 		lastMaterial = material
 		local id = Config.Footsteps[material.Name]
-		running.SoundId = if id and id ~= "" then id else defaults[running].Id
+		running.SoundId = if id and id ~= "" then id else Config.FootstepDefault
 	end)
 end
 
