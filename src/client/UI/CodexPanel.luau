@@ -15,6 +15,7 @@ local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local Banner = require(script.Parent.Banner)
+local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local Odds = require(script.Parent.Odds)
 local RelicViewport = require(script.Parent.RelicViewport)
@@ -56,6 +57,21 @@ local SIZE_COLORS = {
 	Huge = Color3.fromRGB(160, 210, 255),
 	Titanic = Color3.fromRGB(255, 210, 90),
 }
+
+-- The picture on a reward stamp: what the milestone gives (UI pass 2026-11-09; the stamps used to
+-- be blank or a "!").
+local function rewardIcon(milestone: Codex.Milestone): string
+	if milestone.Kind == "Frequency" then
+		return "Pulse"
+	elseif milestone.Luck > 0 then
+		return "Luck"
+	elseif milestone.Income > 0 then
+		return "CursedEnergy"
+	elseif milestone.Title then
+		return "Favorite"
+	end
+	return "Codex"
+end
 
 -- Short reward-track titles ("28 relics", "9 Demonic") instead of full goal sentences.
 local function shortGoal(milestone: Codex.Milestone): string
@@ -191,9 +207,11 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			local done = claimed[milestone.Id] ~= nil or milestone.Need == 0
 			local claimable = ready[milestone.Id] ~= nil and not done
 			local cell = UIKit.create("Frame", { LayoutOrder = index, BackgroundTransparency = 1, Parent = stamps })
+			local icon = rewardIcon(milestone)
 			local stamp = UIKit.button({
 				Name = milestone.Id,
-				Text = if claimable then "!" else "",
+				-- The reward's picture; text only if its icon is missing.
+				Text = if Icons.has(icon) then "" elseif claimable then "!" else "",
 				TextSize = 24,
 				AnchorPoint = Vector2.new(0.5, 0),
 				Position = UDim2.fromScale(0.5, 0),
@@ -207,6 +225,33 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			stamp:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(1, 0)
 			UIKit.skinButton(stamp, if claimable then "Gold" elseif done then "Buy" else "Dark")
 			stamp.TextColor3 = if claimable then colors.Panel else colors.Text
+			local picture = Icons.image(stamp, icon, STAMP - 12)
+			if picture then
+				picture.AnchorPoint = Vector2.new(0.5, 0.5)
+				picture.Position = UDim2.fromScale(0.5, 0.5)
+				-- Locked rewards show what they will give, greyed out.
+				picture.ImageTransparency = if done or claimable then 0 else 0.45
+				picture.ImageColor3 = if done or claimable then Color3.new(1, 1, 1) else Color3.fromRGB(150, 140, 160)
+			end
+			-- Corner badge: a red "!" when ready to claim, a green tick once earned.
+			if claimable or done then
+				local badge = UIKit.label({
+					Name = "Badge",
+					Text = if claimable then "!" else "✓",
+					TextSize = 14,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					TextColor3 = Color3.new(1, 1, 1),
+					BackgroundTransparency = 0,
+					BackgroundColor3 = if claimable then colors.Red else colors.Jade,
+					AnchorPoint = Vector2.new(0.5, 0.5),
+					Position = UDim2.new(1, -4, 0, 4),
+					Size = UDim2.fromOffset(18, 18),
+					ZIndex = 5,
+					Parent = stamp,
+				})
+				UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0), Parent = badge })
+				UIKit.stroke(colors.Panel, 1.5, 0).Parent = badge
+			end
 			if claimable then
 				Motion.shineLoop(stamp, 2.2)
 			end
@@ -272,11 +317,17 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 		local tierColor = UIKit.tierColor(relic.Tier)
 		local card = UIKit.create("Frame", {
 			LayoutOrder = index,
-			BackgroundColor3 = if known then colors.Card else colors.Track,
-		}, { UIKit.corner(8), UIKit.stroke(tierColor, 1.5, if known then 0.1 else 0.6) })
-		UIKit.skinCard(card)
+			ClipsDescendants = true,
+		}, { UIKit.corner(10) })
+		-- Rarity card (UI pass 2026-11-09): found relics glow in their tier colour like the Shop
+		-- cards; unfound ones stay dark with a faint tier edge.
+		local glow = UIKit.skinRarityCard(card, tierColor, not known, known and UIKit.tierShines(relic.Tier))
 		-- Huge / Titanic tabs render the relic bigger in its card (RelicViewport frames by size).
 		local box = RENDER_BOX[sizeId or "Normal"]
+		if glow then
+			glow.Position = UDim2.new(0.5, 0, 0, 4 + box.Box / 2)
+			glow.Size = UDim2.fromOffset(box.Box * 1.1, box.Box * 1.1)
+		end
 		local render = renders.Get(`{relicId}|{sizeId or ""}`, relicId, sizeId)
 		RelicViewport.refit(render, box.Fill)
 		render.AnchorPoint = Vector2.new(0.5, 0)
@@ -302,7 +353,9 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			TextSize = 16,
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			TextColor3 = if known then tierColor else colors.SubText,
+			-- White on the tinted card (the card colour now says the rarity).
+			TextColor3 = if known then colors.Text else colors.SubText,
+			TextStrokeTransparency = if known then 0.55 else 1,
 			Position = UDim2.fromOffset(4, 62 + below),
 			Size = UDim2.new(1, -8, 0, 18),
 			Parent = card,

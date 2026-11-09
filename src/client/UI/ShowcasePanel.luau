@@ -320,6 +320,39 @@ function ShowcasePanel.Start(
 		end
 	end
 
+	-- A still render of a Showcase's level-1 preview for its list tile (UI pass 2026-11-09: the list
+	-- was text only). Nil while the preview model is missing.
+	local THUMB = TILE_HEIGHT - 10
+	local function thumbnail(parent: GuiObject, id: string): ViewportFrame?
+		local folder = ReplicatedStorage:FindFirstChild("ShowcasePreviews")
+		local source = folder and folder:FindFirstChild(`{id}_1`)
+		if not source or not source:IsA("Model") then
+			return nil
+		end
+		local frame = UIKit.create("ViewportFrame", {
+			Name = "Thumb",
+			BackgroundTransparency = 1,
+			AnchorPoint = Vector2.new(0, 0.5),
+			Position = UDim2.new(0, 6, 0.5, 0),
+			Size = UDim2.fromOffset(THUMB, THUMB),
+			Ambient = Color3.fromRGB(190, 180, 210),
+			LightColor = Color3.new(1, 1, 1),
+			LightDirection = Vector3.new(-1, -1, 1),
+			Parent = parent,
+		})
+		local view = Instance.new("Camera")
+		view.FieldOfView = 40
+		view.Parent = frame
+		frame.CurrentCamera = view
+		local model = source:Clone()
+		model.Parent = frame
+		local box, size = model:GetBoundingBox()
+		local radius = math.max(size.X, size.Y, size.Z) * 0.5
+		local distance = radius / math.tan(math.rad(view.FieldOfView / 2)) * 1.05
+		view.CFrame = CFrame.lookAt(box.Position + Vector3.new(distance * 0.35, radius * 0.5, -distance), box.Position)
+		return frame
+	end
+
 	local tilesById: { [string]: TextButton } = {}
 	local function buildTiles()
 		for index, showcase in ShowcaseConfig.Showcases do
@@ -327,6 +360,7 @@ function ShowcasePanel.Start(
 			local tile = UIKit.button({
 				Name = "Tile",
 				Text = "",
+				ClipsDescendants = true,
 				Parent = holder,
 			}, function()
 				selectedId = showcase.Id
@@ -334,14 +368,18 @@ function ShowcasePanel.Start(
 				render()
 			end)
 			UIKit.fill(tile)
+			-- Room for the thumbnail is always kept; the server builds the preview models after the
+			-- client starts, so render() adds it once the model exists.
+			local left = THUMB + 12
 			UIKit.label({
 				Name = "Title",
 				Text = showcase.Name,
 				TextSize = 17,
-				TextColor3 = STYLE_COLORS[showcase.Style] or colors.Text,
+				TextColor3 = colors.Text,
+				TextStrokeTransparency = 0.55,
 				TextTruncate = Enum.TextTruncate.AtEnd,
-				Position = UDim2.fromOffset(10, 6),
-				Size = UDim2.new(1, -16, 0, 22),
+				Position = UDim2.fromOffset(left, 6),
+				Size = UDim2.new(1, -left - 6, 0, 22),
 				Parent = tile,
 			})
 			UIKit.label({
@@ -349,8 +387,8 @@ function ShowcasePanel.Start(
 				Text = "",
 				TextSize = 14,
 				TextColor3 = colors.SubText,
-				Position = UDim2.fromOffset(10, 30),
-				Size = UDim2.new(1, -16, 0, 18),
+				Position = UDim2.fromOffset(left, 30),
+				Size = UDim2.new(1, -left - 6, 0, 18),
 				Parent = tile,
 			})
 			tilesById[showcase.Id] = tile
@@ -380,15 +418,21 @@ function ShowcasePanel.Start(
 				elseif level then `Lv {level}/{maxLevel}`
 				else "Locked"
 			status.TextColor3 = if isActive then colors.Gold elseif level then colors.Text else colors.SubText
-			UIKit.skinButton(tile, "Dark")
+			-- Tinted in the Showcase's own colour (UI pass 2026-11-09): strongest when picked or
+			-- active, faint while locked.
+			local selected = id == selectedId
+			local tint = STYLE_COLORS[showcase.Style] or colors.Trim
+			UIKit.skinTintCard(tile, tint, if selected or isActive then 0.55 elseif level then 0.32 else 0.12)
 			local stroke = tile:FindFirstChildOfClass("UIStroke")
 			if stroke then
-				local selected = id == selectedId
-				stroke.Color = if selected then (STYLE_COLORS[showcase.Style] or colors.Gold) elseif isActive then colors.Gold else colors.Trim
+				stroke.Color = if selected then tint elseif isActive then colors.Gold else tint
 				stroke.Thickness = if selected then 3 else 1.5
-				stroke.Transparency = if selected or isActive then 0 else 0.55
+				stroke.Transparency = if selected or isActive then 0 elseif level then 0.35 else 0.7
 			end
-			tile.BackgroundTransparency = if level then 0 else 0.35
+			local thumb = tile:FindFirstChild("Thumb") or thumbnail(tile, id)
+			if thumb and thumb:IsA("ViewportFrame") then
+				thumb.ImageTransparency = if level then 0 else 0.5
+			end
 		end
 
 		-- Detail.

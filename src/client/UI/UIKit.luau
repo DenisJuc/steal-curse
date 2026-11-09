@@ -285,6 +285,72 @@ function UIKit.skinCard(frame: GuiObject, edge: Color3?)
 	end
 end
 
+-- Item card in its rarity colour (Codex, Backpack), the Shop card recipe: the tier tint at the top
+-- fading to ink, a bright tier edge, and a soft disc of the tint behind the relic render (returned,
+-- so the caller can place it). `dim` = not found yet: almost no tint, faint edge, no disc. `shine`
+-- adds the slow light sweep the top rarities get. Any existing UIGradient/UIStroke is replaced.
+local INK = Color3.fromRGB(18, 14, 26)
+
+-- The tinted half of the Shop card look on any frame: `tint` at the top fading to ink and a tint
+-- edge. `strength` (0..1, default 0.55) is how much of the tint the top keeps. Any existing
+-- UIGradient/UIStroke is replaced.
+function UIKit.skinTintCard(frame: GuiObject, tint: Color3, strength: number?)
+	for _, child in frame:GetChildren() do
+		if child:IsA("UIGradient") or child:IsA("UIStroke") then
+			child:Destroy()
+		end
+	end
+	-- The gradient multiplies the background, so white gives its colours exactly.
+	frame.BackgroundColor3 = Color3.new(1, 1, 1)
+	frame.BackgroundTransparency = 0
+	UIKit.create("UIGradient", {
+		Rotation = 90,
+		Color = ColorSequence.new(tint:Lerp(INK, 1 - (strength or 0.55)), INK),
+		Parent = frame,
+	})
+	UIKit.stroke(tint, 2.5, 0.05).Parent = frame
+end
+
+function UIKit.skinRarityCard(frame: GuiObject, tint: Color3, dim: boolean?, shine: boolean?): Frame?
+	if dim then
+		UIKit.skinTintCard(frame, tint, 0.08)
+		local gradient = frame:FindFirstChildOfClass("UIGradient") :: UIGradient
+		gradient.Color = ColorSequence.new(UIKit.Colors.Track:Lerp(tint, 0.08), UIKit.Colors.Track)
+		local edge = frame:FindFirstChildOfClass("UIStroke") :: UIStroke
+		edge.Thickness = 1.5
+		edge.Transparency = 0.65
+		return nil
+	end
+	UIKit.skinTintCard(frame, tint)
+	-- Two nested discs (UIGradient can't do radial): a faint halo with a brighter core reads as a
+	-- glow rather than a flat circle.
+	local disc = UIKit.create("Frame", {
+		Name = "RarityGlow",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		BackgroundColor3 = tint,
+		BackgroundTransparency = 0.85,
+		BorderSizePixel = 0,
+		ZIndex = 0,
+		Parent = frame,
+	}, {
+		UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }),
+		UIKit.create("Frame", {
+			Name = "Core",
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Position = UDim2.fromScale(0.5, 0.5),
+			Size = UDim2.fromScale(0.62, 0.62),
+			BackgroundColor3 = tint,
+			BackgroundTransparency = 0.7,
+			BorderSizePixel = 0,
+			ZIndex = 0,
+		}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) }),
+	})
+	if shine then
+		Motion.shineLoop(frame, 3.2)
+	end
+	return disc
+end
+
 -- Cost buttons: jade when you can pay, dark and refusing ("Need X more CE") when you can't.
 function UIKit.setAffordable(button: TextButton, affordable: boolean, cost: number)
 	UIKit.skinButton(button, if affordable then "Buy" else "Dark")
@@ -495,6 +561,11 @@ function UIKit.tween(instance: Instance, seconds: number, goal: Props, style: En
 	)
 	tween:Play()
 	return tween
+end
+
+-- Legendary and up get the slow shine sweep on their cards.
+function UIKit.tierShines(tierId: string): boolean
+	return (RarityConfig.IndexById[tierId] or 0) >= (RarityConfig.IndexById.Legendary or math.huge)
 end
 
 function UIKit.tierColor(tierId: string): Color3

@@ -653,16 +653,26 @@ function InventoryPanel.Start(
 		local card = UIKit.create("TextButton", {
 			Name = "Card",
 			Text = "",
-			BackgroundColor3 = colors.Card,
+			ClipsDescendants = true,
 			Parent = cell,
 		}, {
 			UIKit.corner(10),
-			UIKit.stroke(if selected then colors.Gold else strokeColor, if selected or sizeId then 3 else 2, if selected then 0 else 0.35),
-			UIKit.create("UIGradient", {
-				Rotation = 90,
-				Color = ColorSequence.new(colors.Card, strokeColor:Lerp(colors.Card, 0.7)),
-			}),
 		})
+		-- Rarity card like the Codex and Shop (UI pass 2026-11-09): tinted by the relic's colour,
+		-- shine on Legendary and up. Selected cards keep the thick gold edge; Huge/Titanic keep
+		-- their size-coloured edge.
+		local relicInfo = RelicConfig.ById[group.Id]
+		local glow = UIKit.skinRarityCard(card, color, false, relicInfo ~= nil and UIKit.tierShines(relicInfo.Tier))
+		if glow then
+			glow.Position = UDim2.new(0.5, 0, 0, 39)
+			glow.Size = UDim2.fromOffset(72, 72)
+		end
+		local edge = card:FindFirstChildOfClass("UIStroke")
+		if edge and (selected or sizeId) then
+			edge.Color = if selected then colors.Gold else strokeColor
+			edge.Thickness = 3
+			edge.Transparency = 0
+		end
 		UIKit.fill(card)
 		Motion.button(card)
 		card:SetAttribute("PopIn", true)
@@ -687,7 +697,9 @@ function InventoryPanel.Start(
 			-- One line that shrinks to fit, never cut off with "...".
 			TextScaled = true,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			TextColor3 = strokeColor,
+			-- White on the tinted card; Huge/Titanic names keep their size colour.
+			TextColor3 = if sizeId then strokeColor else colors.Text,
+			TextStrokeTransparency = 0.55,
 			Position = UDim2.fromOffset(3, 78),
 			Size = UDim2.new(1, -6, 0, 20),
 			Parent = card,

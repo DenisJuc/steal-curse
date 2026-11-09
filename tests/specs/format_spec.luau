@@ -29,6 +29,8 @@ return {
 			expect.equal(Format.odds(1 / 45), "1 in 45")
 			expect.equal(Format.odds(1 / 1.32e15), "1 in 1.32Qd")
 			expect.equal(Format.odds(0), "never")
+			-- So small that 1/p overflows: "never", not "1 in ∞".
+			expect.equal(Format.odds(1e-320), "never")
 		end,
 	},
 	{

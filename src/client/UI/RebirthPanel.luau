@@ -10,6 +10,7 @@ local BalanceTrials = require(ReplicatedStorage.Shared.BalanceTrials)
 local Config = require(ReplicatedStorage.Shared.Config)
 local Format = require(ReplicatedStorage.Shared.Format)
 local Rebirth = require(ReplicatedStorage.Shared.Rebirth)
+local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local UIKit = require(script.Parent.UIKit)
 
@@ -44,6 +45,28 @@ local CORE_BPLUS_KEEPS = {
 	"Rebirth bonuses",
 }
 
+-- The icon beside each Lose / Keep line (UI pass 2026-11-09), matched on the line's first words.
+local LINE_ICONS = {
+	{ "CE", "CursedEnergy" },
+	{ "Skill", "Upgrades" },
+	{ "Pedestal", "Pedestals" },
+	{ "Relics", "Backpack" },
+	{ "Codex", "Codex" },
+	{ "Showcase", "Pedestals" },
+	{ "Fusion", "Collection" },
+	{ "Zone mastery", "Streak" },
+	{ "Mastery", "Streak" },
+	{ "Rebirth", "Rebirth" },
+}
+local function lineIcon(line: string): string?
+	for _, pair in LINE_ICONS do
+		if string.sub(line, 1, #pair[1]) == pair[1] then
+			return pair[2]
+		end
+	end
+	return nil
+end
+
 local function listsForModel(model: string): ({ string }, { string })
 	if model == "BPlus" then
 		if BalanceTrials.coreLoopPresentation() then
@@ -71,7 +94,15 @@ function RebirthPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: 
 	local model = BalanceTrials.rebirthModel()
 	local RESETS, KEEPS = listsForModel(model)
 
-	local panelH = 620
+	-- Layout heights (content space). The panel is sized to fit them (it used to leave a big empty
+	-- band under the button).
+	local STAT_Y, STAT_H = 34, 104
+	local LIST_Y = STAT_Y + STAT_H + 12
+	local listH = 26 + 8 + math.max(#RESETS, #KEEPS) * LINE_HEIGHT + 20
+	local progressY = LIST_Y + listH + 14
+	local contentH = progressY + PROGRESS_HEIGHT + 32 + 60 + 12
+	-- Window chrome: 10 px padding top and bottom plus the 46 px header.
+	local panelH = contentH + 20 + 46
 	local panel, content = UIKit.modal(screen, "RebirthMenu", "REBIRTH", colors.Jade, Vector2.new(560, panelH), "Rebirth")
 
 	local heading = UIKit.label({
@@ -83,69 +114,90 @@ function RebirthPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: 
 		Parent = content,
 	})
 
-	local function statCard(x: number, title: string): TextLabel
+	-- A Shop-style tinted card with the thing's own icon (CE gem / luck clover) and its before ->
+	-- after value (UI pass 2026-11-09).
+	local function statCard(x: number, title: string, tint: Color3, iconKey: string): TextLabel
 		local card = UIKit.create("Frame", {
-			Position = UDim2.new(x, if x > 0 then 6 else 0, 0, 34),
-			Size = UDim2.new(0.5, -6, 0, 86),
-			BackgroundColor3 = colors.Card,
+			Position = UDim2.new(x, if x > 0 then 6 else 0, 0, STAT_Y),
+			Size = UDim2.new(0.5, -6, 0, STAT_H),
+			ClipsDescendants = true,
 			Parent = content,
-		}, { UIKit.corner(10) })
-		UIKit.skinCard(card, colors.Jade)
+		}, { UIKit.corner(12) })
+		UIKit.skinTintCard(card, tint)
+		local icon = Icons.image(card, iconKey, 62)
+		local left = 10
+		if icon then
+			icon.AnchorPoint = Vector2.new(0, 0.5)
+			icon.Position = UDim2.new(0, 10, 0.5, 0)
+			left = 80
+		end
 		UIKit.label({
 			Text = title,
 			TextSize = 18,
-			TextColor3 = colors.SubText,
+			TextColor3 = Color3.fromRGB(230, 222, 240),
 			TextXAlignment = Enum.TextXAlignment.Center,
-			Position = UDim2.fromOffset(0, 8),
-			Size = UDim2.new(1, 0, 0, 22),
+			Position = UDim2.fromOffset(left, 14),
+			Size = UDim2.new(1, -left - 8, 0, 22),
 			Parent = card,
 		})
 		return UIKit.label({
 			RichText = true,
 			TextSize = 30,
+			TextScaled = true,
+			TextStrokeTransparency = 0.5,
 			TextXAlignment = Enum.TextXAlignment.Center,
-			Position = UDim2.fromOffset(0, 36),
-			Size = UDim2.new(1, 0, 0, 38),
+			Position = UDim2.fromOffset(left, 42),
+			Size = UDim2.new(1, -left - 8, 0, 38),
 			Parent = card,
 		})
 	end
-	local incomeValue = statCard(0, "Income forever")
-	local luckValue = statCard(0.5, "Luck forever")
+	local incomeValue = statCard(0, "Income forever", colors.Gold, "CursedEnergy")
+	local luckValue = statCard(0.5, "Luck forever", colors.Accent, "Luck")
+	for _, value in { incomeValue, luckValue } do
+		UIKit.create("UITextSizeConstraint", { MaxTextSize = 30, MinTextSize = 16, Parent = value })
+	end
 
-	local listH = 26 + 8 + math.max(#RESETS, #KEEPS) * LINE_HEIGHT + 20
+	-- Lose (red) and Keep (green) cards, each line with its own icon.
 	local function list(x: number, title: string, color: Color3, lines: { string })
 		local column = UIKit.create("Frame", {
-			Position = UDim2.new(x, if x > 0 then 6 else 0, 0, 132),
+			Position = UDim2.new(x, if x > 0 then 6 else 0, 0, LIST_Y),
 			Size = UDim2.new(0.5, -6, 0, listH),
-			BackgroundColor3 = colors.Card,
 			Parent = content,
-		}, { UIKit.corner(10), UIKit.padding(10) })
-		UIKit.skinCard(column)
+		}, { UIKit.corner(12), UIKit.padding(10) })
+		UIKit.skinTintCard(column, color, 0.35)
 		UIKit.label({
 			Text = title,
-			TextSize = 21,
-			TextColor3 = color,
+			FontFace = UIKit.TitleFont,
+			TextSize = 22,
+			TextColor3 = color:Lerp(Color3.new(1, 1, 1), 0.25),
+			TextStrokeTransparency = 0.5,
 			Size = UDim2.new(1, 0, 0, 26),
 			Parent = column,
 		})
 		local mark = if color == colors.Red then "\u{00D7}" else "\u{2713}"
 		for index, line in lines do
 			local y = 34 + (index - 1) * LINE_HEIGHT
-			UIKit.label({
-				Text = mark,
-				TextSize = 20,
-				TextColor3 = color,
-				TextXAlignment = Enum.TextXAlignment.Center,
-				Position = UDim2.fromOffset(0, y),
-				Size = UDim2.fromOffset(22, LINE_HEIGHT - 4),
-				Parent = column,
-			})
+			local key = lineIcon(line)
+			local icon = if key then Icons.image(column, key, LINE_HEIGHT - 4) else nil
+			if icon then
+				icon.Position = UDim2.fromOffset(0, y)
+			else
+				UIKit.label({
+					Text = mark,
+					TextSize = 20,
+					TextColor3 = color,
+					TextXAlignment = Enum.TextXAlignment.Center,
+					Position = UDim2.fromOffset(0, y),
+					Size = UDim2.fromOffset(LINE_HEIGHT - 4, LINE_HEIGHT - 4),
+					Parent = column,
+				})
+			end
 			UIKit.label({
 				Text = line,
 				TextSize = 18,
 				TextScaled = true,
-				Position = UDim2.fromOffset(28, y + 3),
-				Size = UDim2.new(1, -28, 0, LINE_HEIGHT - 10),
+				Position = UDim2.fromOffset(LINE_HEIGHT + 2, y + 3),
+				Size = UDim2.new(1, -(LINE_HEIGHT + 2), 0, LINE_HEIGHT - 10),
 				Parent = column,
 			})
 		end
@@ -153,7 +205,6 @@ function RebirthPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: 
 	list(0, "Lose", colors.Red, RESETS)
 	list(0.5, "Keep", colors.Jade, KEEPS)
 
-	local progressY = 132 + listH + 14
 	local track = UIKit.create("Frame", {
 		Name = "Progress",
 		Position = UDim2.fromOffset(0, progressY),

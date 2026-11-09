@@ -59,7 +59,12 @@ function Format.odds(probability: number): string
 	if probability <= 0 then
 		return "never"
 	end
-	return "1 in " .. Format.number(1 / probability)
+	local oneIn = 1 / probability
+	-- A chance so small 1/p overflows (Common at very high luck) is "never", not "1 in ∞".
+	if oneIn ~= oneIn or oneIn == math.huge then
+		return "never"
+	end
+	return "1 in " .. Format.number(oneIn)
 end
 
 -- A multiplier without the "x": 1.6 -> "1.6", 2 -> "2", 1.25 -> "1.25".

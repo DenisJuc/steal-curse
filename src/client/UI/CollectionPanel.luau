@@ -10,6 +10,7 @@ local CollectionMath = require(ReplicatedStorage.Shared.CollectionMath)
 local Format = require(ReplicatedStorage.Shared.Format)
 local ProgressObjective = require(ReplicatedStorage.Shared.ProgressObjective)
 local Banner = require(script.Parent.Banner)
+local Motion = require(script.Parent.Motion)
 local RelicViewport = require(script.Parent.RelicViewport)
 local UIKit = require(script.Parent.UIKit)
 
@@ -837,6 +838,8 @@ function CollectionPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible:
 				BackgroundColor3 = colors.Card,
 				Parent = boardScroll,
 			}, { UIKit.corner(10) })
+			-- Same hover glow / click as every other button (UI pass 2026-11-09).
+			Motion.button(frame)
 			if occ then
 				UIKit.stroke(UIKit.tierColor(occ.Tier), 2, 0.15).Parent = frame
 				UIKit.skinCard(frame)
@@ -1004,6 +1007,9 @@ function CollectionPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible:
 			UIKit.stroke(strokeColor, if suggested and not locked then 2.5 else 2, if locked then 0.45 else 0.15),
 		})
 		UIKit.skinCard(card)
+		if not locked then
+			Motion.button(card)
+		end
 		if locked then
 			card.BackgroundColor3 = colors.Track
 		end
@@ -1259,6 +1265,7 @@ function CollectionPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible:
 			UIKit.stroke(if selected then colors.Gold else tierColor, if selected then 3 else 1.5, if selected then 0 else 0.25),
 		})
 		UIKit.skinCard(frame)
+		Motion.button(frame)
 		local thumb = renders.Get(card.Id, card.Id)
 		thumb.Position = UDim2.fromOffset(8, 8)
 		thumb.Size = UDim2.fromOffset(64, 64)
