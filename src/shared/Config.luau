@@ -877,17 +877,22 @@ Config.Areas = {
 -- Fall particles (rain) drop straight down as streaks (Squash stretches them).
 -- Colors are {r, g, b} 0-255 and Drift is {x, y, z} studs/s^2 (plain numbers so Lune can load Config).
 -- Low particles (mist, ash, dust) hug the ground instead of filling the camera box.
--- Lighting: the wild is night with thick fog (you barely see past your spirit lantern); the town
--- keeps MapBuilder's dusk. Exposure is Lighting.ExposureCompensation.
+-- Lighting: the wild is a moonlit night in coloured fog; the town keeps MapBuilder's dusk. Exposure
+-- is Lighting.ExposureCompensation.
+-- Readable-world pass (2026-11-09, review priority 3): the wild used to be Brightness 0.15, a
+-- near-black ambient, exposure -0.6 and thick dark fog (92% of a wild screenshot near black, a black
+-- screen on a phone). Now it is moonlight bright enough to see the ground, trees and paths, with the
+-- spookiness carried by coloured fog, the tint and the sounds instead of darkness. ClockTime matches
+-- the town (0): with 21 the town-to-wild blend swept through noon.
 local FIREFLY = "rbxasset://textures/particles/sparkles_main.dds"
 local SMOKE = "rbxasset://textures/particles/smoke_main.dds"
 local EMBER = "rbxasset://textures/particles/fire_main.dds"
 local WILD_LIGHT = {
-	ClockTime = 21,
-	Brightness = 0.15,
-	Ambient = { 12, 10, 20 },
-	OutdoorAmbient = { 16, 16, 26 },
-	Exposure = -0.6,
+	ClockTime = 0,
+	Brightness = 1.1,
+	Ambient = { 70, 76, 108 },
+	OutdoorAmbient = { 92, 98, 132 },
+	Exposure = 0.05,
 }
 Config.Ambience = {
 	TownFadeStuds = 20,
@@ -904,25 +909,30 @@ Config.Ambience = {
 	-- Random distant sounds in the wild (WildSounds): one every Every[1]..Every[2] seconds,
 	-- Distance studs away, picked from the area's Distant list.
 	DistantSounds = { Every = { 18, 40 }, Distance = { 40, 90 } },
-	-- A spirit pulse lifts the wild fog toward these values, then it rolls back in.
-	Reveal = { Density = 0.38, Brightness = 1.1, Exposure = 0.1, RiseSeconds = 0.2, Seconds = 2.6 },
+	-- A spirit pulse lifts the wild fog toward these values, then it rolls back in (kept clearly
+	-- brighter than the wild's own light so a pulse still visibly opens the view).
+	Reveal = { Density = 0.22, Brightness = 1.9, Exposure = 0.45, RiseSeconds = 0.2, Seconds = 2.6 },
 	-- The spirit lantern every character carries in the wild (SpiritLantern).
-	Lantern = { Range = 22, Brightness = 1.8, Color = { 170, 225, 255 }, Shadows = true },
+	Lantern = { Range = 26, Brightness = 1.8, Color = { 170, 225, 255 }, Shadows = true },
+	-- Phones and tablets (Settings.IsTouchDevice) get this much extra exposure everywhere: a small
+	-- screen at low brightness in daylight loses the dark half of the picture first.
+	TouchExposure = 0.25,
 	-- The veil (WildVeil): rings of darkness just past the town edge, seen only from the town side,
-	-- so the wild is black from outside. Each layer sits Offset studs past WildInner; SolidUntil is
+	-- so the wild is a wall of dark mist from outside. Each layer sits Offset studs past WildInner; SolidUntil is
 	-- the share of Height that is fully dark before it fades up into the sky. Mist: dark smoke
 	-- rolling along the edge. Everything fades away as you step into the wild.
 	Veil = {
 		Segments = 72,
 		Height = 150,
 		SolidUntil = 0.6,
-		Color = { 4, 3, 8 },
+		-- A deep violet like the fog rather than black, so the town's edge reads as mist, not a hole.
+		Color = { 30, 24, 50 },
 		Layers = {
 			{ Offset = 3, Opacity = 0.5 },
 			{ Offset = 12, Opacity = 0.8 },
 			{ Offset = 24, Opacity = 1 },
 		},
-		Mist = { Offset = 8, Emitters = 48, Rate = 1.5, Size = 28, Color = { 10, 8, 16 } },
+		Mist = { Offset = 8, Emitters = 48, Rate = 1.5, Size = 28, Color = { 44, 36, 70 } },
 		-- The dark lid over the wild (seen when zoomed out above the rings) reaches this far past
 		-- the wild's outer edge.
 		LidBeyond = 80,
@@ -933,7 +943,8 @@ Config.Ambience = {
 	-- lights and a small uplight (PedestalVisuals). The fill comes from this ambient, not from big
 	-- lights: overlapping large PointLights make Roblox drop lights in blocky patches.
 	Town = {
-		Atmosphere = { Density = 0.3, Offset = 0.15, Haze = 1.4, Color = { 72, 54, 104 }, Decay = { 40, 24, 62 } },
+		-- Lighter violet sky/fog colours (2026-11-09) so the sky over the street is a night sky, not black.
+		Atmosphere = { Density = 0.3, Offset = 0.15, Haze = 1.4, Color = { 100, 80, 140 }, Decay = { 60, 42, 92 } },
 		Lighting = {
 			ClockTime = 0,
 			Brightness = 1.8,
@@ -954,7 +965,7 @@ Config.Ambience = {
 	},
 	Areas = {
 		HauntedForest = {
-			Atmosphere = { Density = 0.8, Offset = 0.25, Haze = 2.8, Color = { 38, 52, 50 }, Decay = { 14, 24, 22 } },
+			Atmosphere = { Density = 0.5, Offset = 0.2, Haze = 1.6, Color = { 78, 112, 118 }, Decay = { 44, 70, 80 } },
 			Lighting = WILD_LIGHT,
 			Tint = { 225, 255, 238 },
 			Saturation = -0.05,
@@ -967,7 +978,7 @@ Config.Ambience = {
 			Distant = { "DistantWhisper", "BranchSnap", "DistantHowl" },
 		},
 		AbandonedVillage = {
-			Atmosphere = { Density = 0.78, Offset = 0.25, Haze = 2.6, Color = { 56, 42, 38 }, Decay = { 26, 14, 12 } },
+			Atmosphere = { Density = 0.5, Offset = 0.2, Haze = 1.6, Color = { 120, 92, 84 }, Decay = { 70, 46, 44 } },
 			Lighting = WILD_LIGHT,
 			Tint = { 255, 236, 220 },
 			Saturation = -0.1,
@@ -979,7 +990,7 @@ Config.Ambience = {
 			Distant = { "BellToll", "DistantWhisper", "BranchSnap" },
 		},
 		AncientRuins = {
-			Atmosphere = { Density = 0.76, Offset = 0.25, Haze = 2.4, Color = { 40, 44, 66 }, Decay = { 16, 16, 32 } },
+			Atmosphere = { Density = 0.48, Offset = 0.2, Haze = 1.5, Color = { 86, 96, 140 }, Decay = { 48, 52, 92 } },
 			Lighting = WILD_LIGHT,
 			Tint = { 230, 236, 255 },
 			Saturation = 0.05,

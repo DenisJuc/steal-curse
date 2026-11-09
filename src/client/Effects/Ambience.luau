@@ -3,6 +3,7 @@
 -- around the camera (fireflies, embers, glyphs, mist) and optional looping sounds follow the area
 -- you stand in. Inside a blend zone the two neighbouring areas mix by WorldLayout.areaAt weight;
 -- leaving the town fades from the Town preset over TownFadeStuds. Low effects: no particles.
+-- Touch devices get Config.Ambience.TouchExposure on top, so phones at low brightness still read.
 
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
@@ -276,6 +277,8 @@ function Ambience.Start()
 	local weights: { [string]: number } = { Town = 1 }
 	local elapsed = CHECK_SECONDS
 	local storm = Config.Ambience.Lightning
+	-- Phones and tablets get extra exposure (Config.Ambience.TouchExposure).
+	local touch = Settings.IsTouchDevice()
 
 	local function retarget(position: Vector3)
 		weights = weightsAt(position)
@@ -369,6 +372,7 @@ function Ambience.Start()
 		Lighting.Ambient = look.Ambient
 		Lighting.OutdoorAmbient = look.OutdoorAmbient:Lerp(rgb(storm.Ambient), flash)
 		Lighting.ExposureCompensation = lerp(look.Exposure, math.max(look.Exposure, reveal.Exposure), math.max(lift, flash))
+			+ (if touch then Config.Ambience.TouchExposure else 0)
 		tint.TintColor = look.Tint
 		tint.Saturation = look.Saturation
 

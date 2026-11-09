@@ -571,31 +571,46 @@ local function buildTown(folder: Instance)
 	dressTown(folder, paths)
 end
 
+local groundParams = RaycastParams.new()
+groundParams.FilterType = Enum.RaycastFilterType.Include
+groundParams.IgnoreWater = true
+
+-- Terrain surface height at (x, z), so props stand on the ground instead of sinking into bumps.
+local function groundY(x: number, z: number): number
+	groundParams.FilterDescendantsInstances = { workspace.Terrain }
+	local hit = workspace:Raycast(Vector3.new(x, GROUND_TOP + 40, z), Vector3.new(0, -(GROUND_TOP + 40 - GROUND_BOTTOM), 0), groundParams)
+	return if hit then hit.Position.Y else 0
+end
+
 local function buildPaths(terrain: Terrain, folder: Instance)
 	local world = Config.World
 	buildTown(folder)
 	for _, area in Config.Areas do
 		strip(terrain, area.AngleDegrees, world.WildInner, world.WildOuter, PATH_WIDTH, look(area.Id).Path)
 		-- Glowing stones lead from the town edge into the wild, then sparser all the way to the edge
-		-- (in the dark they are how you find the path back).
+		-- (in the dark they are how you find the path back). Readable-world pass (2026-11-09): bigger
+		-- and every 20 studs instead of 28, so the line of them reads from far off on a phone.
 		local ux, uz = WorldLayout.polar(area.AngleDegrees, 1)
 		local side = Vector3.new(-uz, 0, ux) * (PATH_WIDTH / 2 + 1)
 		local distances = {}
 		for distance = world.WildInner + 2, world.WildInner + 30, 16 do
 			table.insert(distances, distance)
 		end
-		for distance = world.WildInner + 58, world.WildOuter - 10, 28 do
+		for distance = world.WildInner + 50, world.WildOuter - 10, 20 do
 			if not WorldLayout.inStream(world, distance, 0, 8) then
 				table.insert(distances, distance)
 			end
 		end
 		for _, distance in distances do
-			local point = Vector3.new(ux, 0, uz) * distance + Vector3.new(0, 0.3, 0)
+			local point = Vector3.new(ux, 0, uz) * distance
 			for _, sign in { -1, 1 } do
+				-- On the terrain surface: at a fixed height two out of three were buried in the ground.
+				local spot = point + side * sign
+				local stone = Vector3.new(spot.X, groundY(spot.X, spot.Z) + 0.3, spot.Z)
 				BuildUtil.decor(BuildUtil.part(folder, {
 					Name = "PathGlow",
-					Size = Vector3.new(0.8, 0.6, 0.8),
-					CFrame = CFrame.new(point + side * sign) * CFrame.Angles(0, math.rad(45), 0),
+					Size = Vector3.new(1.3, 0.9, 1.3),
+					CFrame = CFrame.new(stone) * CFrame.Angles(0, math.rad(45), 0),
 					Material = Enum.Material.Neon,
 					Color = PATH_GLOW,
 				}))
@@ -698,17 +713,6 @@ local function addCircle(hash: { [string]: { Circle } }, circle: Circle)
 		hash[key] = list
 	end
 	table.insert(list, circle)
-end
-
-local groundParams = RaycastParams.new()
-groundParams.FilterType = Enum.RaycastFilterType.Include
-groundParams.IgnoreWater = true
-
--- Terrain surface height at (x, z), so props stand on the ground instead of sinking into bumps.
-local function groundY(x: number, z: number): number
-	groundParams.FilterDescendantsInstances = { workspace.Terrain }
-	local hit = workspace:Raycast(Vector3.new(x, GROUND_TOP + 40, z), Vector3.new(0, -(GROUND_TOP + 40 - GROUND_BOTTOM), 0), groundParams)
-	return if hit then hit.Position.Y else 0
 end
 
 -- Small stone clusters (3-6 decor parts each) so the ground is not bare between props.

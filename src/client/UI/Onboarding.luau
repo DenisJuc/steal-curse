@@ -939,11 +939,14 @@ function Onboarding.Start(screen: ScreenGui)
 			startTips()
 		end
 	end
-	-- First walk into the wild while Spirit Sight is still locked (once a session).
+	-- First walk into the wild while Spirit Sight is still locked (once a session). Never around the
+	-- intro hunt: its glade counts as wild, and Spirit Sight opens as the intro ends (IntroDone is set
+	-- a moment before the unlock lands, so it is checked too, not only the unlock).
 	task.spawn(function()
 		while not triggered.WildEntry do
 			task.wait(1)
-			if HudUnlocks.IsReady() and not HudUnlocks.IsUnlocked("Hunt") and Ambience.WildWeight() >= WILD_AT then
+			local intro = player:GetAttribute("IntroPending") == true or player:GetAttribute("IntroDone") == true
+			if not intro and HudUnlocks.IsReady() and not HudUnlocks.IsUnlocked("Hunt") and Ambience.WildWeight() >= WILD_AT then
 				fire("WildEntry")
 			elseif HudUnlocks.IsReady() and HudUnlocks.IsUnlocked("Hunt") then
 				-- Spirit Sight is open: the sealing tutorial covers the wild from here.
