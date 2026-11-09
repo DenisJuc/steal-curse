@@ -2,7 +2,8 @@
 --   Distant sounds: now and then, while you are in the wild, one of your area's Distant sounds
 --   (Config.Ambience.Areas.<id>.Distant) plays from somewhere out in the fog.
 --   Footsteps: the character's running sound follows the floor material (Config.Footsteps), at
---   Config.FootstepVolumeScale of Roblox's volume, and speeds up while sprinting.
+--   Config.FootstepVolumeScale of Roblox's volume, and speeds up with your speed (sprint, Spirit
+--   Lane; Config.FootstepPace).
 -- Entries with an empty id stay silent / keep Roblox's default step.
 
 local Players = game:GetService("Players")
@@ -78,7 +79,8 @@ function WildSounds.Start()
 		end
 		local base = character:GetAttribute("BaseWalkSpeed")
 		local pace = if typeof(base) == "number" and base > 0 then humanoid.WalkSpeed / base else 1
-		running.PlaybackSpeed = defaults[running].Speed * math.clamp(pace, 1, Config.Sprint.Multiplier)
+		local rate = math.min(math.max(pace, 1) ^ Config.FootstepPace.Exponent, Config.FootstepPace.MaxRate)
+		running.PlaybackSpeed = defaults[running].Speed * rate
 
 		local material = humanoid.FloorMaterial
 		if material == lastMaterial or material == Enum.Material.Air then

@@ -160,25 +160,23 @@ Config.Sounds = {
 }
 
 -- Footstep sound per floor material (Enum.Material name; WildSounds swaps the character's running
--- sound). Missing = Roblox's default step. Back to the original single step on 2026-11-09
--- (Rosselle preferred it over the per-surface sets). FootstepVolumeScale multiplies the Running
--- sound: 0.25 = a quarter of Roblox's default.
-local STEP = "rbxassetid://92061301674605"
+-- sound). Missing = Roblox's default step. 2026-11-09: the original soft step (Rosselle's pick)
+-- sounds like grass, so only soft ground uses it; stone, tiles, wood, glass and the rest keep
+-- Roblox's own harder step. FootstepVolumeScale multiplies the Running sound: 0.25 = a quarter of
+-- Roblox's default.
+local STEP_SOFT = "rbxassetid://92061301674605"
 Config.FootstepVolumeScale = 0.25
 Config.Footsteps = {
-	Grass = STEP,
-	LeafyGrass = STEP,
-	Mud = STEP,
-	Ground = STEP,
-	Rock = STEP,
-	Slate = STEP,
-	Basalt = STEP,
-	Limestone = STEP,
-	Sandstone = STEP,
-	Cobblestone = STEP,
-	Wood = STEP,
-	WoodPlanks = STEP,
+	Grass = STEP_SOFT,
+	LeafyGrass = STEP_SOFT,
+	Mud = STEP_SOFT,
+	Ground = STEP_SOFT,
+	Sand = STEP_SOFT,
+	Snow = STEP_SOFT,
 } :: { [string]: string }
+-- How much quicker the steps get with speed: PlaybackSpeed follows (speed / walk speed) ^ this,
+-- up to MaxRate, so sprinting and the Spirit Lane boost both sound faster without a chipmunk pitch.
+Config.FootstepPace = { Exponent = 0.75, MaxRate = 2.4 }
 
 Config.RemoteLimits = {
 	Default = { Rate = 10, Burst = 20 },
@@ -1027,11 +1025,12 @@ Config.Hub = {
 	-- Hub kiosks open a menu through a proximity prompt. At = {x, z} in hub space; each counter
 	-- faces the plaza's middle line. Prop: optional map prop beside the counter (MapPropConfig).
 	Kiosks = {
-		{ Menu = "Codex", Label = "Codex Archive", At = { -64, -27 }, Prop = "CodexLectern" },
-		{ Menu = "Skills", Label = "Rune Monolith", At = { -64, -9 }, Prop = "RuneMonolith" },
-		{ Menu = "Wardrobe", Label = "Spirit Wardrobe", At = { -64, 27 } },
-		{ Menu = "Relics", Label = "Relic Keeper", At = { 64, -12 } },
-		{ Menu = "Bounties", Label = "Bounty Board", At = { 64, 12 } },
+		-- 2026-11-09: spread evenly (they crowded each other with the props beside them).
+		{ Menu = "Codex", Label = "Codex Archive", At = { -64, -32 }, Prop = "CodexLectern" },
+		{ Menu = "Skills", Label = "Rune Monolith", At = { -64, 0 }, Prop = "RuneMonolith" },
+		{ Menu = "Wardrobe", Label = "Spirit Wardrobe", At = { -64, 32 } },
+		{ Menu = "Relics", Label = "Relic Keeper", At = { 64, -16 } },
+		{ Menu = "Bounties", Label = "Bounty Board", At = { 64, 16 } },
 	},
 	-- Leaderboard tablets beside the street mouth, facing down the street (hub space {x, z}).
 	Leaderboards = { Seals = { -40, -34 }, Rarest = { 40, -34 } },

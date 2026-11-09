@@ -284,9 +284,14 @@ end
 
 -- Paved strip between two ground points (x, z): a flagstone slab with low dark kerbs. Ends are
 -- padded so bends join without gaps.
+-- Consecutive slabs overlap at bends: every other one sits a hair lower so the two flagstone tops
+-- never share a plane (that flickered as the camera moved).
+local paveCount = 0
 local function pave(folder: Instance, a: { number }, b: { number }, width: number)
-	local from = Vector3.new(a[1], PAVE_TOP - 0.3, a[2])
-	local to = Vector3.new(b[1], PAVE_TOP - 0.3, b[2])
+	paveCount += 1
+	local drop = (paveCount % 2) * 0.04
+	local from = Vector3.new(a[1], PAVE_TOP - 0.3 - drop, a[2])
+	local to = Vector3.new(b[1], PAVE_TOP - 0.3 - drop, b[2])
 	local length = (to - from).Magnitude
 	if length < 0.5 then
 		return

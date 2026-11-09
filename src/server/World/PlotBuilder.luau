@@ -31,6 +31,8 @@ local SEAL_GLOW = Color3.fromRGB(150, 80, 255)
 local CIRCLE_CENTER = { 0, -10 }
 
 local FLOOR_TOP = 1.2
+-- Width of the paved path from the gate to the front cross lane.
+local PATH_W = 10
 local WALL_H = 8
 -- Front wall (the street side) is a low fence so the relics show from Shrine Street.
 local FRONT_H = 3
@@ -50,8 +52,9 @@ local function buildCollectPad(model: Model, at: (number, number, number) -> CFr
 	-- Diamond seal plate (a square turned 45 degrees) under the disc: four gold points show.
 	local plate = BuildUtil.part(model, {
 		Name = "CollectBase",
+		-- Top at FLOOR_TOP + 0.2, clear of the lane top (+0.15): flush faces flickered.
 		Size = Vector3.new(size * 0.8, 0.16, size * 0.8),
-		CFrame = at(x, FLOOR_TOP + 0.08, z) * CFrame.Angles(0, math.rad(45), 0),
+		CFrame = at(x, FLOOR_TOP + 0.12, z) * CFrame.Angles(0, math.rad(45), 0),
 		Material = Enum.Material.Metal,
 		Color = PAD_GOLD,
 	})
@@ -79,8 +82,9 @@ local function buildCollectPad(model: Model, at: (number, number, number) -> CFr
 	local to = pedestalX - (if pedestalX > x then 2.75 else -2.75)
 	BuildUtil.decor(BuildUtil.part(model, {
 		Name = "CollectLink",
+		-- Between the floor top (+0.06) and the lane top (+0.15), touching neither.
 		Size = Vector3.new(math.abs(to - from), 0.06, 0.5),
-		CFrame = at((from + to) / 2, FLOOR_TOP + 0.03, z),
+		CFrame = at((from + to) / 2, FLOOR_TOP + 0.08, z),
 		Material = Enum.Material.Metal,
 		Color = PAD_GOLD,
 	}))
@@ -380,8 +384,11 @@ local function buildCourtyardFloor(parent: Instance, at: (number, number, number
 	-- Dark border frame
 	local border = 2.4
 	local bH = 0.16
+	-- The front strip leaves a gap for the gate path (PATH_W) so the two don't overlap.
+	local frontPiece = (size - 2 - PATH_W) / 2
 	local frames = {
-		{ Vector3.new(size - 2, bH, border), at(0, FLOOR_TOP + bH / 2, -half + border / 2 + 1) },
+		{ Vector3.new(frontPiece, bH, border), at(-(PATH_W + frontPiece) / 2, FLOOR_TOP + bH / 2, -half + border / 2 + 1) },
+		{ Vector3.new(frontPiece, bH, border), at((PATH_W + frontPiece) / 2, FLOOR_TOP + bH / 2, -half + border / 2 + 1) },
 		{ Vector3.new(size - 2, bH, border), at(0, FLOOR_TOP + bH / 2, half - border / 2 - 1) },
 		{ Vector3.new(border, bH, size - border * 2 - 2), at(-half + border / 2 + 1, FLOOR_TOP + bH / 2, 0) },
 		{ Vector3.new(border, bH, size - border * 2 - 2), at(half - border / 2 - 1, FLOOR_TOP + bH / 2, 0) },
@@ -412,16 +419,19 @@ local function buildCourtyardFloor(parent: Instance, at: (number, number, number
 	for _, side in { -1, 1 } do
 		path("Lane", laneW, back - front + laneW, side * plots.PadX, (front + back) / 2)
 	end
-	local span = plots.PadX * 2 + laneW
+	-- Cross lanes only fill the gap between the two lanes: overlapping corners had two cobblestone
+	-- tops at the same height, which flickered as the camera moved.
+	local span = plots.PadX * 2 - laneW
 	path("LaneFront", span, laneW, 0, front)
 	path("LaneBack", span, laneW, 0, back)
 	local gateZ = -half + 2
-	path("Path", 10, front - laneW / 2 - gateZ, 0, (gateZ + front - laneW / 2) / 2)
+	path("Path", PATH_W, front - laneW / 2 - gateZ, 0, (gateZ + front - laneW / 2) / 2)
 end
 
 -- Reflecting pool between the lanes: a basalt kerb around dark violet water with a few floating
 -- paper lanterns (neon, no lights: many overlapping lights drop in blocky patches).
-local POOL_WATER = Color3.fromRGB(28, 18, 52)
+-- Deep blue-violet: the old (28, 18, 52) read as a black hole in the floor at night.
+local POOL_WATER = Color3.fromRGB(46, 66, 112)
 local function buildPool(parent: Instance, at: (number, number, number) -> CFrame)
 	local plots = Config.Plots
 	local w = plots.PoolHalfWidth * 2
@@ -449,32 +459,15 @@ local function buildPool(parent: Instance, at: (number, number, number) -> CFram
 		local long = spec[1] == kerbT
 		BuildUtil.part(model, {
 			Name = "Kerb",
-			Size = if long then Vector3.new(kerbT, kerbH, depth) else Vector3.new(w, kerbH, kerbT),
+			-- Long sides stop at the short ones (no doubled corner tops).
+			Size = if long then Vector3.new(kerbT, kerbH, depth - kerbT * 2) else Vector3.new(w, kerbH, kerbT),
 			CFrame = at(spec[3], FLOOR_TOP + kerbH / 2, cz + spec[2]),
 			Material = Enum.Material.Basalt,
 			Color = WALL_PILLAR,
 		})
 	end
-	-- Floating lanterns, staggered down the pool.
-	for i, spot in { { -2.2, 0.16 }, { 2.0, 0.38 }, { -1.6, 0.62 }, { 2.3, 0.86 } } do
-		local lz = z0 + kerbT + spot[2] * (depth - kerbT * 2)
-		local turn = CFrame.Angles(0, math.rad(i * 37), 0)
-		BuildUtil.decor(BuildUtil.part(model, {
-			Name = "FloatLantern",
-			Size = Vector3.new(0.8, 0.7, 0.8),
-			CFrame = at(spot[1], FLOOR_TOP + 0.9, lz) * turn,
-			Material = Enum.Material.Neon,
-			Color = Color3.fromRGB(150, 86, 40),
-			Transparency = 0.35,
-		}))
-		BuildUtil.decor(BuildUtil.part(model, {
-			Name = "FloatLanternCap",
-			Size = Vector3.new(1.3, 0.18, 1.3),
-			CFrame = at(spot[1], FLOOR_TOP + 1.34, lz) * turn,
-			Material = Enum.Material.Wood,
-			Color = WOOD,
-		}))
-	end
+	-- (The four floating lanterns were removed on 2026-11-09: from above they read as stray red
+	-- squares.)
 	model.Parent = parent
 end
 
@@ -487,13 +480,14 @@ local function buildWalls(parent: Instance, at: (number, number, number) -> CFra
 
 	local walls = {
 		-- Back
-		{ Vector3.new(size, WALL_H, t), at(0, FLOOR_TOP + WALL_H / 2, half - t / 2) },
+		-- (Back and front walls stop at the side walls: overlapping corners flickered.)
+		{ Vector3.new(size - t * 2, WALL_H, t), at(0, FLOOR_TOP + WALL_H / 2, half - t / 2) },
 		-- Sides
 		{ Vector3.new(t, WALL_H, size), at(-half + t / 2, FLOOR_TOP + WALL_H / 2, 0) },
 		{ Vector3.new(t, WALL_H, size), at(half - t / 2, FLOOR_TOP + WALL_H / 2, 0) },
 		-- Front wings (gate gap in the middle)
-		{ Vector3.new(wing, FRONT_H, t), at(-(GATE_GAP / 2 + wing / 2), FLOOR_TOP + FRONT_H / 2, -half + t / 2) },
-		{ Vector3.new(wing, FRONT_H, t), at(GATE_GAP / 2 + wing / 2, FLOOR_TOP + FRONT_H / 2, -half + t / 2) },
+		{ Vector3.new(wing - t, FRONT_H, t), at(-(GATE_GAP / 2 + (wing - t) / 2), FLOOR_TOP + FRONT_H / 2, -half + t / 2) },
+		{ Vector3.new(wing - t, FRONT_H, t), at(GATE_GAP / 2 + (wing - t) / 2, FLOOR_TOP + FRONT_H / 2, -half + t / 2) },
 	}
 	for _, wall in walls do
 		BuildUtil.part(parent, {
@@ -508,7 +502,7 @@ local function buildWalls(parent: Instance, at: (number, number, number) -> CFra
 	-- Capstones
 	local capH = 0.32
 	local caps = {
-		{ Vector3.new(size, capH, t + 0.25), at(0, FLOOR_TOP + WALL_H + capH / 2, half - t / 2) },
+		{ Vector3.new(size - (t + 0.25) * 2, capH, t + 0.25), at(0, FLOOR_TOP + WALL_H + capH / 2, half - t / 2) },
 		{ Vector3.new(t + 0.25, capH, size), at(-half + t / 2, FLOOR_TOP + WALL_H + capH / 2, 0) },
 		{ Vector3.new(t + 0.25, capH, size), at(half - t / 2, FLOOR_TOP + WALL_H + capH / 2, 0) },
 		{ Vector3.new(wing, capH, t + 0.25), at(-(GATE_GAP / 2 + wing / 2), FLOOR_TOP + FRONT_H + capH / 2, -half + t / 2) },
@@ -616,14 +610,16 @@ end
 -- (they sit on the floor and path, inside the pedestal daises) with rune marks between them.
 local function buildSealCircle(parent: Instance, at: (number, number, number) -> CFrame)
 	local cx, cz = CIRCLE_CENTER[1], CIRCLE_CENTER[2]
-	local function ring(name: string, radius: number, count: number, width: number, gap: number, transparency: number)
+	local function ring(name: string, radius: number, count: number, width: number, gap: number, transparency: number, lift: number)
 		local length = 2 * math.pi * radius / count - gap
 		for i = 1, count do
 			local angle = (i - 0.5) / count * math.pi * 2
 			BuildUtil.decor(BuildUtil.part(parent, {
 				Name = name,
 				Size = Vector3.new(length, 0.1, width),
-				CFrame = at(cx + math.cos(angle) * radius, FLOOR_TOP + 0.2, cz + math.sin(angle) * radius)
+				-- Neighbouring segments overlap at their corners: stagger them (and each ring) a
+				-- little in height so no two glowing tops share a plane.
+				CFrame = at(cx + math.cos(angle) * radius, FLOOR_TOP + lift + (i % 2) * 0.03, cz + math.sin(angle) * radius)
 					* CFrame.Angles(0, -angle + math.pi / 2, 0),
 				Material = Enum.Material.Neon,
 				Color = SEAL_GLOW,
@@ -632,9 +628,9 @@ local function buildSealCircle(parent: Instance, at: (number, number, number) ->
 		end
 	end
 	-- Clear of the pedestal daises (inside) and the Showcase podium (outside).
-	ring("SealRing", 31, 44, 0.5, 0.05, 0.3)
-	ring("SealRing", 29.4, 40, 0.25, 0.05, 0.45)
-	ring("SealRune", 30.2, 16, 0.6, 10.3, 0.15)
+	ring("SealRing", 31, 44, 0.5, 0.05, 0.3, 0.2)
+	ring("SealRing", 29.4, 40, 0.25, 0.05, 0.45, 0.2)
+	ring("SealRune", 30.2, 16, 0.6, 10.3, 0.15, 0.28)
 end
 
 local function buildResonatorTerrace(parent: Instance, at: (number, number, number) -> CFrame)
