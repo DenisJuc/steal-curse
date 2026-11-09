@@ -8,14 +8,13 @@
 -- favorites live in the Relics menu.
 -- The client only sends intents; the server validates costs and pushes the new state back on
 -- ShrineState.
--- Buying levels: the header's x1 / x10 / Max toggle picks what every row's single price button
--- buys (one level, ten levels, or as many as the current CE affords).
+-- Buying levels: each row's price button buys one level (the x1 / x10 / Max toggle was removed on
+-- 2026-11-09).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage.Shared.Config)
-local Economy = require(ReplicatedStorage.Shared.Economy)
 local Format = require(ReplicatedStorage.Shared.Format)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
 local Icons = require(script.Parent.Icons)
@@ -34,7 +33,6 @@ local PANEL_WIDTH = 580
 local LIST_TOP = 96
 local ROW2_Y = 42
 local ROW2_HEIGHT = 44
-local BUY_MODES = { { Id = "One", Text = "x1" }, { Id = "Ten", Text = "x10" }, { Id = "Max", Text = "Max" } }
 local CARD_HEIGHT = 116
 local LOCKED_CARD_HEIGHT = 84
 local THUMB = 88
@@ -207,17 +205,6 @@ function ShrinePanel.Start(
 	refreshAutoEquip()
 
 	local refreshAffordability: () -> ()
-	-- x1 / x10 / Max: what each row's price button buys.
-	local modeBar = UIKit.tabBar(content, BUY_MODES, buyMode, function(id)
-		buyMode = id
-		refreshAffordability()
-	end, {
-		Name = "BuyMode",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -4, 0, ROW2_Y),
-		Size = UDim2.fromOffset(204, ROW2_HEIGHT),
-	})
-	modeBar.ZIndex = 2
 
 	local slotsFrame = UIKit.scrollList(content, 8)
 	slotsFrame.Name = "Slots"
@@ -230,16 +217,8 @@ function ShrinePanel.Start(
 			UIKit.setAffordable(entry.Button, ce + 1e-9 >= entry.Cost, entry.Cost)
 		end
 		for _, entry in upgradeButtons do
-			local levels, cost = 1, entry.OneCost
-			if buyMode == "Ten" then
-				levels, cost = Economy.bulkUpgrades(Config.Economy, entry.Level, 10)
-			elseif buyMode == "Max" then
-				levels, cost = Economy.maxAffordableUpgrades(Config.Economy, entry.Level, ce)
-				if levels < 1 then
-					levels, cost = 1, entry.OneCost
-				end
-			end
-			UIKit.setPrice(entry.Button, `+{levels} Lv`, cost)
+			local cost = entry.OneCost
+			UIKit.setPrice(entry.Button, "+1 Lv", cost)
 			UIKit.setAffordable(entry.Button, ce + 1e-9 >= cost, cost)
 		end
 	end
@@ -315,7 +294,7 @@ function ShrinePanel.Start(
 			onChoose(slotNumber)
 		end)
 		if slot.Id then
-			RelicViewport.new(slot.Id, { ZIndex = 1 }).Parent = thumb
+			RelicViewport.new(slot.Id, { ZIndex = 1 }, slot.Size).Parent = thumb
 		else
 			UIKit.label({
 				Text = "+",

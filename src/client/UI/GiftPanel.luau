@@ -165,8 +165,12 @@ function GiftPanel.Start(
 			Parent = card,
 		}, function()
 			local ok, message = pcall(ClaimPlaytimeGift.InvokeServer, ClaimPlaytimeGift, index)
-			Toasts.Show(if ok and type(message) == "string" then message else "Try again in a moment.")
-			if ok and type(message) == "string" and string.find(message, "Gift", 1, true) == 1 then
+			local gotGift = ok and type(message) == "string" and string.find(message, "Gift", 1, true) == 1
+			-- A claim plays its sound and flash; only problems get a toast.
+			if not gotGift then
+				Toasts.Show(if ok and type(message) == "string" then message else "Try again in a moment.")
+			end
+			if gotGift then
 				Sounds.Play("Collect")
 				Motion.flash(card, colors.Gold, 0.2)
 			end

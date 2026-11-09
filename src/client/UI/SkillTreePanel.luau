@@ -508,8 +508,13 @@ function SkillTreePanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible
 				refreshAll()
 				if action == "Buy" then
 					celebrate(before)
-					local node = selected and nodes[selected]
-					if node and (ranks[selected :: string] or 0) <= (before[selected :: string] or 0) then
+					local rose = false
+					for id, rank in ranks do
+						if rank > (before[id] or 0) then
+							rose = true
+						end
+					end
+					if not rose then
 						Motion.deny(buyButton)
 						if type(result.Message) == "string" then
 							Toasts.Show(result.Message)

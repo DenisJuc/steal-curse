@@ -13,12 +13,16 @@ local RelicViewport = {}
 
 local VIEW_ANGLE = CFrame.Angles(math.rad(-12), math.rad(28), 0)
 
--- Points the viewport camera at `part` so its longest side fills the frame.
-local function frame(viewport: ViewportFrame, part: BasePart)
+-- How much of the frame the relic fills, by size (2026-11-09: the camera used to fit every model
+-- the same way, so a Titanic looked no bigger than a Normal one). Titanic spills past the edges.
+local FILL = { Normal = 0.72, Huge = 0.95, Titanic = 1.2 }
+
+-- Points the viewport camera at `part` so it fills `fill` of the frame.
+local function frame(viewport: ViewportFrame, part: BasePart, fill: number?)
 	local camera = viewport.CurrentCamera or Instance.new("Camera")
 	camera.FieldOfView = 30
 	local size = part.Size.Magnitude
-	local distance = size / (2 * math.tan(math.rad(camera.FieldOfView / 2))) * 1.05
+	local distance = size / (2 * math.tan(math.rad(camera.FieldOfView / 2))) * 1.05 * 0.95 / (fill or FILL.Normal)
 	camera.CFrame = CFrame.lookAt(part.Position + Vector3.new(0, size * 0.12, distance), part.Position)
 	camera.Parent = viewport
 	viewport.CurrentCamera = camera
@@ -48,7 +52,8 @@ function RelicViewport.show(viewport: ViewportFrame, relicId: string, sizeId: st
 			child:Destroy()
 		end
 	end
-	local part = RelicModels.build(relicId, VIEW_ANGLE, SizeConfig.scaleOf(sizeId))
+	local scale = SizeConfig.scaleOf(sizeId)
+	local part = RelicModels.build(relicId, VIEW_ANGLE, scale)
 	if part and part:GetAttribute("ModelNeeded") then
 		-- No model yet: a dark silhouette tinted with the rarity color reads as "relic", not as a
 		-- white block.
@@ -59,7 +64,7 @@ function RelicViewport.show(viewport: ViewportFrame, relicId: string, sizeId: st
 	end
 	if part then
 		part.Parent = viewport
-		frame(viewport, part)
+		frame(viewport, part, FILL[SizeConfig.normalize(sizeId) or "Normal"])
 	end
 	viewport:SetAttribute("RelicId", relicId)
 	viewport:SetAttribute("Size", sizeId or "")

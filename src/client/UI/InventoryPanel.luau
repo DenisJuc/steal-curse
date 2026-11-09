@@ -384,7 +384,7 @@ function InventoryPanel.Start(
 	UIKit.skinButton(backButton, "Dark")
 
 	-- Detail panel: big render, name in its rarity color, big income, one short stats line, then
-	-- two big actions (Place, Sell) over a row of small toggles (Lock, Favorite, Float, Sell all).
+	-- one big Sell button over a row of small toggles (Lock, Favorite, Float, Sell all).
 	local side = UIKit.create("Frame", {
 		Name = "Detail",
 		AnchorPoint = Vector2.new(1, 0),
@@ -494,24 +494,13 @@ function InventoryPanel.Start(
 			end
 		end
 	end
-	local equipButton = UIKit.button({
-		Name = "Place",
-		Text = "Place",
-		TextSize = 22,
-		Size = UDim2.new(0.5, -3, 0, BIG_BUTTON_HEIGHT),
-		Parent = actions,
-	}, onSelected(function(group)
-		ShrineAction:FireServer("EquipGroup", group.Id, group.Mutation, group.Size)
-	end))
-	UIKit.skinButton(equipButton, "Equip")
+	-- Placing lives in the Pedestals menu (tap a pedestal's relic); the backpack only sells.
 	local sellOneButton: TextButton
 	sellOneButton = UIKit.button({
 		Name = "Sell",
 		Text = "Sell",
-		TextSize = 20,
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.fromScale(1, 0),
-		Size = UDim2.new(0.5, -3, 0, BIG_BUTTON_HEIGHT),
+		TextSize = 22,
+		Size = UDim2.new(1, 0, 0, BIG_BUTTON_HEIGHT),
 		Parent = actions,
 	}, onSelected(function(group)
 		Motion.markCoinSource(sellOneButton)

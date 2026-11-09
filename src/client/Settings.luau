@@ -58,10 +58,5 @@ function Settings.Volume(): number
 	return (if type(value) == "number" then value else 100) / 100
 end
 
--- Own footsteps, scaled by the main Sound volume too.
-function Settings.FootstepVolume(): number
-	local value = Settings.Get("Footsteps")
-	return (if type(value) == "number" then value else 50) / 100 * Settings.Volume()
-end
 
 return Settings

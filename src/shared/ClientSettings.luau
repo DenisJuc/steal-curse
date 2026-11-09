@@ -99,9 +99,10 @@ ClientSettings.Schema = {
 	{
 		Key = "Footsteps",
 		Label = "Footsteps",
-		Help = "Volume of your own footsteps (each floor has its own step sound).",
+		Help = "Volume of your own footsteps (unused since 2026-11-09: fixed at 25%).",
 		Range = { Min = 0, Max = 100, Step = 5 },
 		Default = 50,
+		Hidden = true,
 	},
 	{
 		Key = "InterfaceSize",

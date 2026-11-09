@@ -595,6 +595,64 @@ function ShowcaseVisuals.Apply(plot: Model?, view: View?, ownerUserId: number?, 
 	model.Parent = podium
 end
 
+-- Menu previews (2026-11-09): every Showcase at every level, built once at the origin on a copy
+-- of the podium dais into ReplicatedStorage.ShowcasePreviews ("<Id>_<level>"), so the Showcases
+-- menu can show what each one looks like in a ViewportFrame. No prompt, no effect anchors
+-- (viewports draw no particles); every accessory is on.
+function ShowcaseVisuals.BuildPreviews()
+	local ReplicatedStorageService = game:GetService("ReplicatedStorage")
+	if ReplicatedStorageService:FindFirstChild("ShowcasePreviews") then
+		return
+	end
+	local folder = Instance.new("Folder")
+	folder.Name = "ShowcasePreviews"
+	local function at(x: number, y: number, z: number): CFrame
+		-- Turned so the set piece's front (podium -Z faces the hub) faces the viewport camera.
+		return CFrame.Angles(0, math.pi, 0) * CFrame.new(x, y, z)
+	end
+	local builders: { [string]: (Model, At, Color3, number) -> () } = {
+		Throne = buildThrone,
+		Guardian = buildGuardian,
+		Grove = buildGrove,
+		Bell = buildBell,
+		Star = buildStar,
+	}
+	for _, showcase in ShowcaseConfig.Showcases do
+		local accent = ACCENT[showcase.Style] or Color3.new(1, 1, 1)
+		for level = 1, ShowcaseConfig.MaxLevel do
+			local model = Instance.new("Model")
+			model.Name = `{showcase.Id}_{level}`
+			local dais = BuildUtil.cylinder(model, CFrame.new(0, -0.6, 0), 1.2, 16, {
+				Name = "PreviewDais",
+				Material = Enum.Material.Basalt,
+				Color = Color3.fromRGB(30, 27, 36),
+			})
+			model.PrimaryPart = dais
+			BuildUtil.cylinder(model, CFrame.new(0, -0.05, 0), 0.1, 16.2, {
+				Name = "PreviewEdge",
+				Material = Enum.Material.Neon,
+				Color = accent,
+				Transparency = 0.5,
+			})
+			;(builders[showcase.Style] or buildStance)(model, at, accent, level)
+			buildLevelEffects(model, at, level, accent)
+			for _, accessory in showcase.Accessories do
+				local build = ACCESSORY_BUILDERS[accessory.Id]
+				if build then
+					build(model, at)
+				end
+			end
+			for _, light in model:GetDescendants() do
+				if light:IsA("Light") or light:IsA("ProximityPrompt") or light:IsA("Script") then
+					light:Destroy()
+				end
+			end
+			model.Parent = folder
+		end
+	end
+	folder.Parent = ReplicatedStorageService
+end
+
 -- Where a posing character stands (on the dais centre, facing the hub) and the throne seat.
 function ShowcaseVisuals.PoseTarget(plot: Model?): (CFrame?, Seat?)
 	local podium = plot and plot:FindFirstChild("ShowcasePodium")

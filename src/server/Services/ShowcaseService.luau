@@ -360,6 +360,7 @@ function ShowcaseService.Init()
 		return income
 	end)
 	RemoteGuard.Function(ShowcaseAction, onAction, "Shrine")
+	task.spawn(ShowcaseVisuals.BuildPreviews)
 
 	local function refresh(player: Player)
 		local data = DataService.Get(player)

@@ -43,8 +43,14 @@ function BountyPanel.Start(screen: ScreenGui): { Toggle: () -> (), Open: () -> (
 			end)
 			busy = false
 			if ok and type(result) == "table" then
-				if type(result.Message) == "string" then
-					Toasts.Show(result.Message, if string.find(result.Message, "claimed") then "Item" else nil)
+				-- Success just redraws the board (2026-11-09: no toast for claims and rerolls).
+				local message = result.Message
+				if
+					type(message) == "string"
+					and string.find(message, "Bounty claimed", 1, true) ~= 1
+					and message ~= "Bounty rerolled."
+				then
+					Toasts.Show(message)
 				end
 				render(result.View)
 			end

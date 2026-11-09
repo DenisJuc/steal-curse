@@ -115,57 +115,8 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	})
 	UIKit.scaler(column)
 
-	-- Next objective (Collection Studio): one line from server-authoritative ProgressObjective.
-	local objectiveCard = UIKit.create("Frame", {
-		Name = "NextObjective",
-		LayoutOrder = 0,
-		Size = UDim2.fromOffset(300, 62),
-		Visible = false,
-		Parent = column,
-	}, { UIKit.corner(10), UIKit.padding(8) })
-	UIKit.skinPanel(objectiveCard, colors.Accent)
-	local objectiveTitle = UIKit.label({
-		Name = "Title",
-		Size = UDim2.new(1, 0, 0, 16),
-		Text = "NEXT",
-		TextSize = 14,
-		TextColor3 = colors.Accent,
-		FontFace = UIKit.TitleFont,
-		Parent = objectiveCard,
-	})
-	local objectiveBody = UIKit.label({
-		Name = "Body",
-		Position = UDim2.fromOffset(0, 18),
-		Size = UDim2.new(1, 0, 0, 26),
-		Text = "",
-		TextSize = 19,
-		TextWrapped = true,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		TextTruncate = Enum.TextTruncate.AtEnd,
-		Parent = objectiveCard,
-	})
-	local function refreshObjective()
-		local text = player:GetAttribute("NextObjectiveText")
-		local hasCollection = type(player:GetAttribute("Essence")) == "number"
-		-- Hidden while a tutorial bubble talks (Onboarding), so there's one instruction at a time.
-		if not hasCollection or type(text) ~= "string" or text == "" or player:GetAttribute("TutorialShowing") == true then
-			objectiveCard.Visible = false
-			return
-		end
-		objectiveCard.Visible = true
-		local lift = player:GetAttribute("BoardIncomeMult")
-		objectiveTitle.Text = if type(lift) == "number" and lift > 1 + 1e-9
-			then `NEXT · Board ×{string.format("%.2f", lift)}`
-			else "NEXT"
-		-- One short line; the detail stays in the Collection menu (less text on screen).
-		objectiveBody.Text = text
-	end
-	player:GetAttributeChangedSignal("NextObjectiveText"):Connect(refreshObjective)
-	player:GetAttributeChangedSignal("TutorialShowing"):Connect(refreshObjective)
-	player:GetAttributeChangedSignal("NextObjectiveDetail"):Connect(refreshObjective)
-	player:GetAttributeChangedSignal("BoardIncomeMult"):Connect(refreshObjective)
-	player:GetAttributeChangedSignal("Essence"):Connect(refreshObjective)
-	refreshObjective()
+	-- (The NEXT objective card that sat here was removed on 2026-11-09: the tutorial guides new
+	-- players; after it the screen stays clear.)
 
 	local panel = UIKit.create("Frame", {
 		Name = "ResonatorPanel",
@@ -438,7 +389,19 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local journalButton = pillButton(pills, "JournalButton", 1, "Journal", "Journal")
 	journalButton.Activated:Connect(callbacks.OnJournal)
 
-	local settingsButton = pillButton(pills, "SettingsButton", 2, "Settings", "Settings")
+	-- Icon only: a gear needs no word (2026-11-09).
+	local settingsButton = pillButton(pills, "SettingsButton", 2, "", "Settings")
+	local settingsSlot = settingsButton.Parent :: Frame
+	settingsSlot.Size = UDim2.fromOffset(PILL_SIZE.Y, PILL_SIZE.Y)
+	local gear = settingsButton:FindFirstChild("InlineIcon") :: Frame?
+	local inset = settingsButton:FindFirstChildOfClass("UIPadding")
+	if inset then
+		inset.PaddingLeft = UDim.new(0, 0)
+	end
+	if gear then
+		gear.AnchorPoint = Vector2.new(0.5, 0.5)
+		gear.Position = UDim2.fromScale(0.5, 0.5)
+	end
 	settingsButton.Activated:Connect(callbacks.OnSettings)
 
 	-- Big tiles: Pedestals, Codex, Rebirth (+ Collection in the collection trial).

@@ -25,7 +25,6 @@ local DiscoveryPipeline = require(script.Parent.Parent.DiscoveryPipeline)
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local BountyAction = Remotes:WaitForChild("BountyAction") :: RemoteFunction
 local BountiesUpdated = Remotes:WaitForChild("BountiesUpdated") :: RemoteEvent
-local Notify = Remotes:WaitForChild("Notify") :: RemoteEvent
 
 local BountyService = {}
 
@@ -193,9 +192,7 @@ function BountyService.Record(player: Player, event: string, payload: { [string]
 	if not refreshed and progressSum() == progressBefore then
 		return
 	end
-	for _, def in completed do
-		Notify:FireClient(player, `Bounty complete: {def.Text} - claim it from Gifts or the Bounty Board`, "Item")
-	end
+	-- No toast when one completes (2026-11-09): the Bounties tile's red dot says so.
 	if #completed > 0 or Bounties.claimable(data.Bounties, OPTIONS) ~= before then
 		DataService.RequestSave(player)
 	end

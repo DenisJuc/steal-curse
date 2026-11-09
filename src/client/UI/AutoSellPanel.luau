@@ -258,9 +258,16 @@ function AutoSellPanel.Start(screen: ScreenGui): { Open: () -> (), SetVisible: (
 			Name = "Ladder",
 			LayoutOrder = nextOrder(),
 			BackgroundTransparency = 1,
-			Size = UDim2.new(1, -10, 0, LADDER_HEIGHT),
+			Size = UDim2.new(1, -10, 0, LADDER_HEIGHT + 8),
 			Parent = body,
 		}, {
+			-- Room for the chosen chip's thick outline (the list clips its edges).
+			UIKit.create("UIPadding", {
+				PaddingLeft = UDim.new(0, 4),
+				PaddingRight = UDim.new(0, 4),
+				PaddingTop = UDim.new(0, 4),
+				PaddingBottom = UDim.new(0, 4),
+			}),
 			UIKit.create("UIListLayout", {
 				FillDirection = Enum.FillDirection.Horizontal,
 				SortOrder = Enum.SortOrder.LayoutOrder,

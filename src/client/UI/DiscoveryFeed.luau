@@ -201,6 +201,8 @@ local function rarityKey(result: Result): number
 	return tierIndex(result.Id) * 2 + (if result.Mutation then 1 else 0) + bonus
 end
 
+local SHOW_CARDS = false
+
 function DiscoveryFeed.Start(screen: ScreenGui)
 	local list = UIKit.create("Frame", {
 		Name = "DiscoveryFeed",
@@ -233,22 +235,22 @@ function DiscoveryFeed.Start(screen: ScreenGui)
 		if type(results) ~= "table" or hunt then
 			return
 		end
-		-- A plain first find (no size, no mutation) gets no line: it lights the Codex button's
-		-- "new" badge instead (HUD), which clears when the Codex is opened.
-		local shown = {}
+		-- 2026-11-09: the feed's cards are off (Rosselle: screen clutter; the roll card and the big
+		-- reveal already show every find). All that is left is the Codex button's "new" badge:
+		-- first finds count up there and clear when the Codex is opened.
 		local fresh = 0
 		for _, result in results do
-			if result.First and not SizeConfig.normalize(result.Size) and not result.Mutation then
+			if result.First then
 				fresh += 1
-			else
-				table.insert(shown, result)
 			end
 		end
 		if fresh > 0 then
 			local player = Players.LocalPlayer
 			player:SetAttribute("CodexNew", (player:GetAttribute("CodexNew") or 0) + fresh)
 		end
-		results = shown
+		if not SHOW_CARDS then
+			return
+		end
 		local plan = RewardPresentation.planFeed(results, tierOf)
 		-- Exceptionals first (rarest), then notables, then one routine summary.
 		local exceptional = table.clone(plan.Exceptional)

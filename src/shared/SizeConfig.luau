@@ -16,10 +16,11 @@ export type ChanceRow = { Huge: number, Titanic: number }
 
 SizeConfig.Ids = { "Huge", "Titanic" } :: { SizeId }
 
--- World / viewport scale relative to Normal (1).
+-- World / viewport scale relative to Normal (1). Raised 2026-11-09 (was 1.4 / 1.9) so a Huge or
+-- Titanic relic on a pedestal reads as clearly bigger at a glance.
 SizeConfig.Scale = {
-	Huge = 1.4,
-	Titanic = 1.9,
+	Huge = 1.6,
+	Titanic = 2.2,
 }
 
 -- Pedestal income multiplier for that instance. Bounded prestige — not a Common→Cosmic ladder.

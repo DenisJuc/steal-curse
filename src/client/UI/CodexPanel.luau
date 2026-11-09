@@ -37,7 +37,6 @@ local KIND_HEADINGS = {
 }
 local REFRESH_SECONDS = 1
 local DONE_COLOR = Color3.fromRGB(120, 230, 140)
-local ROW_HEIGHT = 68
 local CARD_SIZE = Vector2.new(106, 104)
 local BAR_HEIGHT = 6
 local SIZE_TABS = { "Normal", "Huge", "Titanic" }
@@ -106,76 +105,124 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 
 	local claim: (string) -> ()
 
-	local function milestoneRow(milestone: Codex.Milestone, have: number, claimed: boolean, ready: boolean)
-		local done = claimed or milestone.Need == 0
-		local claimable = ready and not done
-		local holder = UIKit.slot(body, milestone.Id, UDim2.new(1, -10, 0, ROW_HEIGHT), nextOrder())
-		local frame = UIKit.create("Frame", {
-			Name = "Card",
-			BackgroundColor3 = colors.Card,
-			Parent = holder,
-		}, { UIKit.corner(8) })
-		UIKit.fill(frame)
-		UIKit.skinCard(frame, if claimable then colors.Gold elseif done then DONE_COLOR else nil)
-		frame:SetAttribute("PopIn", true)
-		UIKit.label({
-			Text = shortGoal(milestone),
-			TextSize = 20,
-			TextColor3 = if done then DONE_COLOR else colors.Text,
-			Position = UDim2.fromOffset(10, 6),
-			Size = UDim2.new(1, -130, 0, 24),
-			Parent = frame,
-		})
-		UIKit.label({
-			Text = Codex.rewardText(milestone),
-			TextSize = 17,
-			TextScaled = true,
-			TextColor3 = colors.Gold,
-			Position = UDim2.fromOffset(10, 32),
-			Size = UDim2.new(1, -130, 0, 18),
-			Parent = frame,
-		})
-		local fill = if milestone.Need <= 0 then 1 else math.clamp(have / milestone.Need, 0, 1)
-		local track = UIKit.create("Frame", {
-			Name = "Track",
-			Position = UDim2.fromOffset(10, ROW_HEIGHT - BAR_HEIGHT - 6),
-			Size = UDim2.new(1, -20, 0, BAR_HEIGHT),
-			BackgroundColor3 = colors.Track,
-			BorderSizePixel = 0,
-			Parent = frame,
-		}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
-		UIKit.create("Frame", {
-			Name = "Fill",
-			Size = UDim2.fromScale(fill, 1),
-			BackgroundColor3 = if claimable then colors.Gold elseif done then DONE_COLOR else colors.Jade,
-			BorderSizePixel = 0,
-			Parent = track,
-		}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
-		if claimable then
-			local claimButton = UIKit.button({
-				Text = "Claim",
-				TextSize = 20,
-				AnchorPoint = Vector2.new(1, 0.5),
-				Position = UDim2.new(1, -10, 0.5, -3),
-				Size = UDim2.fromOffset(110, 46),
-				Parent = frame,
-			}, function()
-				claim(milestone.Id)
-			end)
-			UIKit.skinButton(claimButton, "Gold")
-			Motion.shineLoop(claimButton, 2.2)
-			return
+	-- One kind of milestone as a card: title + "earned/total", a wrap of round stamps (green
+	-- check = earned, gold = ready to claim, dim = locked with its goal under it) and one line on
+	-- the next goal with its progress bar.
+	local STAMP = 46
+	local function milestoneTrack(title: string, list: { Codex.Milestone }, state: Codex.State, claimed: { [string]: any }, ready: { [string]: any })
+		local earned, nextOne = 0, nil
+		for _, milestone in list do
+			if claimed[milestone.Id] ~= nil or milestone.Need == 0 then
+				earned += 1
+			elseif not nextOne and ready[milestone.Id] == nil then
+				nextOne = milestone
+			end
 		end
-		UIKit.label({
-			Text = if done then "EARNED" else `{math.min(have, milestone.Need)} / {milestone.Need}`,
-			TextSize = 19,
-			TextXAlignment = Enum.TextXAlignment.Right,
-			TextColor3 = if done then DONE_COLOR else colors.SubText,
-			AnchorPoint = Vector2.new(1, 0),
-			Position = UDim2.new(1, -10, 0, 6),
-			Size = UDim2.fromOffset(110, 40),
-			Parent = frame,
+		local card = UIKit.create("Frame", {
+			Name = title,
+			LayoutOrder = nextOrder(),
+			Size = UDim2.new(1, -10, 0, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			BackgroundColor3 = colors.Card,
+			Parent = body,
+		}, {
+			UIKit.corner(10),
+			UIKit.padding(10),
+			UIKit.create("UIListLayout", { SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 8) }),
 		})
+		UIKit.skinCard(card, if earned == #list then DONE_COLOR else nil)
+		local head = UIKit.create("Frame", { LayoutOrder = 1, BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 24), Parent = card })
+		UIKit.label({
+			Text = title,
+			FontFace = UIKit.TitleFont,
+			TextSize = 19,
+			TextColor3 = colors.Gold,
+			Size = UDim2.new(1, -80, 1, 0),
+			Parent = head,
+		})
+		UIKit.label({
+			Text = `{earned} / {#list}`,
+			TextSize = 18,
+			TextXAlignment = Enum.TextXAlignment.Right,
+			TextColor3 = if earned == #list then DONE_COLOR else colors.SubText,
+			AnchorPoint = Vector2.new(1, 0),
+			Position = UDim2.fromScale(1, 0),
+			Size = UDim2.new(0, 80, 1, 0),
+			Parent = head,
+		})
+		local stamps = UIKit.create("Frame", {
+			LayoutOrder = 2,
+			BackgroundTransparency = 1,
+			Size = UDim2.fromScale(1, 0),
+			AutomaticSize = Enum.AutomaticSize.Y,
+			Parent = card,
+		}, {
+			UIKit.create("UIGridLayout", {
+				CellSize = UDim2.fromOffset(72, STAMP + 22),
+				CellPadding = UDim2.fromOffset(6, 6),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
+		})
+		for index, milestone in list do
+			local done = claimed[milestone.Id] ~= nil or milestone.Need == 0
+			local claimable = ready[milestone.Id] ~= nil and not done
+			local cell = UIKit.create("Frame", { LayoutOrder = index, BackgroundTransparency = 1, Parent = stamps })
+			local stamp = UIKit.button({
+				Name = milestone.Id,
+				Text = if claimable then "!" else "",
+				TextSize = 24,
+				AnchorPoint = Vector2.new(0.5, 0),
+				Position = UDim2.fromScale(0.5, 0),
+				Size = UDim2.fromOffset(STAMP, STAMP),
+				Parent = cell,
+			}, function()
+				if claimable then
+					claim(milestone.Id)
+				end
+			end)
+			stamp:FindFirstChildOfClass("UICorner").CornerRadius = UDim.new(1, 0)
+			UIKit.skinButton(stamp, if claimable then "Gold" elseif done then "Buy" else "Dark")
+			stamp.TextColor3 = if claimable then colors.Panel else colors.Text
+			if claimable then
+				Motion.shineLoop(stamp, 2.2)
+			end
+			UIKit.label({
+				Text = shortGoal(milestone),
+				TextSize = 13,
+				TextScaled = true,
+				TextXAlignment = Enum.TextXAlignment.Center,
+				TextColor3 = if done then DONE_COLOR elseif claimable then colors.Gold else colors.SubText,
+				Position = UDim2.fromOffset(0, STAMP + 3),
+				Size = UDim2.new(1, 0, 0, 16),
+				Parent = cell,
+			})
+		end
+		if nextOne then
+			local have = Codex.progress(nextOne, state)
+			UIKit.label({
+				LayoutOrder = 3,
+				Text = `Next at {shortGoal(nextOne)}: {Codex.rewardText(nextOne)}`,
+				TextSize = 17,
+				TextColor3 = colors.Text,
+				TextWrapped = true,
+				AutomaticSize = Enum.AutomaticSize.Y,
+				Size = UDim2.new(1, 0, 0, 20),
+				Parent = card,
+			})
+			local track = UIKit.create("Frame", {
+				LayoutOrder = 4,
+				Size = UDim2.new(1, 0, 0, BAR_HEIGHT),
+				BackgroundColor3 = colors.Track,
+				BorderSizePixel = 0,
+				Parent = card,
+			}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+			UIKit.create("Frame", {
+				Size = UDim2.fromScale(math.clamp(have / math.max(nextOne.Need, 1), 0, 1), 1),
+				BackgroundColor3 = colors.Jade,
+				BorderSizePixel = 0,
+				Parent = track,
+			}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+		end
 	end
 
 	local function relicKnown(relicId: string, tab: string, state: Codex.State, sizes: { [string]: { [string]: number } }): boolean
@@ -204,7 +251,8 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			BackgroundColor3 = if known then colors.Card else colors.Track,
 		}, { UIKit.corner(8), UIKit.stroke(tierColor, 1.5, if known then 0.1 else 0.6) })
 		UIKit.skinCard(card)
-		local render = renders.Get(relicId, relicId)
+		-- Huge / Titanic tabs render the relic bigger in its card (RelicViewport frames by size).
+		local render = renders.Get(`{relicId}|{sizeId or ""}`, relicId, sizeId)
 		render.AnchorPoint = Vector2.new(0.5, 0)
 		render.Position = UDim2.new(0.5, 0, 0, 4)
 		render.Size = UDim2.fromOffset(56, 56)
@@ -441,17 +489,17 @@ function CodexPanel.Start(screen: ScreenGui): { Toggle: () -> (), SetVisible: (b
 			Motion.shineLoop(claimAll, 2.2)
 		end
 
+		-- 2026-11-09: one compact card per kind (a row of stamps, one per milestone) and only the
+		-- next goal spelled out, instead of a long list of near-identical rows.
 		for _, kind in KIND_ORDER do
-			heading(KIND_HEADINGS[kind])
+			local list = {}
 			for _, milestone in CodexBook.Milestones do
 				if milestone.Kind == kind then
-					milestoneRow(
-						milestone,
-						Codex.progress(milestone, state),
-						claimed[milestone.Id] ~= nil,
-						ready[milestone.Id] ~= nil
-					)
+					table.insert(list, milestone)
 				end
+			end
+			if #list > 0 then
+				milestoneTrack(KIND_HEADINGS[kind], list, state, claimed, ready)
 			end
 		end
 

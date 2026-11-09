@@ -159,35 +159,26 @@ Config.Sounds = {
 	DistantHowl = { Id = "rbxassetid://9113956884", Volume = 1.00, Range = 300 },
 }
 
--- Footsteps (2026-11-08): one short step sound per stride, picked at random from the floor's set
--- (free Creator Store audio, each checked to load). Replaces the long recorded loops, which
--- restarted from a quiet lead-in every time you started walking (only sprinting was audible).
--- Material variants report their base material (slate tiles = Slate).
-Config.FootstepSets = {
-	Grass = { "rbxassetid://129956418693357", "rbxassetid://78534941650081", "rbxassetid://110522236020035", "rbxassetid://135037154891351" },
-	Stone = {
-		"rbxassetid://133325104274958", "rbxassetid://93803555891980", "rbxassetid://85682518019906",
-		"rbxassetid://80346333847986", "rbxassetid://140594308250996", "rbxassetid://82615619091463",
-	},
-	Wood = { "rbxassetid://75982487060381", "rbxassetid://92705710431057", "rbxassetid://76286399907074" },
-	Dirt = {
-		"rbxassetid://103963258527392", "rbxassetid://98375658066754", "rbxassetid://138750508569819",
-		"rbxassetid://83249973538428", "rbxassetid://134689890007261", "rbxassetid://140165597842270",
-	},
-} :: { [string]: { string } }
--- Floor material -> step set. Unlisted floors use Stone.
+-- Footstep sound per floor material (Enum.Material name; WildSounds swaps the character's running
+-- sound). Missing = Roblox's default step. Back to the original single step on 2026-11-09
+-- (Rosselle preferred it over the per-surface sets). FootstepVolumeScale multiplies the Running
+-- sound: 0.25 = a quarter of Roblox's default.
+local STEP = "rbxassetid://92061301674605"
+Config.FootstepVolumeScale = 0.25
 Config.Footsteps = {
-	Grass = "Grass",
-	LeafyGrass = "Grass",
-	Mud = "Dirt",
-	Ground = "Dirt",
-	Sand = "Dirt",
-	Pebble = "Dirt",
-	Wood = "Wood",
-	WoodPlanks = "Wood",
+	Grass = STEP,
+	LeafyGrass = STEP,
+	Mud = STEP,
+	Ground = STEP,
+	Rock = STEP,
+	Slate = STEP,
+	Basalt = STEP,
+	Limestone = STEP,
+	Sandstone = STEP,
+	Cobblestone = STEP,
+	Wood = STEP,
+	WoodPlanks = STEP,
 } :: { [string]: string }
--- Seconds between steps at walking speed (16); faster movement steps quicker, never under MinGap.
-Config.FootstepCadence = { Walk = 0.4, MinGap = 0.2, Volume = 0.45 }
 
 Config.RemoteLimits = {
 	Default = { Rate = 10, Burst = 20 },

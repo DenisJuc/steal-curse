@@ -131,16 +131,23 @@ function SprintController.Start(screen: ScreenGui, anchor: GuiObject?)
 		local onLane = root ~= nil
 			and root:IsA("BasePart")
 			and WorldLayout.onStreet(Config.Plots, Config.World, Config.Hub.PlazaSize, root.Position.X, root.Position.Z)
+		-- Inside your own base, running is free too (2026-11-09): sprint the lanes collecting.
+		local plotIndex = player:GetAttribute("PlotIndex")
+		local atHome = root ~= nil
+			and root:IsA("BasePart")
+			and type(plotIndex) == "number"
+			and WorldLayout.distanceToBox(root.Position.X, root.Position.Z, WorldLayout.plotBox(Config.Plots, plotIndex)) <= 0
+		local freeRun = onLane or atHome
 		local wantsRun = (held or toggled) and not frozen
-		-- On the lane, running is free: stamina refills instead of draining.
-		Stamina.step(state, dt, wantsRun and not onLane, moving, cfg)
-		if state.Winded and not onLane then
+		-- On the lane and at home, running is free: stamina refills instead of draining.
+		Stamina.step(state, dt, wantsRun and not freeRun, moving, cfg)
+		if state.Winded and not freeRun then
 			toggled = false
 		end
 		if not frozen then
 			local base = character:GetAttribute("BaseWalkSpeed")
 			local walk = if type(base) == "number" then base else SkillConfig.walkSpeed(0)
-			local running = state.Running or (onLane and wantsRun)
+			local running = state.Running or (freeRun and wantsRun)
 			local speed = Stamina.speed(walk, running, cfg.Multiplier, cfg.MaxSpeed)
 			if onLane then
 				speed = math.min(speed * Config.Plots.Street.Lane.Multiplier, cfg.MaxSpeed)
