@@ -3,6 +3,7 @@
 -- "Start": the character goes to the glade (IntroLayout) and "InIntro" keeps the zone gates off
 -- it. "Finish" (the spirit is sealed) and "Skip" both end it the same way: IntroDone is saved, the
 -- first seal's relic (Config.Intro.FirstSeal) is granted as a capture, and the player goes home.
+-- The "IntroDone" attribute mirrors the save: it opens Spirit Sight (HudUnlocks gate "Hunt").
 -- Respawning mid-intro puts the character back in the glade.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -38,6 +39,8 @@ local function finish(player: Player, sealed: boolean)
 		return
 	end
 	data.IntroDone = true
+	-- HudUnlocks opens Spirit Sight on this, so the hunt carries on straight after the intro.
+	player:SetAttribute("IntroDone", true)
 	player:SetAttribute("IntroPending", false)
 	player:SetAttribute("InIntro", false)
 	local home = PlotService.HomeCFrame(player)
@@ -69,6 +72,7 @@ function IntroService.Init()
 			-- Older saves never see the intro.
 			data.IntroDone = true
 		end
+		player:SetAttribute("IntroDone", data ~= nil and data.IntroDone == true)
 		player.CharacterAdded:Connect(function()
 			if player:GetAttribute("InIntro") == true then
 				task.wait(0.2)

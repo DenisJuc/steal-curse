@@ -3,6 +3,8 @@
 -- appears with one short banner. Purely client-side display: no new save fields. It reads stats
 -- the server already saves and mirrors (TotalScans, DiscoveredCount, Rebirths, Skill_CoreLuck)
 -- so veterans (75+ lifetime rolls or a rebirth) see everything as before, with no banners.
+-- Spirit Sight (gate "Hunt") opens when the intro hunt ends (the "IntroDone" attribute), not at a
+-- roll count, so a new player can hunt right away.
 -- Finishing or skipping the tutorial does NOT unlock everything: a new player keeps the
 -- roll-only start and earns each entry at its milestone.
 -- An entry the tutorial points at (the "TutorialTarget" attribute Onboarding sets locally)
@@ -22,7 +24,7 @@ local HudUnlocks = {}
 -- next-unlock chip (top center) and locked world prompts. Before Start everything counts as unlocked.
 local started = false
 local unlockedState: { [string]: boolean } = {}
-local latest = { Scans = 0, Discovered = 0, CoreLuck = 0 }
+local latest = { Scans = 0, Discovered = 0, CoreLuck = 0, IntroDone = false }
 local changedEvent = Instance.new("BindableEvent")
 HudUnlocks.Changed = changedEvent.Event
 -- (gateId, announced): announced = opened by its milestone now (not on join / unlock-all).
@@ -32,7 +34,7 @@ HudUnlocks.Unlocked = unlockedEvent.Event
 -- Everything unlocks at this many lifetime rolls (~5 minutes of Auto Roll at 4 s a roll).
 local ALL_SCANS = 75
 
-type Stats = { Scans: number, Discovered: number, CoreLuck: number }
+type Stats = { Scans: number, Discovered: number, CoreLuck: number, IntroDone: boolean }
 
 type Gate = {
 	Id: string,
@@ -107,8 +109,10 @@ local GATES: { Gate } = {
 		Text = "Hunt signals in the wild",
 		Names = { "SpiritSightSlot", "HubSlot", "ShrinesSlot" },
 		Targets = { "SpiritSight" },
+		-- Open as soon as the intro hunt ends (finished or skipped), so the hunt the intro sells
+		-- carries straight on. 50 rolls stays the route when the intro is turned off.
 		When = function(s)
-			return s.Scans >= 50
+			return s.IntroDone or s.Scans >= 50
 		end,
 	},
 	{
@@ -363,6 +367,7 @@ function HudUnlocks.Start(screen: ScreenGui)
 			Scans = number(player, "TotalScans"),
 			Discovered = number(player, "DiscoveredCount"),
 			CoreLuck = number(player, "Skill_CoreLuck"),
+			IntroDone = player:GetAttribute("IntroDone") == true,
 		}
 		latest = stats
 		local target = player:GetAttribute("TutorialTarget")

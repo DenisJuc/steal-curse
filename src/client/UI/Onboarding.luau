@@ -15,7 +15,8 @@
 -- top and lay glowing arrows on the ground (Effects/GroundGuide). Before Spirit Sight, a player's
 -- first walk into the wild gets one tip: no hunting yet, look for Lost Ones and offering boxes.
 --
--- Spirit hunt tutorial: when Spirit Sight unlocks (at its milestone, not on join) everything stops
+-- Spirit hunt tutorial: when Spirit Sight unlocks (right after the intro hunt ends, or at 50 rolls
+-- when the intro is off; never on join) everything stops
 -- for it: menus close, the HUD except travel and the hunt buttons is hidden (rolling carries on in
 -- the background) and it walks through: go to the wild (ground arrows), fast travel exists, F for
 -- Spirit Sight, Q to pulse, arrows to the nearest spirit, hold to bind. It plays even with Hints
@@ -343,7 +344,7 @@ local HUNT_STEPS: { Step } = {
 		Hunt = true,
 		Target = TOP,
 		Side = "Below",
-		Text = "Spirit Sight unlocked! You can hunt spirits now. Follow the arrows to the wild.",
+		Text = "Spirit Sight unlocked! More spirits hide in the wild. Follow the arrows and hunt one.",
 		Guide = wildSpot,
 		Done = function()
 			return inWild()
