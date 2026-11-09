@@ -299,8 +299,7 @@ function IntroController.Run(screen: ScreenGui)
 		tween(objective, 0.4, { TextTransparency = 0 })
 	end
 
-	-- Anime-opening toolkit: letterbox bars, radial speed lines, an impact frame, a title card and
-	-- a seal stamp.
+	-- Cinematic touches: letterbox bars, radial speed lines, an impact frame and a seal stamp.
 	local barTop = frame({ Size = UDim2.fromScale(1, 0), BackgroundColor3 = Color3.new(0, 0, 0), ZIndex = 3 })
 	local barBottom = frame({
 		AnchorPoint = Vector2.new(0, 1),
@@ -348,55 +347,6 @@ function IntroController.Run(screen: ScreenGui)
 		task.delay(0.1, function()
 			hit:Destroy()
 		end)
-	end
-	local function titleCard()
-		bars(true)
-		local kanji = text({
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.5, 0.45),
-			Size = UDim2.fromScale(0.5, 0.75),
-			Text = "狐",
-			TextScaled = true,
-			TextColor3 = Color3.fromRGB(150, 225, 255),
-			TextTransparency = 1,
-			TextStrokeTransparency = 1,
-			ZIndex = 6,
-		})
-		local name = text({
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.35, 0.44),
-			Size = UDim2.new(1, 0, 0, 90),
-			Text = "SEAL A CURSE",
-			TextSize = 86,
-			TextColor3 = GOLD,
-			TextTransparency = 1,
-			TextStrokeTransparency = 1,
-			ZIndex = 7,
-		})
-		local episode = text({
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.fromScale(0.65, 0.55),
-			Size = UDim2.new(1, 0, 0, 34),
-			Text = "EPISODE 1: THE FOX IN THE FOG",
-			TextSize = 28,
-			TextTransparency = 1,
-			TextStrokeTransparency = 1,
-			ZIndex = 7,
-		})
-		Sounds.Play("EventStart")
-		tween(kanji, 0.6, { TextTransparency = 0.82 })
-		tween(name, 0.5, { Position = UDim2.fromScale(0.5, 0.44), TextTransparency = 0, TextStrokeTransparency = 0.2 }, Enum.EasingStyle.Back)
-		task.wait(0.25)
-		tween(episode, 0.5, { Position = UDim2.fromScale(0.5, 0.55), TextTransparency = 0, TextStrokeTransparency = 0.4 }, Enum.EasingStyle.Back)
-		task.wait(2.1)
-		tween(name, 0.35, { Position = UDim2.fromScale(0.62, 0.44), TextTransparency = 1, TextStrokeTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		tween(episode, 0.35, { Position = UDim2.fromScale(0.38, 0.55), TextTransparency = 1, TextStrokeTransparency = 1 }, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-		tween(kanji, 0.5, { TextTransparency = 1 })
-		task.wait(0.5)
-		kanji:Destroy()
-		name:Destroy()
-		episode:Destroy()
-		bars(false)
 	end
 	local function stamp(): TextLabel
 		local mark = text({
@@ -642,10 +592,7 @@ function IntroController.Run(screen: ScreenGui)
 	if ended then
 		return
 	end
-	titleCard()
-	if ended then
-		return
-	end
+	bars(false)
 	say("A cursed spirit! It's getting away...", 3)
 	camera.CameraType = Enum.CameraType.Custom
 	if control then
