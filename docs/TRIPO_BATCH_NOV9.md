@@ -18,6 +18,11 @@
 2. `tools/models/blender/prep_tripo_glb.py` (normalize, export FBX + maps), then `python -I tools/models/upload_model.py <fbx> <RelicId>` (writes `assets/RelicModels/<RelicId>.rbxmx`).
 3. In Studio: `/modelcheck`, then compare it on a shelf next to two existing relics (same lighting) before accepting.
 
+## Names check (2026-11-08)
+14 prompts were rewritten so the models don't copy the anime designs, and 17 existing models are
+flagged for an optional remake (fruits, Enma, Prison Realm, Inverse Spear; ~680 credits, owner's
+call). See `docs/NAMES_CHECK.md`. Remake prompts: `work/models/tripo_remakes.json`.
+
 ## Step 1: test 2 first
 - `HoyPoyCapsule` (Common, small round object, the most-seen tier)
 - `ThunderNichirenBlade` (Uncommon, thin blade: the style's weak spot)
