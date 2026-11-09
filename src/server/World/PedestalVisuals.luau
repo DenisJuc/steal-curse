@@ -251,7 +251,10 @@ local function updateInfo(top: BasePart, state: SlotState)
 
 	if not state.Owned then
 		local isNext = state.IsNext == true
-		gui.Enabled = state.Price ~= nil
+		-- Only the next pedestal to buy shows a label (2026-11-09: every sealed slot showing its
+		-- price crowded a new player's view).
+		gui.Enabled = state.Price ~= nil and isNext
+		stats.Visible = true
 		name.Text = if isNext then `Pedestal {state.Slot}` else "Sealed pedestal"
 		name.TextColor3 = if isNext then WHITE else GREY
 		amount.Text = Format.number(state.Price or 0)
@@ -262,6 +265,8 @@ local function updateInfo(top: BasePart, state: SlotState)
 	end
 	amount.TextColor3 = GOLD
 	gui.Enabled = true
+	-- An empty pedestal just says so (no "0/s" and level chips).
+	stats.Visible = state.Id ~= nil
 	if state.Id then
 		name.Text, name.TextColor3 = relicLook(state)
 	else
@@ -365,7 +370,8 @@ local function showStored(pedestal: Instance, owned: boolean, stored: number)
 		glow.Transparency = if not owned then 1 elseif ready then PAD_GLOW_READY else PAD_GLOW_IDLE
 	end
 	local gui = (pad:FindFirstChild("Stored") or buildStoredGui(pad)) :: BillboardGui
-	gui.Enabled = owned
+	-- Nothing waiting: no floating "0" (2026-11-09: four zeros greeted every new player).
+	gui.Enabled = ready
 	local amount = (gui:FindFirstChild("Row") :: Frame):FindFirstChild("Amount") :: TextLabel
 	amount.Text = Format.number(stored)
 	amount.TextColor3 = if ready then GOLD else GREY

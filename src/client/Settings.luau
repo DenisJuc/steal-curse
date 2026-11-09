@@ -49,8 +49,21 @@ function Settings.Watch(key: string, callback: (ClientSettings.Value) -> ())
 	callback(Settings.Get(key))
 end
 
+-- True on a touch-only device (phone or tablet): the "Auto" effects level goes Low there.
+function Settings.IsTouchDevice(): boolean
+	local UserInputService = game:GetService("UserInputService")
+	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled and not UserInputService.GamepadEnabled
+end
+
 function Settings.LowEffects(): boolean
-	return Settings.Get("Effects") == "Low"
+	local value = Settings.Get("Effects")
+	return value == "Low" or (value == "Auto" and Settings.IsTouchDevice())
+end
+
+-- Music setting as 0..1.
+function Settings.MusicVolume(): number
+	local value = Settings.Get("Music")
+	return (if type(value) == "number" then value else 70) / 100
 end
 
 function Settings.Volume(): number

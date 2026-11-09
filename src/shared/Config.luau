@@ -178,6 +178,28 @@ Config.Footsteps = {
 -- up to MaxRate, so sprinting and the Spirit Lane boost both sound faster without a chipmunk pitch.
 Config.FootstepPace = { Exponent = 0.75, MaxRate = 2.4 }
 
+-- Soundtrack (2026-11-09): a calm koto playlist in town and a darker ambient one in the wild,
+-- crossfading as you walk out (Ambience.WildWeight). Free Creator Store music, each checked to load
+-- in Studio (measured length in seconds after the name). Volume is the full-volume level before
+-- the player's Music setting. The old ambience loops (town crickets, wild drones) were cut so
+-- nothing plays over the music.
+Config.Music = {
+	Volume = 0.4,
+	FadeSeconds = 2.5,
+	-- Seconds of silence between two tracks of a playlist.
+	Gap = 4,
+	Town = {
+		"rbxassetid://100971756298760", -- Twilight Temple Koto Ambient (158)
+		"rbxassetid://137172521077350", -- Biwa Lake Fog (290)
+		"rbxassetid://133364143276489", -- Autumn Moon Koto Ambient (158)
+	},
+	Wild = {
+		"rbxassetid://139743346356072", -- Forgotten Crypt Ambient (218)
+		"rbxassetid://128237371023483", -- Slow Ritual Rain (205)
+		"rbxassetid://138001651207846", -- Dark Ambient Scary Horror Suspense (223)
+	},
+}
+
 Config.RemoteLimits = {
 	Default = { Rate = 10, Burst = 20 },
 	Bind = { Rate = 8, Burst = 12 },
@@ -884,8 +906,9 @@ Config.Ambience = {
 			{ Name = "Motes", Texture = FIREFLY, Color = { 190, 150, 255 }, Rate = 6, Size = 0.3, Lifetime = 6, Speed = 0.5, LightEmission = 1, Drift = { 0, 0.3, 0 } },
 			{ Name = "Mist", Texture = SMOKE, Color = { 150, 140, 185 }, Rate = 2, Size = 9, Lifetime = 10, Speed = 0.4, LightEmission = 0, Transparency = 0.88, Low = true },
 		},
-		-- Crickets at night (Roblox sound library), and wind chimes now and then (WildSounds).
-		SoundId = "rbxassetid://9112764573",
+		-- No ambience loop: the town has music now (Config.Music; the crickets were cut so the two
+		-- don't play over each other). Wind chimes now and then (WildSounds).
+		SoundId = "",
 		Distant = { "WindChimes" },
 	},
 	Areas = {
@@ -899,7 +922,8 @@ Config.Ambience = {
 				{ Name = "Mist", Texture = SMOKE, Color = { 190, 215, 205 }, Rate = 3, Size = 9, Lifetime = 10, Speed = 0.4, LightEmission = 0, Transparency = 0.85, Low = true },
 				{ Name = "Rain", Texture = SMOKE, Color = { 170, 185, 200 }, Rate = 450, Size = 0.09, Lifetime = 0.5, Speed = 55, LightEmission = 0.4, Transparency = 0.45, Fall = true, Squash = 3 },
 			},
-			SoundId = "rbxassetid://82469083481448",
+			-- Loops cut for the wild music (Config.Music); the rare distant sounds stay.
+			SoundId = "",
 			Distant = { "DistantWhisper", "BranchSnap", "DistantHowl" },
 		},
 		AbandonedVillage = {
@@ -911,7 +935,7 @@ Config.Ambience = {
 				{ Name = "Embers", Texture = EMBER, Color = { 255, 150, 70 }, Rate = 10, Size = 0.25, Lifetime = 5, Speed = 1.5, LightEmission = 1, Drift = { 0, 1.2, 0 } },
 				{ Name = "Ash", Texture = SMOKE, Color = { 160, 145, 140 }, Rate = 2, Size = 7, Lifetime = 9, Speed = 0.5, LightEmission = 0, Transparency = 0.88, Low = true },
 			},
-			SoundId = "rbxassetid://9114574159",
+			SoundId = "",
 			Distant = { "BellToll", "DistantWhisper", "BranchSnap" },
 		},
 		AncientRuins = {
@@ -923,7 +947,7 @@ Config.Ambience = {
 				{ Name = "Glyphs", Texture = FIREFLY, Color = { 140, 200, 255 }, Rate = 10, Size = 0.45, Lifetime = 5, Speed = 0.8, LightEmission = 1, Drift = { 0, 0.6, 0 } },
 				{ Name = "Dust", Texture = SMOKE, Color = { 200, 195, 220 }, Rate = 2, Size = 6, Lifetime = 8, Speed = 0.6, LightEmission = 0, Transparency = 0.9, Low = true },
 			},
-			SoundId = "rbxassetid://273398061",
+			SoundId = "",
 			Distant = { "StoneGrind", "DistantWhisper", "DistantHowl" },
 		},
 	},
@@ -1010,8 +1034,9 @@ Config.Plots = {
 	SealShrineOffset = { -32, -40 },
 	AltarOffset = { 31, 30 },
 	GardenOffset = { -30, 30 },
-	-- On the aisle between the gate and the first pads, so spawning never claims a pad.
-	SpawnOffset = { 0, -40 },
+	-- On the front cross lane just before the pool, so spawning never claims a pad and the camera
+	-- behind you is clear of the gate's torii (2026-11-09: at -40 it started inside the beam).
+	SpawnOffset = { 0, -36.5 },
 }
 
 -- Hub plaza at the near end of Shrine Street. Hub space: X across the street, -Z toward the

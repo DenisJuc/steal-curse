@@ -35,6 +35,11 @@ local GroundGuide = require(script.Parent.Parent.Effects.GroundGuide)
 local SpiritSight = require(script.Parent.Parent.Effects.SpiritSight)
 local HuntController = require(script.Parent.Parent.Hunt.HuntController)
 local Settings = require(script.Parent.Parent.Settings)
+
+-- Keyboard wording on a computer, button wording on a phone or tablet.
+local function pick(keyboard: string, touch: string): string
+	return if Settings.IsTouchDevice() then touch else keyboard
+end
 local HudUnlocks = require(script.Parent.HudUnlocks)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
@@ -52,7 +57,7 @@ type Step = {
 	-- A function is re-read every frame (e.g. a live countdown).
 	Text: string | (Player) -> string,
 	Done: ((Player) -> boolean)?,
-	Fallback: { Target: string, Side: Side, Text: string }?,
+	Fallback: { Target: string, Side: Side, Text: string | (Player) -> string }?,
 	Skip: boolean?,
 	-- HudUnlocks gate: shown only once this feature is unlocked (at its unlock, or in a replay).
 	Gate: string?,
@@ -354,7 +359,9 @@ local HUNT_STEPS: { Step } = {
 		Hunt = true,
 		Target = "SpiritSight",
 		Side = "Left",
-		Text = "Press F to enter the spirit world.",
+		Text = function()
+			return pick("Press F to enter the spirit world.", "Tap Spirit Sight to enter the spirit world.")
+		end,
 		Done = function()
 			return SpiritSight.IsEnabled()
 		end,
@@ -363,11 +370,19 @@ local HUNT_STEPS: { Step } = {
 		Hunt = true,
 		Target = "Pulse",
 		Side = "Left",
-		Text = "Press Q to pulse: it shows where the spirits are hiding.",
+		Text = function()
+			return pick("Press Q to pulse: it shows where the spirits are hiding.", "Tap Pulse: it shows where the spirits are hiding.")
+		end,
 		Done = function()
 			return HuntController.LastPulse() > stepClock
 		end,
-		Fallback = { Target = "SpiritSight", Side = "Left", Text = "Press F to go back into the spirit world." },
+		Fallback = {
+			Target = "SpiritSight",
+			Side = "Left",
+			Text = function()
+				return pick("Press F to go back into the spirit world.", "Tap Spirit Sight to go back into the spirit world.")
+			end,
+		},
 	},
 	{
 		Hunt = true,
@@ -376,7 +391,7 @@ local HUNT_STEPS: { Step } = {
 		Text = function()
 			return if SpiritSight.IsEnabled()
 				then "Follow the arrows to the nearest spirit."
-				else "Press F to go back into the spirit world, then follow the arrows."
+				else pick("Press F to go back into the spirit world, then follow the arrows.", "Tap Spirit Sight to go back into the spirit world, then follow the arrows.")
 		end,
 		Guide = nearestSpirit,
 		Done = function()
@@ -387,7 +402,9 @@ local HUNT_STEPS: { Step } = {
 		Hunt = true,
 		Target = "Bind",
 		Side = "Left",
-		Text = "Hold E (or the Bind button) to seal it. Keep holding until the chains close!",
+		Text = function()
+			return pick("Hold E (or the Bind button) to seal it. Keep holding until the chains close!", "Hold the Bind button to seal it. Keep holding until the chains close!")
+		end,
 		Guide = nearestSpirit,
 		Done = function()
 			return sealed
@@ -398,7 +415,9 @@ local HUNT_STEPS: { Step } = {
 		Hunt = true,
 		Target = TOP,
 		Side = "Below",
-		Text = "Sealed! Every seal gives that relic plus bonus rolls. Press F to leave the spirit world.",
+		Text = function()
+			return pick("Sealed! Every seal gives that relic plus bonus rolls. Press F to leave the spirit world.", "Sealed! Every seal gives that relic plus bonus rolls. Tap Leave Sight to leave the spirit world.")
+		end,
 	},
 }
 -- Direct children of the main screen that stay up during the spirit hunt tutorial. Rolling goes
@@ -720,7 +739,8 @@ function Onboarding.Start(screen: ScreenGui)
 		local side, text = step.Side, (if type(step.Text) == "function" then (step.Text :: any)(player) else step.Text) :: string
 		if not target and step.Fallback then
 			target = find(step.Fallback.Target)
-			side, text = step.Fallback.Side, step.Fallback.Text
+			local fallbackText = step.Fallback.Text
+			side, text = step.Fallback.Side, (if type(fallbackText) == "function" then (fallbackText :: any)(player) else fallbackText) :: string
 		end
 		local inMenu = string.find(step.Target, "/", 1, true) ~= nil and target ~= nil and find(step.Target) ~= nil
 		-- A rare find's reveal, or the bonus rolls after a seal, has the screen: the tip waits behind

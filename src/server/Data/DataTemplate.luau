@@ -236,7 +236,7 @@ DataTemplate.Template = {
 		},
 		-- Must equal ClientSettings.defaults() (checked by a Lune test).
 		Client = {
-			Effects = "Full",
+			Effects = "Auto",
 			Reveals = "Full",
 			RevealAnimation = "On",
 			RevealSound = "On",
@@ -244,6 +244,7 @@ DataTemplate.Template = {
 			RollStyle = "Omikuji",
 			Camera = "On",
 			Sound = 100,
+			Music = 70,
 			Footsteps = 50,
 			InterfaceSize = "Medium",
 			AfkReports = "On",

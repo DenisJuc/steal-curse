@@ -81,6 +81,34 @@ local function countParts(folder: Instance): number
 	return count
 end
 
+-- Performance pass over the finished static map (2026-11-09, phones): nothing in the map needs
+-- touch events except the collect pads' triggers, so every other part stops generating them; and
+-- tiny, glowing or see-through parts stop casting shadows (no visible difference at night, a
+-- cheaper shadow pass).
+local TOUCH_KEEP = { CollectTrigger = true }
+local SHADOW_MIN_SIZE = 3
+local function lighten(folder: Instance): { Touch: number, Shadow: number }
+	local touch, shadow = 0, 0
+	for _, part in folder:GetDescendants() do
+		if not part:IsA("BasePart") then
+			continue
+		end
+		if part.CanTouch and not TOUCH_KEEP[part.Name] then
+			part.CanTouch = false
+			touch += 1
+		end
+		if part.CastShadow then
+			local size = part.Size
+			local small = math.max(size.X, size.Y, size.Z) < SHADOW_MIN_SIZE
+			if small or part.Material == Enum.Material.Neon or part.Transparency >= 0.5 then
+				part.CastShadow = false
+				shadow += 1
+			end
+		end
+	end
+	return { Touch = touch, Shadow = shadow }
+end
+
 function MapBuilder.Build(): Map
 	for _, name in { "Baseplate", "SpawnLocation" } do
 		local template = workspace:FindFirstChild(name)
@@ -117,10 +145,13 @@ function MapBuilder.Build(): Map
 	local started = os.clock()
 	local wild = WildBuilder.Build(folder)
 
+	local lightened = lighten(folder)
+
 	-- Plot relic displays are added later per player; this measures the static map.
 	local partCount = countParts(folder)
 	local summary = `{partCount} parts ({dressed} with shrine materials), {wild.PropCount} wild props, {#wild.SpawnPoints} signal spots,`
 		.. ` wild built in {string.format("%.1f", os.clock() - started)} s`
+	summary ..= ` ({lightened.Touch} touch / {lightened.Shadow} shadow flags cleared)`
 	if partCount > Config.World.PartBudget then
 		warn(`[Map] {summary}: over the budget of {Config.World.PartBudget}; consider StreamingEnabled.`)
 	else

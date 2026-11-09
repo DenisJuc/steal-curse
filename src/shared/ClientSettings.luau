@@ -34,9 +34,9 @@ ClientSettings.Schema = {
 	{
 		Key = "Effects",
 		Label = "Visual effects",
-		Help = "Low turns off particles, flashes and small projections (better on slow phones).",
-		Options = { "Full", "Low" },
-		Default = "Full",
+		Help = "Low turns off particles, flashes and small projections. Auto: Low on phones and tablets, Full elsewhere.",
+		Options = { "Auto", "Full", "Low" },
+		Default = "Auto",
 	},
 	{
 		Key = "Reveals",
@@ -95,6 +95,13 @@ ClientSettings.Schema = {
 		Help = "Volume of reveal and menu sounds.",
 		Range = { Min = 0, Max = 100, Step = 5 },
 		Default = 100,
+	},
+	{
+		Key = "Music",
+		Label = "Music volume",
+		Help = "Volume of the soundtrack (0 turns it off).",
+		Range = { Min = 0, Max = 100, Step = 5 },
+		Default = 70,
 	},
 	{
 		Key = "Footsteps",

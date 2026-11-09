@@ -1,6 +1,7 @@
 -- After a teleport (spawning at your shrine, Home / Hub / Wild / Shrine travel) the camera kept its
 -- old angle, so you arrived looking the wrong way: at the street instead of into your shrine. When
--- the character jumps farther than JUMP studs in one frame, swing the camera behind its new facing.
+-- the character jumps farther than JUMP studs in one frame, or a new character spawns, swing the
+-- camera behind its new facing.
 -- Only the normal (Custom) camera is touched; reveals and binds that script the camera are left alone.
 
 local Players = game:GetService("Players")
@@ -9,10 +10,10 @@ local RunService = game:GetService("RunService")
 local CameraSnap = {}
 
 local JUMP = 40
--- High enough to look over the sacred rope across a plot gate and under the torii beam when you
--- arrive home (the spawn sits just inside the gate).
-local BACK = 12
-local UP = 10
+-- Close and high enough that, arriving home, the camera sits inside the shrine in front of the
+-- torii (the spawn is 13.5 studs inside the gate) looking down into it.
+local BACK = 9
+local UP = 8
 
 local function snap(root: BasePart)
 	local camera = workspace.CurrentCamera
@@ -40,7 +41,8 @@ function CameraSnap.Start()
 			return
 		end
 		local position = root.Position
-		if root == lastRoot and last and (position - last).Magnitude > JUMP then
+		if root ~= lastRoot or (last and (position - last).Magnitude > JUMP) then
+			-- A new character (first spawn, respawn) or a teleport.
 			snap(root)
 		end
 		last, lastRoot = position, root
