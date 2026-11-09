@@ -15,7 +15,6 @@ local Config = require(ReplicatedStorage.Shared.Config)
 local SkillConfig = require(ReplicatedStorage.Shared.SkillConfig)
 local Stamina = require(ReplicatedStorage.Shared.Stamina)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
-local Toasts = require(script.Parent.Parent.UI.Toasts)
 local UIKit = require(script.Parent.Parent.UI.UIKit)
 
 local LANE_COLOR = Color3.fromRGB(190, 140, 255)
@@ -104,7 +103,6 @@ function SprintController.Start(screen: ScreenGui, anchor: GuiObject?)
 	local state = Stamina.new()
 	local held, toggled = false, false
 	local fullFor = math.huge
-	local laneHinted = false
 	local holder, back, fill = makeBar(screen)
 	local icon = holder:FindFirstChild("Icon") :: TextLabel
 
@@ -157,10 +155,6 @@ function SprintController.Start(screen: ScreenGui, anchor: GuiObject?)
 			if wind.Enabled ~= boosted then
 				wind.Enabled = boosted
 				wind.Rate = if boosted then 40 else 0
-			end
-			if boosted and not laneHinted then
-				laneHinted = true
-				Toasts.Show("Spirit Lane: you move faster on Shrine Street, and running here is free!")
 			end
 		end
 		fullFor = if state.Value >= 1 then fullFor + dt else 0

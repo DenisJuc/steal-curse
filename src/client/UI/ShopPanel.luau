@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Config = require(ReplicatedStorage.Shared.Config)
 local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
+local HudTile = require(script.Parent.HudTile)
 local UIKit = require(script.Parent.UIKit)
 
 local player = Players.LocalPlayer
@@ -250,27 +251,7 @@ function ShopPanel.Start(screen: ScreenGui, onOpen: () -> ()): { Toggle: () -> (
 		card(products, index, entry, false, "Card")
 	end
 
-	local holder = UIKit.create("Frame", {
-		Name = "ShopButton",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -40, 0, 116),
-		Size = UDim2.fromOffset(150, 48),
-		BackgroundTransparency = 1,
-		Parent = screen,
-	})
-	UIKit.scaler(holder)
-	-- Small screens: SHOP and GIFTS share one row under the travel bar, clear of Spirit Sight.
-	UIKit.watchCompact(function(compact: boolean)
-		holder.Position = if compact then UDim2.new(1, -190, 0, 34) else UDim2.new(1, -40, 0, 116)
-	end)
-	local open = UIKit.button({
-		Text = "SHOP",
-		FontFace = UIKit.TitleFont,
-		TextSize = 24,
-		Size = UDim2.fromScale(1, 1),
-		Parent = holder,
-	}, onOpen)
-	UIKit.skinButton(open, "Gold")
+	HudTile.make(screen, "ShopButton", 1, "Shop", "Shop", onOpen)
 
 	return {
 		Toggle = function()

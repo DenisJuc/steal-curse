@@ -38,6 +38,7 @@ function SettingsService.SetFocus(player: Player, focus: any): boolean
 	if not data or type(focus) ~= "string" or not VALID_FOCUS[focus] then
 		return false
 	end
+	-- Rarity Focus was removed (2026-11-08): the choice is still accepted and saved, never used.
 	data.Settings.RarityFocus = focus
 	RollService.RefreshAttributes(player)
 	return true

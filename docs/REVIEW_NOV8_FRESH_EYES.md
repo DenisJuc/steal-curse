@@ -39,3 +39,24 @@ dressing hit 11,227, cut back by using fewer spider-lily patches, which are 14 p
    sealed slots. Once relics land it fills up, but the first minutes look bare.
 7. **Sound levels need a listen.** Step volumes and the cricket/chime mix were set blind (no way to
    hear audio from here). Rosselle should walk grass, slate and the street with sound on.
+
+## Rebirth cost review (proposal, not applied)
+
+Today: first Rebirth costs 400M CE, then x4 each time. Simulated progression (SoftCap + B+) shows
+the problem: by minute 15 a player has ~1 useful upgrade left and luck sits flat (~x125-131) from
+minute 15 to 60, then R1 lands around 70-90 min. The real 35-minute playtest never reached a Rebirth.
+Competitor RNG/collector games let you rebirth around 10-20 minutes in.
+
+Core-loop simulator, 10 seeds, 2 hours (`tests/lib/coreLoopSim`):
+
+| BaseCost | CostGrowth | R1 P50 | R1 P10-P90 | Rebirths by 2h |
+| --- | --- | --- | --- | --- |
+| 400M (now) | 4 | 68 min | 39-78 | 3 |
+| 2M | 4 | 25 min | 20-30 | 14 |
+| 1M | 10 | 22 min | 16-23 | 6 |
+| **500K** | **10** | **17 min** | **11-19** | **7** |
+
+Proposal: **BaseCost 500K, CostGrowth 10.** R1 lands at ~17 min (where upgrades run out), later
+Rebirths stay spaced out (7 by 2h instead of 14 with the old x4 growth). Watch-out: more Rebirths
+means more Rebirth luck early (x1.5 each), so rarity pacing should be re-checked in a playtest.
+Balance change: needs Rosselle's OK.

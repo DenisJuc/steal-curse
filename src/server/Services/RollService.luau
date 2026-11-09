@@ -106,7 +106,8 @@ function RollService.BuildContext(player: Player, options: RollOptions?): RollMa
 	local familyAttune = CollectionService.FamilyAttuneBonus(player)
 	local ctx = RollMath.contextFor(RollRules, {
 		FullLuck = RollService.GetFullLuck(player) * (if options and options.LuckFactor then options.LuckFactor else 1),
-		RarityFocus = attuneFocus or (if data then data.Settings.RarityFocus else Config.Focus.Default),
+		-- Rarity Focus removed 2026-11-08 (full luck always); only the Attune craft still focuses.
+		RarityFocus = attuneFocus or "MaxLuck",
 		Frequency = familyAttune or (if data then data.Settings.Frequency else Config.Frequency.Default),
 		FrequencyRank = if data then data.Skills.FrequencyFocus else 0,
 		MutationRank = mutationRank,

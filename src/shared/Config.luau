@@ -159,40 +159,35 @@ Config.Sounds = {
 	DistantHowl = { Id = "rbxassetid://9113956884", Volume = 1.00, Range = 300 },
 }
 
--- Footstep sound per floor material (Enum.Material name; WildSounds swaps the character's running
--- sound). Empty / missing = Roblox's default step. FootstepVolumeScale multiplies the Running
--- sound (0.35 = turned down 65% from Roblox's default).
-local STEP = "rbxassetid://92061301674605"
-Config.FootstepVolumeScale = 0.35
--- 2026-11-08 SFX pass: one looping step per surface family (free Creator Store audio, each
--- checked to load in Studio). Material variants report their base material (slate tiles = Slate).
-local STEP_GRASS = "rbxassetid://18438190442"
-local STEP_STONE = "rbxassetid://104851661205720"
-local STEP_WOOD = "rbxassetid://102932066102999"
-local STEP_DIRT = "rbxassetid://85618165171747"
+-- Footsteps (2026-11-08): one short step sound per stride, picked at random from the floor's set
+-- (free Creator Store audio, each checked to load). Replaces the long recorded loops, which
+-- restarted from a quiet lead-in every time you started walking (only sprinting was audible).
+-- Material variants report their base material (slate tiles = Slate).
+Config.FootstepSets = {
+	Grass = { "rbxassetid://129956418693357", "rbxassetid://78534941650081", "rbxassetid://110522236020035", "rbxassetid://135037154891351" },
+	Stone = {
+		"rbxassetid://133325104274958", "rbxassetid://93803555891980", "rbxassetid://85682518019906",
+		"rbxassetid://80346333847986", "rbxassetid://140594308250996", "rbxassetid://82615619091463",
+	},
+	Wood = { "rbxassetid://75982487060381", "rbxassetid://92705710431057", "rbxassetid://76286399907074" },
+	Dirt = {
+		"rbxassetid://103963258527392", "rbxassetid://98375658066754", "rbxassetid://138750508569819",
+		"rbxassetid://83249973538428", "rbxassetid://134689890007261", "rbxassetid://140165597842270",
+	},
+} :: { [string]: { string } }
+-- Floor material -> step set. Unlisted floors use Stone.
 Config.Footsteps = {
-	Grass = STEP_GRASS,
-	LeafyGrass = STEP_GRASS,
-	Mud = STEP_DIRT,
-	Ground = STEP_DIRT,
-	Sand = STEP_DIRT,
-	Pebble = STEP_DIRT,
-	Rock = STEP_STONE,
-	Slate = STEP_STONE,
-	Basalt = STEP_STONE,
-	Limestone = STEP_STONE,
-	Sandstone = STEP_STONE,
-	Cobblestone = STEP_STONE,
-	Brick = STEP_STONE,
-	Concrete = STEP_STONE,
-	Granite = STEP_STONE,
-	Marble = STEP_STONE,
-	Pavement = STEP_STONE,
-	Wood = STEP_WOOD,
-	WoodPlanks = STEP_WOOD,
+	Grass = "Grass",
+	LeafyGrass = "Grass",
+	Mud = "Dirt",
+	Ground = "Dirt",
+	Sand = "Dirt",
+	Pebble = "Dirt",
+	Wood = "Wood",
+	WoodPlanks = "Wood",
 } :: { [string]: string }
--- Unlisted floors (plastic, metal...) keep this default step.
-Config.FootstepDefault = STEP
+-- Seconds between steps at walking speed (16); faster movement steps quicker, never under MinGap.
+Config.FootstepCadence = { Walk = 0.4, MinGap = 0.2, Volume = 0.45 }
 
 Config.RemoteLimits = {
 	Default = { Rate = 10, Burst = 20 },
@@ -986,7 +981,7 @@ Config.Plots = {
 		LanternSpacing = 27,
 		LanternLight = { Range = 26, Brightness = 2.4 },
 		-- Spirit Lane: on the paved street you walk Multiplier x faster and sprint costs no stamina.
-		Lane = { Multiplier = 1.75 },
+		Lane = { Multiplier = 3.5 },
 		-- Town paths from the hub plaza to the other wild areas: optional bends, as
 		-- {along, across} street coordinates (across is positive on the odd-plot side).
 		Bends = { AncientRuins = { { -200, -190 } } },
@@ -1031,7 +1026,6 @@ Config.Hub = {
 	Kiosks = {
 		{ Menu = "Codex", Label = "Codex Archive", At = { -64, -27 }, Prop = "CodexLectern" },
 		{ Menu = "Skills", Label = "Rune Monolith", At = { -64, -9 }, Prop = "RuneMonolith" },
-		{ Menu = "Luck", Label = "Fortune Shrine", At = { -64, 9 }, Prop = "OfferingBox" },
 		{ Menu = "Wardrobe", Label = "Spirit Wardrobe", At = { -64, 27 } },
 		{ Menu = "Relics", Label = "Relic Keeper", At = { 64, -18 } },
 		{ Menu = "Journal", Label = "Journal Board", At = { 64, 0 } },

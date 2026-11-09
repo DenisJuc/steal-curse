@@ -188,6 +188,17 @@ function MenuMotion.Start(screen: ScreenGui)
 		end
 	end)
 	screen:GetPropertyChangedSignal("Enabled"):Connect(refreshBackdrop)
+	-- Safety net: whatever toggled it, the backdrop never stays up with no menu open (it is a
+	-- full-screen button and would swallow camera drags).
+	backdrop:GetPropertyChangedSignal("Visible"):Connect(function()
+		if backdrop.Visible and not (anyOpen() and screen.Enabled) then
+			task.delay(0.3, function()
+				if backdrop.Visible and not (anyOpen() and screen.Enabled) then
+					backdrop.Visible = false
+				end
+			end)
+		end
+	end)
 
 	local function attach(child: Instance)
 		if not child:IsA("GuiObject") or not child:GetAttribute("Modal") then

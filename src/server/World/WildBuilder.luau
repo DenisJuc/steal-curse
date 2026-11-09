@@ -774,32 +774,67 @@ local function scatter(folder: Instance, rng: Random, boxes: { WorldLayout.Box }
 			if WildLayout.pathDistance(Config.Areas, x, z) < PATH_WIDTH / 2 + radius + 2 then
 				continue
 			end
-			local blocked = false
-			for _, box in boxes do
-				if WorldLayout.distanceToBox(x, z, box) < radius + 3 then
-					blocked = true
+			-- One placement seeds a small group: 1-4 more props of the same kind or a companion,
+			-- tighter and with more size spread, so the wild reads as groves, rock fields and
+			-- mushroom rings instead of one even sprinkle.
+			local group = { { Prop = propId, X = x, Z = z, Scale = scale } }
+			local companions = WildLayout.Companions[propId]
+			for _ = 1, rng:NextInteger(1, 4) do
+				local partner = if companions and rng:NextNumber() < 0.55
+					then companions[rng:NextInteger(1, #companions)]
+					else propId
+				local angle = rng:NextNumber(0, math.pi * 2)
+				local distance = rng:NextNumber(3, 6) + MapPropConfig.radius(partner)
+				table.insert(group, {
+					Prop = partner,
+					X = x + math.cos(angle) * distance,
+					Z = z + math.sin(angle) * distance,
+					Scale = rng:NextNumber(SCATTER_SCALE.Min * 0.8, SCATTER_SCALE.Max * 1.25),
+				})
+			end
+			for index, piece in group do
+				if placed >= wanted then
 					break
 				end
-			end
-			if not blocked then
-				for _, circle in nearby(hash, x, z, radius + 12) do
-					if (circle.X - x) ^ 2 + (circle.Z - z) ^ 2 < ((circle.R + radius) * 0.85) ^ 2 then
+				local px, pz = piece.X, piece.Z
+				local pr = MapPropConfig.radius(piece.Prop) * piece.Scale
+				if index > 1 then
+					if
+						not WorldLayout.inWild(world, px, pz, pr + 3)
+						or WorldLayout.inStream(world, px, pz, pr + 3)
+						or WildLayout.pathDistance(Config.Areas, px, pz) < PATH_WIDTH / 2 + pr + 2
+						or ditheredArea(rng, px, pz) ~= area.Id
+					then
+						continue
+					end
+				end
+				local blocked = false
+				for _, box in boxes do
+					if WorldLayout.distanceToBox(px, pz, box) < pr + 3 then
 						blocked = true
 						break
 					end
 				end
+				if not blocked then
+					for _, circle in nearby(hash, px, pz, pr + 12) do
+						if (circle.X - px) ^ 2 + (circle.Z - pz) ^ 2 < ((circle.R + pr) * 0.85) ^ 2 then
+							blocked = true
+							break
+						end
+					end
+				end
+				if blocked then
+					continue
+				end
+				local base = CFrame.new(px, groundY(px, pz), pz) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
+				local model = MapProps.build(folder, piece.Prop, base, piece.Scale, rng)
+				if model and PERCHES[piece.Prop] then
+					model:SetAttribute("Scale", piece.Scale)
+					CollectionService:AddTag(model, PERCH_TAG)
+				end
+				addCircle(hash, { X = px, Z = pz, R = pr })
+				placed += 1
 			end
-			if blocked then
-				continue
-			end
-			local base = CFrame.new(x, groundY(x, z), z) * CFrame.Angles(0, rng:NextNumber(0, math.pi * 2), 0)
-			local model = MapProps.build(folder, propId, base, scale, rng)
-			if model and PERCHES[propId] then
-				model:SetAttribute("Scale", scale)
-				CollectionService:AddTag(model, PERCH_TAG)
-			end
-			addCircle(hash, { X = x, Z = z, R = radius })
-			placed += 1
 		end
 		counts[area.Id] = placed
 	end

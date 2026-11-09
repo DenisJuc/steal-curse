@@ -13,6 +13,9 @@ return {
 	Color = {
 		-- Big square buttons (left column and bottom bar)
 		Luck = "rbxassetid://133633712186433",
+		-- gvesster free pack (CoinsPMetall, BronzeChest), uploaded 2026-11-08.
+		Shop = "rbxassetid://114599455575955",
+		Gift = "rbxassetid://118679306136275",
 		Rebirth = "rbxassetid://123009932980997",
 		Codex = "rbxassetid://110657794557639",
 		-- Collection reuses Favorite (star) until a dedicated pack icon is uploaded.

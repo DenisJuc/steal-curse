@@ -14,7 +14,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local Banner = require(script.Parent.Banner)
 local Toasts = require(script.Parent.Toasts)
 
 local HudUnlocks = {}
@@ -32,7 +31,6 @@ HudUnlocks.Unlocked = unlockedEvent.Event
 
 -- Everything unlocks at this many lifetime rolls (~5 minutes of Auto Roll at 4 s a roll).
 local ALL_SCANS = 75
-local BANNER_COLOR = Color3.fromRGB(255, 215, 120)
 
 type Stats = { Scans: number, Discovered: number, CoreLuck: number }
 
@@ -70,7 +68,8 @@ local GATES: { Gate } = {
 		Rule = { Stat = "Scans", At = 25 },
 		Title = "GIFTS UNLOCKED",
 		Text = "Free gifts while you play",
-		Names = { "GiftButton", "ShopButton" },
+		-- The Shop is always visible (early purchases matter most); only Gifts waits.
+		Names = { "GiftButton", "BountyButton" },
 		Targets = { "GiftButton" },
 		When = function(s)
 			return s.Scans >= 25
@@ -94,7 +93,7 @@ local GATES: { Gate } = {
 		Rule = { Stat = "Scans", At = 40 },
 		Title = "LUCK UNLOCKED",
 		Text = "See every boost to your luck",
-		Names = { "LuckButtonSlot" },
+		Names = { "LuckPillSlot" },
 		Targets = {},
 		When = function(s)
 			return s.CoreLuck >= 1 or s.Scans >= 40
@@ -150,7 +149,6 @@ HudUnlocks.MenuGate = {
 	Shrine = "Pedestals",
 	Codex = "Codex",
 	Collection = "Codex",
-	Luck = "Luck",
 	Journal = "Journal",
 	Rebirth = "Journal",
 } :: { [string]: string }
@@ -343,9 +341,7 @@ function HudUnlocks.Start(screen: ScreenGui)
 				wanted[object] = nil
 			end
 		end
-		if announce then
-			Banner.Show(gate.Title, gate.Text, BANNER_COLOR)
-		end
+		-- No banner per unlock (2026-11-08: too much on screen); the entry just appears.
 		unlockedEvent:Fire(gate.Id, announce)
 	end
 
@@ -384,9 +380,6 @@ function HudUnlocks.Start(screen: ScreenGui)
 				unlock(gate, false)
 				rest += 1
 			end
-		end
-		if rest > 0 and announce then
-			Banner.Show("EVERYTHING UNLOCKED", "Every menu is open now", BANNER_COLOR)
 		end
 		-- Locks only apply once the saved stats have been judged (no flash of "Locked" on join).
 		started = true

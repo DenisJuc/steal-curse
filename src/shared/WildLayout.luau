@@ -123,35 +123,60 @@ end
 WildLayout.BridgeAngles = { 22.5, 90, 157.5, 225, 292.5, 337.5 }
 
 -- stylua: ignore
+-- 2026-11-08: placements come in groups (WildBuilder scatter: each pick seeds 1-4 more of its kind
+-- or a companion nearby), so these densities count props, not groups. More rock models per area
+-- and fewer spider-lily patches (14 parts each).
 WildLayout.Scatter = {
 	HauntedForest = {
-		{ Prop = "DeadTree1", Density = 4.4 },
-		{ Prop = "DeadTree2", Density = 3.3 },
-		{ Prop = "MossyRocks", Density = 1.6 },
+		{ Prop = "DeadTree1", Density = 4.0 },
+		{ Prop = "DeadTree2", Density = 3.0 },
+		{ Prop = "MossyRocks", Density = 0.6 },
+		{ Prop = "MossRock1", Density = 0.5 },
+		{ Prop = "MossRock3", Density = 0.4 },
 		{ Prop = "GlowMushrooms", Density = 2.2 },
 		{ Prop = "FernBush", Density = 3.1 },
 		{ Prop = "FallenLog", Density = 0.8 },
-		{ Prop = "SpiderLilyPatch", Density = 1.0 },
-		{ Prop = "BambooGrove", Density = 0.4 },
-		{ Prop = "BambooGrove2", Density = 0.4 },
+		{ Prop = "SpiderLilyPatch", Density = 0.5 },
+		{ Prop = "BambooGrove", Density = 0.5 },
+		{ Prop = "BambooGrove2", Density = 0.5 },
 	},
 	AbandonedVillage = {
-		{ Prop = "FernBush", Density = 1.6 },
+		{ Prop = "FernBush", Density = 1.4 },
 		{ Prop = "CrateBarrelPile", Density = 0.65 },
-		{ Prop = "MossyRocks", Density = 0.5 },
+		{ Prop = "MossyRocks", Density = 0.3 },
+		{ Prop = "MossRock4", Density = 0.3 },
+		{ Prop = "MossSlab", Density = 0.3 },
 		{ Prop = "DeadTree2", Density = 0.65 },
 		{ Prop = "FallenLog", Density = 0.3 },
-		{ Prop = "SpiderLilyPatch", Density = 0.6 },
+		{ Prop = "SpiderLilyPatch", Density = 0.3 },
 		{ Prop = "BambooGrove", Density = 0.3 },
 	},
 	AncientRuins = {
 		{ Prop = "BrokenPillar1", Density = 1.3 },
 		{ Prop = "BrokenPillar2", Density = 1.6 },
-		{ Prop = "MossyRocks", Density = 1.6 },
+		{ Prop = "MossyRocks", Density = 0.6 },
+		{ Prop = "MossRock2", Density = 0.5 },
+		{ Prop = "MossRock3", Density = 0.5 },
+		{ Prop = "MossSlab", Density = 0.4 },
 		{ Prop = "FernBush", Density = 0.8 },
-		{ Prop = "SpiderLilyPatch", Density = 0.6 },
+		{ Prop = "SpiderLilyPatch", Density = 0.3 },
 	},
 } :: { [string]: { ScatterRule } }
+
+-- Which prop may join a group seeded by another (else more of the same kind).
+WildLayout.Companions = {
+	DeadTree1 = { "DeadTree2", "FernBush", "FallenLog" },
+	DeadTree2 = { "DeadTree1", "FernBush", "GlowMushrooms" },
+	GlowMushrooms = { "GlowMushrooms", "FernBush" },
+	MossyRocks = { "MossRock1", "MossRock3", "FernBush" },
+	MossRock1 = { "MossyRocks", "MossRock3", "MossSlab" },
+	MossRock3 = { "MossRock1", "MossRock4", "FernBush" },
+	CrateBarrelPile = { "CrateBarrelPile", "FallenLog" },
+	BrokenPillar1 = { "BrokenPillar2", "MossRock2", "MossSlab" },
+	BrokenPillar2 = { "BrokenPillar1", "MossRock3" },
+	BambooGrove = { "BambooGrove2", "FernBush" },
+	BambooGrove2 = { "BambooGrove", "FernBush" },
+} :: { [string]: { string } }
 
 -- Rock walls: arcs around the hub from Angle0 to Angle1 (degrees) at Radius. Open arcs only, never
 -- across a path, a bridge or the stream, so they steer you without boxing anyone in. Material is

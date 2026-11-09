@@ -23,7 +23,6 @@ local HUD = {}
 
 export type Callbacks = {
 	OnShrine: () -> (),
-	OnLuck: () -> (),
 	OnRebirth: () -> (),
 	OnCollection: (() -> ())?,
 	OnCodex: () -> (),
@@ -35,7 +34,6 @@ local ICON_BUTTON_SIZE = 72
 local ICON_GAP = 6
 -- Rows also leave room for the caption hanging under each button.
 local ROW_GAP = 16
-local COMPACT_PER_ROW = 3
 -- Journal and Settings: small pills under the CE counter instead of big tiles (HUD declutter,
 -- 2026-11-08), so the big tiles are only the four everyday buttons.
 local PILL_SIZE = Vector2.new(132, 40)
@@ -265,7 +263,7 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	-- Journal + Settings pills right under the CE counter.
 	local pills = UIKit.create("Frame", {
 		Name = "Pills",
-		LayoutOrder = 3,
+		LayoutOrder = 4,
 		Size = UDim2.fromOffset(PILL_SIZE.X * 2 + 8, PILL_SIZE.Y),
 		BackgroundTransparency = 1,
 		Parent = column,
@@ -279,7 +277,7 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 
 	local buttons = UIKit.create("Frame", {
 		Name = "Buttons",
-		LayoutOrder = 4,
+		LayoutOrder = 5,
 		BackgroundTransparency = 1,
 		Parent = column,
 	})
@@ -294,18 +292,43 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local shrineButton = iconButton(buttons, "ShrineButton", 3, "Pedestals", "Pedestals")
 	shrineButton.Activated:Connect(callbacks.OnShrine)
 
-	local luckButton, _, luckChip = iconButton(buttons, "LuckButton", 4, "Luck", "Luck")
-	luckButton.Activated:Connect(callbacks.OnLuck)
-	luckChip.Visible = true
-	-- Friends in the server (FriendService): a second chip beside the button, e.g. "Friends +20%".
-	local friendChip = UIKit.iconChip(luckButton)
-	friendChip.Name = "FriendChip"
-	friendChip.TextSize = 14
-	friendChip.AnchorPoint = Vector2.new(0, 0.5)
-	friendChip.Position = UDim2.new(1, 8, 0.5, 0)
-	friendChip.TextColor3 = colors.Jade
+	-- Luck readout (read-only; the Luck/Focus menu was removed 2026-11-08): "x494 Luck" with the
+	-- friends bonus beside it.
+	local luckSlot = UIKit.slot(column, "LuckPillSlot", UDim2.fromOffset(250, 34), 3)
+	local luckPill = UIKit.create("Frame", {
+		Name = "LuckPill",
+		Size = UDim2.fromOffset(170, 34),
+		Parent = luckSlot,
+	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+	UIKit.skinPanel(luckPill)
+	local luckIcon = Icons.image(luckPill, "Luck", 26)
+	if luckIcon then
+		luckIcon.AnchorPoint = Vector2.new(0, 0.5)
+		luckIcon.Position = UDim2.new(0, 6, 0.5, 0)
+	end
+	local luckLabel = UIKit.label({
+		Name = "Amount",
+		Text = "x1 Luck",
+		TextSize = 20,
+		TextColor3 = colors.Text,
+		TextStrokeTransparency = 0.5,
+		Position = UDim2.fromOffset(38, 0),
+		Size = UDim2.new(1, -44, 1, 0),
+		Parent = luckPill,
+	})
+	local friendChip = UIKit.label({
+		Name = "FriendChip",
+		Text = "",
+		TextSize = 15,
+		TextColor3 = colors.Jade,
+		TextStrokeTransparency = 0.5,
+		AnchorPoint = Vector2.new(0, 0.5),
+		Position = UDim2.new(0, 178, 0.5, 0),
+		Size = UDim2.fromOffset(80, 20),
+		Parent = luckSlot,
+	})
 	local function refreshLuck()
-		luckChip.Text = `x{Format.number(player:GetAttribute("EffectiveLuck") or 1)}`
+		luckLabel.Text = `x{Format.number(player:GetAttribute("EffectiveLuck") or 1)} Luck`
 		local friends = player:GetAttribute("FriendLuckPercent")
 		friendChip.Visible = type(friends) == "number" and friends > 0
 		friendChip.Text = `Friends +{friends or 0}%`
@@ -418,14 +441,14 @@ function HUD.Start(screen: ScreenGui, callbacks: Callbacks): { SetVisible: (bool
 	local settingsButton = pillButton(pills, "SettingsButton", 2, "Settings", "Settings")
 	settingsButton.Activated:Connect(callbacks.OnSettings)
 
-	-- Big tiles: Pedestals, Luck, Codex, Rebirth (+ Collection in the collection trial).
+	-- Big tiles: Pedestals, Codex, Rebirth (+ Collection in the collection trial).
 	local function liveButtonCount(): number
-		return if collectionVisible then 5 else 4
+		return if collectionVisible then 4 else 3
 	end
 	local function layoutButtons(compact: boolean)
 		local count = liveButtonCount()
-		-- Phones: a 2 x 2 block for the four tiles (3 per row with Collection).
-		local perRow = if not compact then 1 elseif count <= 4 then 2 else COMPACT_PER_ROW
+		-- Phones: one row of three tiles (2 x 2 with Collection).
+		local perRow = if not compact then 1 elseif count <= 3 then 3 else 2
 		local rows = math.ceil(count / perRow)
 		grid.FillDirectionMaxCells = perRow
 		buttons.Size = UDim2.fromOffset(

@@ -25,9 +25,10 @@ local function publish()
 	workspace:SetAttribute("ZoneEvent", if active and event then event.Id else nil)
 	workspace:SetAttribute("ZoneEventArea", if active and event then event.Area else nil)
 	workspace:SetAttribute("ZoneEventEndsAt", if active then state.EndsAt else nil)
-	local soon = state.Phase == "Soon" and event
-	workspace:SetAttribute("ZoneEventSoon", if soon and event then event.Id else nil)
-	workspace:SetAttribute("ZoneEventStartsAt", if soon then state.StartsAt else nil)
+	-- No advance notice (2026-11-08): players find out when an event starts. The schedule still has
+	-- its warning phase internally, it just isn't published.
+	workspace:SetAttribute("ZoneEventSoon", nil)
+	workspace:SetAttribute("ZoneEventStartsAt", nil)
 end
 
 function ZoneEventService.Factors(area: string): ZoneEvents.Factors

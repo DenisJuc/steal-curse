@@ -268,6 +268,12 @@ return {
 				expect.truthy(prop.Collide == "Box" or prop.Collide == "None", `{id} collide mode`)
 			end
 			expect.equal(count, 45, "prop count (the Tripo list + 16 Creator Store imports)")
+			for seed, partners in WildLayout.Companions do
+				expect.truthy(MapPropConfig.Props[seed] ~= nil, `companion seed {seed} is a known prop`)
+				for _, partner in partners do
+					expect.truthy(MapPropConfig.Props[partner] ~= nil, `{seed} companion {partner} is a known prop`)
+				end
+			end
 			for areaId, rules in WildLayout.Scatter do
 				local known = false
 				for _, area in areas do

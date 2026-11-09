@@ -404,6 +404,9 @@ local HUNT_STEPS: { Step } = {
 -- Direct children of the main screen that stay up during the spirit hunt tutorial. Rolling goes
 -- on in the background, so a rare find's reveal (card, band, glow, dim, flashes) must still show.
 local HUNT_KEEP = {
+	-- MenuMotion owns the backdrop: hiding then restoring it here left an invisible full-screen
+	-- button over the world after the tutorial (the camera could not be dragged).
+	MenuBackdrop = true,
 	HintBubble = true,
 	TravelBar = true,
 	HuntButtons = true,

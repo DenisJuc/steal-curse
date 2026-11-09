@@ -4,8 +4,10 @@
 -- Entering (about 0.6s): vision softly dims in from the edges (the feathered edge veil deepens
 -- while a dark violet wash fades over the whole screen and the view blurs), the world turns over
 -- at the darkest moment (the caller's `onCovered` switches the spirit tint on there), then it
--- clears on a soft violet flash with a faint ripple ring and the blur lifting. A dark violet veil
--- stays on the screen edges, slowly breathing, for as long as Spirit Sight is on.
+-- clears on a soft violet flash and the blur lifting. Like opening a third eye: dark violet lids
+-- close from the top and bottom, a thin seam of violet light shows where they meet, and they open
+-- onto the spirit world with a slight overshoot (2026-11-08; replaced a flat expanding UI ring).
+-- A dark violet veil stays on the screen edges, slowly breathing, while Spirit Sight is on.
 -- Leaving is a shorter, lighter dim that drops the veil and lets the colour flood back.
 
 local Lighting = game:GetService("Lighting")
@@ -18,7 +20,8 @@ local SightTransition = {}
 
 local DIM_COLOR = Color3.fromRGB(20, 6, 40)
 local VEIL_COLOR = Color3.fromRGB(28, 6, 52)
-local RING_COLOR = Color3.fromRGB(190, 140, 255)
+local SEAM_COLOR = Color3.fromRGB(205, 160, 255)
+local LID_COLOR = Color3.fromRGB(14, 4, 28)
 local FLASH_TINT = Color3.fromRGB(200, 170, 255)
 
 -- Seconds for each phase of entering.
@@ -40,8 +43,8 @@ local gui: ScreenGui? = nil
 -- The veil lives in its own ScreenGui under the HUD so it never darkens buttons at rest.
 local veilGui: ScreenGui
 local wash: Frame
-local ripple: Frame
-local rippleStroke: UIStroke
+local lids: { Frame } = {}
+local seam: Frame
 local veilEdges: { Frame } = {}
 local blur: BlurEffect
 local flash: ColorCorrectionEffect
@@ -104,22 +107,45 @@ local function build(): ScreenGui
 	wash.ZIndex = 1
 	wash.Parent = screen
 
-	ripple = Instance.new("Frame")
-	ripple.Name = "Ripple"
-	ripple.AnchorPoint = Vector2.new(0.5, 0.5)
-	ripple.Position = UDim2.fromScale(0.5, 0.5)
-	ripple.SizeConstraint = Enum.SizeConstraint.RelativeXX
-	ripple.BackgroundTransparency = 1
-	ripple.ZIndex = 2
-	ripple.Visible = false
-	ripple.Parent = screen
-	local round = Instance.new("UICorner")
-	round.CornerRadius = UDim.new(0.5, 0)
-	round.Parent = ripple
-	rippleStroke = Instance.new("UIStroke")
-	rippleStroke.Color = RING_COLOR
-	rippleStroke.Thickness = 3
-	rippleStroke.Parent = ripple
+	-- Two lids, each a bit over half the screen, solid at the screen edge and feathered at the lip.
+	lids = {}
+	for index, anchorY in { 1, 0 } do
+		local lid = Instance.new("Frame")
+		lid.Name = if index == 1 then "LidTop" else "LidBottom"
+		lid.AnchorPoint = Vector2.new(0.5, anchorY)
+		lid.Size = UDim2.fromScale(1.1, 0.62)
+		lid.BackgroundColor3 = LID_COLOR
+		lid.BorderSizePixel = 0
+		lid.ZIndex = 3
+		lid.Visible = false
+		lid.Parent = screen
+		local fade = Instance.new("UIGradient")
+		fade.Rotation = if index == 1 then 90 else -90
+		fade.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.82, 0),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		fade.Parent = lid
+		table.insert(lids, lid)
+	end
+	seam = Instance.new("Frame")
+	seam.Name = "Seam"
+	seam.AnchorPoint = Vector2.new(0.5, 0.5)
+	seam.Position = UDim2.fromScale(0.5, 0.5)
+	seam.Size = UDim2.new(1, 0, 0, 3)
+	seam.BackgroundColor3 = SEAM_COLOR
+	seam.BorderSizePixel = 0
+	seam.ZIndex = 4
+	seam.Visible = false
+	seam.Parent = screen
+	local seamFade = Instance.new("UIGradient")
+	seamFade.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(0.5, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	seamFade.Parent = seam
 
 	veilGui = Instance.new("ScreenGui")
 	veilGui.Name = "SpiritSightVeil"
@@ -183,6 +209,24 @@ local function setFlash(amount: number, tint: Color3)
 	flash.TintColor = Color3.new(1, 1, 1):Lerp(tint, amount)
 end
 
+-- Lids: 0 = fully open (off screen), 1 = shut (meeting at the middle). The seam glows as they meet.
+local function setLids(closed: number)
+	local top, bottom = lids[1], lids[2]
+	if not top or not bottom then
+		return
+	end
+	local visible = closed > 0.001
+	top.Visible = visible
+	bottom.Visible = visible
+	-- Top lid's bottom edge travels from the top of the screen (0) to just past the middle.
+	top.Position = UDim2.fromScale(0.5, 0.52 * closed)
+	bottom.Position = UDim2.fromScale(0.5, 1 - 0.52 * closed)
+	local glow = math.clamp((closed - 0.75) / 0.25, 0, 1)
+	seam.Visible = glow > 0.01
+	seam.BackgroundTransparency = 1 - glow
+	seam.Size = UDim2.new(1, 0, 0, 2 + 4 * glow)
+end
+
 -- Runs `step(elapsed)` every frame until it returns true or a newer toggle took over.
 local function animate(mine: number, step: (number) -> boolean)
 	local start = os.clock()
@@ -240,12 +284,15 @@ function SightTransition.Enter(onCovered: () -> ())
 	local total = DIM_SECONDS + HOLD_SECONDS + OPEN_SECONDS
 	animate(mine, function(t)
 		if t < DIM_SECONDS then
-			setDim(fromDim + (1 - fromDim) * easeInOut(t / DIM_SECONDS), blurOn)
+			local k = easeInOut(t / DIM_SECONDS)
+			setDim(fromDim + (1 - fromDim) * k, blurOn)
+			setLids(k)
 			return false
 		end
 		cover()
 		if t < DIM_SECONDS + HOLD_SECONDS then
 			setDim(1, blurOn)
+			setLids(1)
 			setFlash(easeInOut((t - DIM_SECONDS) / HOLD_SECONDS) * 0.6, FLASH_TINT)
 			return false
 		end
@@ -255,16 +302,12 @@ function SightTransition.Enter(onCovered: () -> ())
 		setDim(1 - open, blurOn)
 		-- The flash peaks just as vision clears, then settles.
 		setFlash(math.sin(math.min(1, k * 1.6 + 0.3) * math.pi) * 0.6 + (1 - k) * 0.2, FLASH_TINT)
-		if blurOn then
-			ripple.Visible = k < 1
-			ripple.Size = UDim2.fromScale(0.2 + easeOut(k) * 1.3, 0.2 + easeOut(k) * 1.3)
-			rippleStroke.Thickness = 3 * (1 - k) + 1
-			rippleStroke.Transparency = 0.45 + 0.55 * k
-		end
+		-- Lids snap open past the edge (slight overshoot), quicker than the wash clears.
+		setLids(math.max(0, 1 - easeOut(math.min(1, k * 1.4))))
 		if t >= total then
 			veilAmount = 1
 			setDim(0, false)
-			ripple.Visible = false
+			setLids(0)
 			blur.Enabled = false
 			flash.Enabled = false
 			return true
@@ -290,7 +333,7 @@ function SightTransition.Exit(onCovered: () -> ())
 	end
 	veilOn = false
 	swell = 1
-	ripple.Visible = false
+	setLids(0)
 	-- A press mid-enter starts from wherever the dim, veil and blur already are.
 	local fromVeil = veilAmount
 	local fromDim = dimAmount

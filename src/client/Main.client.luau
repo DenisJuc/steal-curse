@@ -9,13 +9,13 @@ local ClientSettings = require(ReplicatedStorage.Shared.ClientSettings)
 local Config = require(ReplicatedStorage.Shared.Config)
 local HUD = require(script.Parent.UI.HUD)
 local AutoSellPanel = require(script.Parent.UI.AutoSellPanel)
+local EventBanner = require(script.Parent.UI.EventBanner)
 local Banner = require(script.Parent.UI.Banner)
 local BountyPanel = require(script.Parent.UI.BountyPanel)
 local BuffTimers = require(script.Parent.UI.BuffTimers)
 local CodexPanel = require(script.Parent.UI.CodexPanel)
 local CollectionPanel = require(script.Parent.UI.CollectionPanel)
 local DiscoveryFeed = require(script.Parent.UI.DiscoveryFeed)
-local FocusPanel = require(script.Parent.UI.FocusPanel)
 local InventoryPanel = require(script.Parent.UI.InventoryPanel)
 local JournalPanel = require(script.Parent.UI.JournalPanel)
 local MenuMotion = require(script.Parent.UI.MenuMotion)
@@ -122,7 +122,6 @@ end, function()
 	closeAllExcept(showcasePanel)
 	showcasePanel.Open()
 end)
-local focusPanel = FocusPanel.Start(screen)
 local skillPanel = if Config.SkillTreeUI then SkillTreePanel.Start(screen) else SkillListPanel.Start(screen)
 local codexPanel = CodexPanel.Start(screen)
 local collectionPanel = CollectionPanel.Start(screen)
@@ -149,7 +148,6 @@ menus = {
 	shrinePanel,
 	rebirthPanel,
 	showcasePanel,
-	focusPanel,
 	inventoryPanel,
 	autoSellPanel,
 	skillPanel,
@@ -174,7 +172,6 @@ end
 
 local openers = {
 	Shrine = toggleOnly(shrinePanel),
-	Luck = toggleOnly(focusPanel),
 	Relics = toggleOnly(inventoryPanel),
 	Skills = toggleOnly(skillPanel),
 	Collection = toggleOnly(collectionPanel),
@@ -193,7 +190,6 @@ end
 local coreLoop = BalanceTrials.coreLoopPresentation()
 local hud = HUD.Start(screen, {
 	OnShrine = openers.Shrine,
-	OnLuck = openers.Luck,
 	OnRebirth = openers.Rebirth,
 	-- Studio Core Loop: Collection / Fusion Board hidden (implementation kept).
 	OnCollection = if coreLoop then nil else openers.Collection,
@@ -222,6 +218,7 @@ CollectFX.Start()
 PedestalFloat.Start()
 Toasts.Start(screen)
 Banner.Start(screen)
+EventBanner.Start(screen)
 Announcements.Start()
 HuntController.Start(screen, {
 	-- Spirit Sight hides management UI; scanning itself never stops.

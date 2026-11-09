@@ -13,6 +13,7 @@ local Icons = require(script.Parent.Icons)
 local Motion = require(script.Parent.Motion)
 local Sounds = require(script.Parent.Parent.Sounds)
 local Toasts = require(script.Parent.Toasts)
+local HudTile = require(script.Parent.HudTile)
 local UIKit = require(script.Parent.UIKit)
 
 local ClaimPlaytimeGift = ReplicatedStorage:WaitForChild("Remotes"):WaitForChild("ClaimPlaytimeGift") :: RemoteFunction
@@ -84,13 +85,6 @@ function GiftPanel.Start(
 	local colors = UIKit.Colors
 	local panel, content = UIKit.modal(screen, "GiftsMenu", "FREE GIFTS", colors.Gold, Vector2.new(560, 520))
 	local list = UIKit.scrollList(content, 8)
-	local bounties = UIKit.button({
-		Text = "Daily bounties",
-		TextSize = 18,
-		LayoutOrder = 0,
-		Size = UDim2.new(1, -10, 0, 44),
-		Parent = list,
-	}, onBounties)
 	local rows: { { Button: TextButton, Index: number, Card: Frame, Stroke: UIStroke, Icon: ImageLabel? } } = {}
 	-- skinButton "Gold" darkens the text and "Dark" doesn't undo it; only restyle on a change.
 	local function skin(button: TextButton, kind: string)
@@ -180,38 +174,9 @@ function GiftPanel.Start(
 		table.insert(rows, { Button = button, Index = index, Card = card, Stroke = stroke, Icon = icon })
 	end
 
-	-- The HUD button under SHOP.
-	local holder = UIKit.create("Frame", {
-		Name = "GiftButton",
-		AnchorPoint = Vector2.new(1, 0),
-		Position = UDim2.new(1, -40, 0, 186),
-		Size = UDim2.fromOffset(150, 44),
-		BackgroundTransparency = 1,
-		Parent = screen,
-	})
-	UIKit.scaler(holder)
-	UIKit.watchCompact(function(compact: boolean)
-		holder.Position = if compact then UDim2.new(1, -40, 0, 34) else UDim2.new(1, -40, 0, 186)
-	end)
-	local open = UIKit.button({
-		Text = "GIFTS",
-		FontFace = UIKit.TitleFont,
-		TextSize = 20,
-		Size = UDim2.fromScale(1, 1),
-		Parent = holder,
-	}, onOpen)
-	skin(open, "Dark")
-	local dot = UIKit.create("Frame", {
-		Name = "Ready",
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.new(1, -4, 0, 4),
-		Size = UDim2.fromOffset(18, 18),
-		BackgroundColor3 = colors.Red,
-		Visible = false,
-		ZIndex = 5,
-		Parent = open,
-	}, { UIKit.create("UICorner", { CornerRadius = UDim.new(1, 0) }) })
-	Motion.badge(dot)
+	-- HUD tiles under SHOP: Gifts (timer chip until one is ready) and Bounties (its own menu).
+	local giftTile = HudTile.make(screen, "GiftButton", 2, "Gifts", "Gift", onOpen)
+	local bountyTile = HudTile.make(screen, "BountyButton", 3, "Bounties", "Journal", onBounties)
 
 	local elapsed = 1
 	RunService.Heartbeat:Connect(function(dt)
@@ -232,14 +197,10 @@ function GiftPanel.Start(
 			end
 		end
 		local bountyReady = (player:GetAttribute("BountiesReady") or 0) > 0
-		dot.Visible = ready > 0 or bountyReady
-		open.Text = if ready > 0
-			then "GIFT READY!"
-			elseif bountyReady then "BOUNTY READY!"
-			elseif nextLeft < math.huge then `GIFT {Format.duration(math.ceil(nextLeft))}`
-			else "GIFTS"
-		skin(open, if ready > 0 or bountyReady then "Gold" else "Dark")
-		skin(bounties, if bountyReady then "Gold" else "Dark")
+		HudTile.setReady(giftTile, ready > 0)
+		HudTile.setReady(bountyTile, bountyReady)
+		giftTile.Chip.Visible = ready == 0 and nextLeft < math.huge
+		giftTile.Chip.Text = if nextLeft < math.huge then Format.duration(math.ceil(nextLeft)) else ""
 		if not panel.Visible then
 			return
 		end

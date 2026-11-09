@@ -12,8 +12,7 @@ local ZoneGates = require(ReplicatedStorage.Shared.ZoneGates)
 local Format = require(ReplicatedStorage.Shared.Format)
 local WorldLayout = require(ReplicatedStorage.Shared.WorldLayout)
 local Sounds = require(script.Parent.Parent.Sounds)
-local Banner = require(script.Parent.Parent.UI.Banner)
-local Toasts = require(script.Parent.Parent.UI.Toasts)
+local EventBanner = require(script.Parent.Parent.UI.EventBanner)
 
 local ZoneBeacon = {}
 
@@ -132,7 +131,6 @@ end
 function ZoneBeacon.Start()
 	local beam: Part? = nil
 	local shownId: string? = nil
-	local warnedId: string? = nil
 
 	local function refresh()
 		local id = workspace:GetAttribute("ZoneEvent")
@@ -157,33 +155,23 @@ function ZoneBeacon.Start()
 		local where = if area then area.Name else event.Area
 		local color = rgb(event.Color)
 		local locked = lockedNote(event.Area)
+		local icon = nil
+		for _, entry in Config.Shop.Events do
+			if entry.Event == event.Id then
+				icon = entry.Icon
+			end
+		end
 		if locked ~= "" then
-			Banner.Show(string.upper(event.Name), `{where}{locked}`, color, 2)
+			EventBanner.Show(event.Name, `{where}{locked}`, color, icon)
 		else
-			Banner.Show(string.upper(event.Name), `{where}: {event.Effect} for {Format.duration(Config.ZoneEvents.Duration)}`, color, 2)
+			EventBanner.Show(event.Name, `{where}  \u{00B7}  {event.Effect}  \u{00B7}  {Format.duration(Config.ZoneEvents.Duration)}`, color, icon)
 		end
 		chat(`{event.Name} over the {where}! {event.Effect} on captures there.{locked}`, color)
 		Sounds.Play("EventStart")
 	end
 
-	local function warn()
-		local id = workspace:GetAttribute("ZoneEventSoon")
-		local event = eventOf(id)
-		if not event or event.Id == warnedId then
-			return
-		end
-		warnedId = event.Id
-		local area = areaOf(event.Area)
-		local where = if area then area.Name else event.Area
-		local text = `A {event.Name} gathers over the {where} in {Format.duration(Config.ZoneEvents.Warning)}...{lockedNote(event.Area)}`
-		Toasts.Show(text, "Debug")
-		chat(text, rgb(event.Color))
-	end
-
 	workspace:GetAttributeChangedSignal("ZoneEvent"):Connect(refresh)
-	workspace:GetAttributeChangedSignal("ZoneEventSoon"):Connect(warn)
 	refresh()
-	warn()
 
 	-- A slow shimmer so the beam reads as alive.
 	RunService.Heartbeat:Connect(function()
