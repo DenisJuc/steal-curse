@@ -7,6 +7,8 @@
 --   /mapstats          part count vs the budget, props per area, signal spots
 --   /modelcheck [all|clear]   gallery of imported relic models with warnings (all = include missing ones);
 --                      also lists which map props are imported, still primitives, or wrongly named
+--   /modelreview [all|clear]   relic models that need a redo (ModelReview.Redo) on spinning stands in
+--                      front of you, with the reason; all = every relic, redo ones in red
 --   /spawnsignal       spawn one of your signals right in front of you (ignores the cap)
 --   /regen             refill your signals to the maximum
 --   /relocate          move your signals near you now
@@ -65,6 +67,7 @@ local Format = require(ReplicatedStorage.Shared.Format)
 local ItemConfig = require(ReplicatedStorage.Shared.ItemConfig)
 local MapPropConfig = require(ReplicatedStorage.Shared.MapPropConfig)
 local ModelCheck = require(ReplicatedStorage.Shared.ModelCheck)
+local ModelReview = require(ReplicatedStorage.Shared.ModelReview)
 local MutationConfig = require(ReplicatedStorage.Shared.MutationConfig)
 local RarityConfig = require(ReplicatedStorage.Shared.RarityConfig)
 local RelicConfig = require(ReplicatedStorage.Shared.RelicConfig)
@@ -118,6 +121,13 @@ type Map = {
 local GALLERY_NAME = "ModelGallery"
 local GALLERY_COLUMNS = 8
 local GALLERY_SPACING = 9
+local REVIEW_NAME = "ModelReview"
+local REVIEW_COLUMNS = 6
+local REVIEW_SPACING = 9
+local REVIEW_SPIN = 0.7 -- radians per second
+local REVIEW_HEIGHT = 400 -- the review floats this far above you, away from the dark map
+local reviewSpin: RBXScriptConnection? = nil
+local reviewReturn: { [Player]: CFrame } = {}
 
 local AREA_ALIASES = {
 	forest = "HauntedForest",
@@ -934,6 +944,126 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				.. (if #unknownProps > 0 then ` ({#unknownProps} wrongly named)` else "")
 				.. ` | gallery of {#shown} in front of you (details in Output; /modelcheck clear removes it)`
 			reply(player, text)
+		end,
+
+		modelreview = function(player, args)
+			local old = workspace:FindFirstChild(REVIEW_NAME)
+			if old then
+				old:Destroy()
+			end
+			if reviewSpin then
+				reviewSpin:Disconnect()
+				reviewSpin = nil
+			end
+			local mode = string.lower(args[1] or "")
+			local root = rootOf(player)
+			if mode == "clear" then
+				local back = reviewReturn[player]
+				reviewReturn[player] = nil
+				if back and root then
+					root.CFrame = back
+				end
+				reply(player, "Model review removed.")
+				return
+			end
+			if not root then
+				return
+			end
+			local shown = {}
+			for _, relic in RelicConfig.Relics do
+				local entry = ModelReview.ById[relic.Id]
+				if entry or mode == "all" then
+					table.insert(shown, { Relic = relic, Entry = entry })
+				end
+			end
+
+			local folder = Instance.new("Folder")
+			folder.Name = REVIEW_NAME
+			local forward = root.CFrame.LookVector * Vector3.new(1, 0, 1)
+			forward = if forward.Magnitude > 0.01 then forward.Unit else Vector3.zAxis
+			reviewReturn[player] = reviewReturn[player] or root.CFrame
+			local base = reviewReturn[player].Position + Vector3.new(0, REVIEW_HEIGHT, 0)
+			local origin = CFrame.lookAt(base, base + forward)
+			local rows = math.max(1, math.ceil(#shown / REVIEW_COLUMNS))
+			local floor = Instance.new("Part")
+			floor.Name = "Floor"
+			floor.Anchored = true
+			floor.Size = Vector3.new(REVIEW_COLUMNS * REVIEW_SPACING + 12, 1, rows * REVIEW_SPACING + 26)
+			floor.CFrame = origin * CFrame.new(0, -3.5, -(floor.Size.Z / 2) + 8)
+			floor.Material = Enum.Material.SmoothPlastic
+			floor.Color = Color3.fromRGB(58, 58, 68)
+			floor.Parent = folder
+			local spinners = {}
+			for index, item in shown do
+				local column = (index - 1) % REVIEW_COLUMNS
+				local row = (index - 1) // REVIEW_COLUMNS
+				local x = (column - (REVIEW_COLUMNS - 1) / 2) * REVIEW_SPACING
+				local spot = origin * CFrame.new(x, -2.5, -12 - row * REVIEW_SPACING)
+				local stand = Instance.new("Part")
+				stand.Shape = Enum.PartType.Cylinder
+				stand.Anchored = true
+				stand.CanCollide = false
+				stand.Size = Vector3.new(1, 4.5, 4.5)
+				stand.CFrame = CFrame.new(spot.Position) * CFrame.Angles(0, 0, math.rad(90))
+				stand.Material = Enum.Material.Slate
+				stand.Color = if item.Entry then Color3.fromRGB(90, 40, 40) else Color3.fromRGB(40, 70, 50)
+				stand.Parent = folder
+				local center = spot.Position + Vector3.new(0, 3.4, 0)
+				local model = RelicModels.build(item.Relic.Id, CFrame.new(center) * spot.Rotation * CFrame.Angles(0, math.pi, 0))
+				if model then
+					model.Anchored = true
+					model.Parent = folder
+					table.insert(spinners, { Part = model, Center = center, Rotation = model.CFrame.Rotation })
+				end
+				local glow = Instance.new("Attachment")
+				glow.Position = Vector3.new(4, 0, 0) -- the stand is a cylinder turned on its side: +X is up
+				glow.Parent = stand
+				local light = Instance.new("PointLight")
+				light.Range = 9
+				light.Brightness = 1.2
+				light.Shadows = false
+				light.Parent = glow
+				local billboard = Instance.new("BillboardGui")
+				billboard.Size = UDim2.fromOffset(240, 70)
+				billboard.StudsOffset = Vector3.new(0, 6.5, 0)
+				billboard.MaxDistance = 16
+				billboard.Parent = stand
+				local label = Instance.new("TextLabel")
+				label.Size = UDim2.fromScale(1, 1)
+				label.BackgroundTransparency = 1
+				label.TextScaled = true
+				label.Font = Enum.Font.GothamBold
+				label.TextStrokeTransparency = 0.3
+				label.TextColor3 = if item.Entry then Color3.fromRGB(255, 120, 100) else Color3.fromRGB(120, 230, 140)
+				label.Text = `{item.Relic.Name} ({item.Relic.Tier})\n`
+					.. (if item.Entry then `REDO: {item.Entry.Reason}` else "approved")
+				label.Parent = billboard
+			end
+			folder.Parent = workspace
+			root.CFrame = origin * CFrame.new(0, 0.5, 0)
+
+			local angle = 0
+			reviewSpin = RunService.Heartbeat:Connect(function(dt)
+				if not folder.Parent then
+					if reviewSpin then
+						reviewSpin:Disconnect()
+						reviewSpin = nil
+					end
+					return
+				end
+				angle += dt * REVIEW_SPIN
+				local turn = CFrame.Angles(0, angle, 0)
+				for _, spinner in spinners do
+					spinner.Part.CFrame = CFrame.new(spinner.Center) * turn * spinner.Rotation
+				end
+			end)
+			reply(
+				player,
+				`{#ModelReview.Redo} relic models flagged for a redo`
+					.. (if mode == "all" then `, showing all {#shown} relics (redo = red)` else `, all in front of you`)
+					.. ". Everything not flagged is approved. Walk along the rows to read each reason;"
+					.. " /modelreview clear removes them and takes you back."
+			)
 		end,
 
 		spawnsignal = function(player)
