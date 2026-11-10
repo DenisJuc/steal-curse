@@ -13,8 +13,9 @@ Legend: **SWAP** = replaces the old relic but keeps its id, so owners of the old
 new one (no save migration needed; the id map is at the top of RelicConfig), **NEW** = added relic,
 last in its tier (lowest weight), **REMODEL** = new 3D model only.
 
-Status 2026-11-10: in code (RelicConfig). The 10 old swapped models are removed, so those 17 relics
-show placeholder shapes until their new models are in.
+Status 2026-11-10: in code (RelicConfig), and all 17 new or swapped relics plus the Saint's Corpse
+remodel have concept-first models (concepts in work/models/concepts_nov10, Tripo jobs in
+work/models/tripo/jobs_nov10b.txt, 720 credits).
 
 ## Common (17)
 
