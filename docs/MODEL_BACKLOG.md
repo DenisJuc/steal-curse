@@ -1,6 +1,12 @@
 # 3D model backlog
 
-26 of 92 relics have a model in `assets/RelicModels`; the 66 below still render as placeholder shapes.
+**Done, 2026-11-10: 92 of 92 relics have a model.** The last 40 were made from ChatGPT concept
+images Rosselle approved (`work/models/concepts_nov9/`, anime-accurate, Roblox-cartoon style), then
+Tripo image-to-3D (H3.0), `tools/models/blender/prep_tripo_glb.py` and `tools/models/upload_model.py`.
+Rule for any future model: recognisable as the anime item, Roblox-cartoon look, owner approves the
+concept or test before credits are spent. The table below is the old backlog, kept for reference.
+
+(Old status:) 26 of 92 relics have a model in `assets/RelicModels`; the 66 below still render as placeholder shapes.
 Ordered by how often players see them (Common drops most). Design briefs per relic are in `docs/ROSTER.md`; generation settings in `docs/MESHY_PILOT.md` (same settings work in Tripo: stylized, ~5k tris, textured, no base, no text).
 
 Suggested batches: 1 = Common + Uncommon (seen every few scans), 2 = Rare + Epic, 3 = the rest.
