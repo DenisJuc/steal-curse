@@ -25,9 +25,9 @@ return {
 		end,
 	},
 	{
-		Name = "the roster has 92 relics, every tier filled, rarer tiers never larger",
+		Name = "the roster has 99 relics, every tier filled, rarer tiers never larger",
 		Run = function()
-			expect.equal(#RelicConfig.Relics, 92, "relic count")
+			expect.equal(#RelicConfig.Relics, 99, "relic count")
 			local byTier = RollMath.groupByTier(RelicConfig.Relics)
 			local previous = math.huge
 			for _, tier in RarityConfig.Tiers do

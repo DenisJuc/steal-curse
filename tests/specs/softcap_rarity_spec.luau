@@ -8,11 +8,11 @@ local LUCK_SWEEP = { 1, 5, 20, 60, 150, 500, 2000, 10000, 100000 }
 
 return {
 	{
-		Name = "SoftCap rows cover all 92 relics with distinct R",
+		Name = "SoftCap rows cover all 99 relics with distinct R",
 		Run = function()
 			local rows = SoftCapRarity.rows()
-			expect.equal(#rows, 92, "92 rows")
-			expect.equal(#RelicConfig.Relics, 92, "roster")
+			expect.equal(#rows, 99, "99 rows")
+			expect.equal(#RelicConfig.Relics, 99, "roster")
 			local seenR = {}
 			local dupR = 0
 			for _, row in rows do

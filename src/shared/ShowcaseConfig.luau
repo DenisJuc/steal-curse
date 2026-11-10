@@ -50,7 +50,7 @@ ShowcaseConfig.Showcases = {
 		Description = "A quiet spirit circle. You stand at its heart while wisps orbit.",
 		Unlock = { Kind = "CE", Price = 500000 },
 		Accessories = {
-			{ Id = "BoneFluteCharm", Name = "Hollow Lure Charm", RelicId = "HolloBait" },
+			{ Id = "BoneFluteCharm", Name = "Soul Badge Charm", RelicId = "HolloBait" },
 		},
 	},
 	{
