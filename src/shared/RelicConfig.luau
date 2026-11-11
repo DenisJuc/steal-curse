@@ -5,6 +5,7 @@
 -- DragonsBone = Inosuke's Boar Mask, GreedyIslandBook = Killua's Yo-yos, HolloBait = Substitute Soul
 -- Reaper Badge, BlackenedRope = Gojo's Blindfold, RiskieDice = Hisoka's Cards, OniSpineNaginata =
 -- Gaara's Gourd, StaffOfJudgement = Nezuko's Box.
+-- Nov 11, same rule: HoyPoyCapsule = Ichiraku Ramen, SenzoBean = Den Den Mushi.
 -- Weight = relative chance inside its tier (every weight in a tier is different, so every relic
 -- has its own base odds); base odds are derived by RollMath, never typed by hand.
 -- ObjectType picks the shared capture animation family (Weapon, Book, Mask, Crystal, Special).
@@ -38,8 +39,8 @@ RelicConfig.Relics = {
 	{ Id = "SealScroll", Name = "Sealing Scroll", Tier = "Common", Weight = 88, Family = "Arcane", ObjectType = "Book", Vfx = "Spirit", Description = "Whatever was sealed inside keeps knocking." },
 	{ Id = "StealBall", Name = "Steel Ball", Tier = "Common", Weight = 84, Family = "Astral", ObjectType = "Crystal", Vfx = "Storm", Description = "It never stops spinning, even in a locked box." },
 	{ Id = "QuinsyBangle", Name = "Quincy Bangle", Tier = "Common", Weight = 80, Family = "Spiritual", ObjectType = "Crystal", Vfx = "Holy", Description = "Pull the charm and a bow of light snaps into your hand." },
-	{ Id = "HoyPoyCapsule", Name = "Hoi-Poi Capsule", Tier = "Common", Weight = 76, Family = "Arcane", ObjectType = "Crystal", Vfx = "Spirit", Description = "Click, throw, and a whole house pops out." },
-	{ Id = "SenzoBean", Name = "Senzu Bean", Tier = "Common", Weight = 72, Family = "Astral", ObjectType = "Special", Vfx = "Bloom", Description = "One bite heals everything. Ten days without food, too." },
+	{ Id = "HoyPoyCapsule", Name = "Ichiraku Ramen", Tier = "Common", Weight = 76, Family = "Arcane", ObjectType = "Special", Vfx = "Spirit", Description = "Naruto's favourite. Miso, extra pork, on Iruka's tab." },
+	{ Id = "SenzoBean", Name = "Den Den Mushi", Tier = "Common", Weight = 72, Family = "Astral", ObjectType = "Special", Vfx = "Bloom", Description = "A snail that rings. It talks with the caller's face, too." },
 	{ Id = "WistariaPoisonVial", Name = "Wisteria Poison", Tier = "Common", Weight = 68, Family = "Spiritual", ObjectType = "Mask", Vfx = "Toxin", Description = "Demons start coughing the moment you uncork it." },
 	{ Id = "FoxxMask", Name = "Fox Mask", Tier = "Common", Weight = 64, Family = "Spiritual", ObjectType = "Mask", Vfx = "Spirit", Description = "Carved to keep its wearer safe. It remembers every one of them." },
 	{ Id = "HuntarLicense", Name = "Hunter License", Tier = "Common", Weight = 60, Family = "Arcane", ObjectType = "Book", Vfx = "None", Description = "Opens doors that appear on no map." },

@@ -27,8 +27,8 @@ work/models/tripo/jobs_nov10b.txt, 720 credits).
 | SealScroll | Sealing Scroll | |
 | StealBall | Steel Ball | |
 | QuinsyBangle | Quincy Bangle | |
-| HoyPoyCapsule | Hoi-Poi Capsule | |
-| SenzoBean | Senzu Bean | |
+| HoyPoyCapsule | Ichiraku Ramen | SWAP Nov 11 (was Hoi-Poi Capsule, not recognisable) |
+| SenzoBean | Den Den Mushi | SWAP Nov 11 (was Senzu Bean, not recognisable) |
 | WistariaPoisonVial | Wisteria Poison | |
 | *(new)* | **Nezuko's Bamboo Muzzle** | NEW |
 | FoxxMask | Fox Mask | |

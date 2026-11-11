@@ -18,8 +18,8 @@ final sweep, `/modelreview all` shows all 99 (redo red, later amber), `/modelrev
 | Tier | Relic | Why |
 |---|---|---|
 | Common | Steel Ball | black bomb with a red band, not a shiny dimpled steel ball |
-| Common | Hoi-Poi Capsule | reads as a bottle with fake writing |
-| Common | Senzu Bean | shapeless green blob on a sack |
+| Common | Ichiraku Ramen (id HoyPoyCapsule) | swapped from Hoi-Poi Capsule Nov 11; needs its new model |
+| Common | Den Den Mushi (id SenzoBean) | swapped from Senzu Bean Nov 11; needs its new model |
 | Common | Tanjiro's Nichirin Blade | thin purple dagger, not a black katana with the round guard |
 | Rare | Demon-Dweller Sword | spiky dagger, not a thin black katana |
 | Epic | Senbonzakura | a square guard and a handle, no blade or petals |

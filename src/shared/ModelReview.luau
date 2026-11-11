@@ -12,8 +12,8 @@ export type Entry = { Id: string, Reason: string }
 ModelReview.Redo = {
 	-- Common
 	{ Id = "StealBall", Reason = "black bomb with a red band, not a shiny dimpled steel ball" },
-	{ Id = "HoyPoyCapsule", Reason = "reads as a bottle with fake writing, not a small pill capsule" },
-	{ Id = "SenzoBean", Reason = "shapeless green blob on a sack" },
+	{ Id = "HoyPoyCapsule", Reason = "relic is now Ichiraku Ramen; still the old capsule model" },
+	{ Id = "SenzoBean", Reason = "relic is now Den Den Mushi; still the old bean model" },
 	{ Id = "BlackNichirenBlade", Reason = "thin purple dagger, not Tanjiro's black katana with the round guard" },
 	-- Rare
 	{ Id = "DemonDwellingSword", Reason = "spiky dagger, not a thin black katana" },
