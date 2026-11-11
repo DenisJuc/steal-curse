@@ -21,6 +21,28 @@ export type Options = {
 
 local NEON_FROM_TIER = RarityConfig.IndexById.Epic
 
+-- Owner's display fixes (degrees X, Y, Z), applied on top of DisplayRotation / auto stand-up in the
+-- display's own frame: X = right, Y = up, Z = toward the back. Order: Z, then X, then Y (so a Y spin
+-- happens last, around the vertical). A Z turn tilts the model sideways as seen from the front
+-- (swords and rods look better on a diagonal than bolt upright).
+local SWORD_TILT = { 0, 0, -35 }
+-- stylua: ignore
+RelicModels.DisplayTurn = {
+	SlaughterDaemon = { 0, 0, 180 }, -- Nobara's hammer came in upside down
+	TriLeafGrimoire = { 90, 180, 0 }, -- books lay flat: stand them up, then spin the cover to the front
+	DeosDiary = { 90, 180, 0 },
+	PaladynsNecklace = SWORD_TILT, -- Gon's Fishing Rod
+	BlackNichirenBlade = SWORD_TILT,
+	Zangetzu = SWORD_TILT,
+	ThunderNichirenBlade = SWORD_TILT,
+	Samehadu = SWORD_TILT,
+	Benihima = SWORD_TILT,
+	DemonDwellingSword = SWORD_TILT,
+	FlameNichirenBlade = SWORD_TILT,
+	Senbonsakura = SWORD_TILT,
+	AncientSunriseBlade = SWORD_TILT,
+} :: { [string]: { number } }
+
 local function folder(): Instance?
 	return ReplicatedStorage:FindFirstChild("RelicModels")
 end
@@ -122,6 +144,10 @@ local function fromAsset(relic: RelicConfig.Relic, asset: Instance, at: CFrame, 
 		then CFrame.Angles(math.rad(rotation.X), math.rad(rotation.Y), math.rad(rotation.Z))
 		elseif auto then CFrame.Angles(math.rad(auto[1]), math.rad(auto[2]), math.rad(auto[3]))
 		else CFrame.identity
+	local fix = RelicModels.DisplayTurn[relic.Id]
+	if fix then
+		turn = CFrame.fromEulerAnglesYXZ(math.rad(fix[1]), math.rad(fix[2]), math.rad(fix[3])) * turn
+	end
 	part.CFrame = at * turn
 	if spectral then
 		for _, child in part:GetChildren() do

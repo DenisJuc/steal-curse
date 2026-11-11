@@ -11,6 +11,11 @@ export type Entry = { Id: string, Reason: string }
 -- stylua: ignore
 ModelReview.Redo = {
 	-- Nov 11: all 24 remade from approved concepts (Tripo image-to-3D). Add ids back here if a model fails review.
+	-- Owner's Nov 11 review of the new models:
+	{ Id = "InsectNichirenBlade", Reason = "Shinobu's blade model is broken and looks very weird" },
+	{ Id = "Yorru", Reason = "blade came out far too small next to the cross guard" },
+	{ Id = "ScarlettEyes", Reason = "solid tinted jar, the eye reads poorly" },
+	{ Id = "DeathPaintWomb", Reason = "solid tinted jar, the creature reads poorly" },
 } :: { Entry }
 
 -- stylua: ignore
