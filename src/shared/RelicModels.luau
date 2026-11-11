@@ -29,8 +29,10 @@ local SWORD_TILT = { 0, 0, -35 }
 -- stylua: ignore
 RelicModels.DisplayTurn = {
 	SlaughterDaemon = { 0, 0, 180 }, -- Nobara's hammer came in upside down
-	TriLeafGrimoire = { 90, 180, 0 }, -- books lay flat: stand them up, then spin the cover to the front
-	DeosDiary = { 90, 180, 0 },
+	TriLeafGrimoire = { -90, 0, 0 }, -- books lay flat: stand them up, cover to the front, right way up
+	DeosDiary = { -90, 0, 0 },
+	QuadLeafGrimoire = { 0, 180, 0 }, -- clover cover was facing the back
+	MahoragasWheel = { 90, 0, 0 }, -- lies flat, like the wheel above Mahoraga's head
 	PaladynsNecklace = SWORD_TILT, -- Gon's Fishing Rod
 	BlackNichirenBlade = SWORD_TILT,
 	Zangetzu = SWORD_TILT,
