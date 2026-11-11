@@ -13,39 +13,19 @@ it counts as approved. In Studio, `/modelreview` puts the failing ones on spinni
 platform above you (walk up to a stand to read why it failed), `/modelreview later` shows the 6 kept for the
 final sweep, `/modelreview all` shows all 99 (redo red, later amber), `/modelreview clear` removes them and takes you back.
 
-## Redo: needs a new model (24)
+## Redo: needs a new model (0)
 
-| Tier | Relic | Why |
-|---|---|---|
-| Common | Steel Ball | black bomb with a red band, not a shiny dimpled steel ball |
-| Common | Ichiraku Ramen (id HoyPoyCapsule) | swapped from Hoi-Poi Capsule Nov 11; needs its new model |
-| Common | Den Den Mushi (id SenzoBean) | swapped from Senzu Bean Nov 11; needs its new model |
-| Common | Tanjiro's Nichirin Blade | thin purple dagger, not a black katana with the round guard |
-| Rare | Demon-Dweller Sword | spiky dagger, not a thin black katana |
-| Epic | Senbonzakura | a square guard and a handle, no blade or petals |
-| Epic | Madara's Gunbai | plain tan disc like a frying pan |
-| Epic | Demon-Slayer Sword | realistic rock texture, doesn't read as Asta's |
-| Legendary | Kubikiribocho | grey jagged dagger, no huge blade with the round hole |
-| Legendary | Bashosen | realistic palm leaf |
-| Legendary | Amber Purifying Jar | realistic brown pot |
-| Legendary | Quincy Medallion | realistic grey puck |
-| Legendary | Demon-Destroyer Sword | generic skull fantasy sword |
-| Legendary | Scarlet Eyes | murky realistic jar, the eye barely shows |
-| Mythic | Hollow Mask | generic skull with yellow eyes, not Ichigo's mask |
-| Mythic | Death Painting Womb | grimy pickle jar |
-| Mythic | Yoru | thin curved sabre, not Mihawk's huge black cross sword |
-| Mythic | Tori Tori Fruit (Phoenix) | green pineapple |
-| Celestial | Requiem Arrow | lumpy gold blob |
-| Celestial | Prison Realm | right shape but dark red; should be pale |
-| Celestial | Shichiseiken | generic realistic sword with stars |
-| Cosmic | Red Stone of Aja | red gem on a realistic rock lump |
-| Cosmic | Five-Leaf Grimoire | muddy black slab, no clover |
-| Cosmic | Yoriichi's Nichirin Blade | plain black katana, no sun guard |
+**Nov 11:** all 24 were remade from the owner-approved concepts (`work/models/concepts_redo/`, sheet
+`concepts_redo_24_v2.jpg`) with Tripo image-to-3D H3.0 (960 credits, job ids in
+`work/models/tripo/jobs_nov11.txt`) and checked in Studio. Contact sheet: `research_shots/models_nov11/`.
+The Redo list is empty; put an id back in `ModelReview.Redo` (with a row here) if a model fails review.
 
-Cost at 40 credits each: 960 of the 2,860 left.
-
-Owner's rule: Celestial and Cosmic models must be the best-looking in the game (VFX helps, but the
-model itself has to be good), so their concepts get extra detail and polish.
+Still weaker than the rest (glass jars: Tripo bakes whatever is behind the glass into a blur):
+Scarlet Eyes (eye reads as a red glow, not a sharp eye) and Death Painting Womb (the foetus is a soft
+purple shape). Demon-Dweller lost the red flame streaks on the blade.
+Yoru's blade came out shorter than Mihawk's, so it looks small next to the other swords. Quincy
+Medallion's mesh is tilted 30 degrees, fixed with a `DisplayRotation` attribute (-30, 0, 0) in its .rbxmx.
+Fronts face -Z like every other Tripo model (the review stands turn them 180 degrees).
 
 ## Later: kept for now, judged again on the final sweep (6)
 
