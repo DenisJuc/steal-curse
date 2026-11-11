@@ -36,7 +36,7 @@ local HELP = {
 	"/hunt [forest|village|ruins] - teleport to the middle of a wild area (nearest if empty)",
 	"/mapstats - part count vs the budget, props per area, signal spots",
 	"/modelcheck [all|clear] - gallery of imported relic models; map prop import status in Output",
-	"/modelreview [all|clear] - relic models flagged for a redo on spinning stands (all = every relic)",
+	"/modelreview [all|later|clear] - relic models flagged for a redo on spinning stands (all = every relic, later = kept for the final sweep)",
 	"/spawnsignal - spawn one of your signals in front of you",
 	"/regen - refill your signals to the maximum",
 	"/relocate - move your signals near you now",

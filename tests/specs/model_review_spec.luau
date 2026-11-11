@@ -18,4 +18,18 @@ return {
 			end
 		end,
 	},
+	{
+		Name = "every later entry is a real relic with a reason, never also on the redo list",
+		Run = function()
+			local seen = {}
+			for _, entry in ModelReview.Later do
+				expect.truthy(RelicConfig.ById[entry.Id] ~= nil, `{entry.Id} is not a relic id`)
+				expect.truthy(not seen[entry.Id], `{entry.Id} is listed twice`)
+				expect.truthy(ModelReview.ById[entry.Id] == nil, `{entry.Id} is on both lists`)
+				seen[entry.Id] = true
+				expect.truthy(#entry.Reason > 0, `{entry.Id} has no reason`)
+				expect.truthy(ModelReview.LaterById[entry.Id] == entry, `{entry.Id} lookup`)
+			end
+		end,
+	},
 }

@@ -65,7 +65,7 @@ RelicConfig.Relics = {
 	{ Id = "Zangetzu", Name = "Zangetsu", Tier = "Uncommon", Weight = 56, Family = "Spiritual", ObjectType = "Weapon", Vfx = "Spirit", Description = "Its slash leaves a crescent hanging in the air." },
 	{ Id = "PowaPole", Name = "Power Pole", Tier = "Uncommon", Weight = 52, Family = "Astral", ObjectType = "Weapon", Vfx = "Storm", Description = "Say \"extend\" and mean it." },
 	{ Id = "ThunderNichirenBlade", Name = "Zenitsu's Nichirin Blade", Tier = "Uncommon", Weight = 48, Family = "Demonic", ObjectType = "Weapon", Vfx = "Storm", Description = "One draw, one flash, one strike." },
-	{ Id = "SerratedTwinBlades", Name = "Tengen's Nichirin Cleavers", Tier = "Uncommon", Weight = 44, Family = "Demonic", ObjectType = "Weapon", Vfx = "Blood", Description = "Two cleavers on one chain. Flashy, like their owner." },
+	{ Id = "SerratedTwinBlades", Name = "Inosuke's Nichirin Blades", Tier = "Uncommon", Weight = 44, Family = "Demonic", ObjectType = "Weapon", Vfx = "Blood", Description = "Two blades chipped jagged on purpose. Their owner charges first." },
 
 	-- Rare (15)
 	{ Id = "HolloBait", Name = "Substitute Soul Reaper Badge", Tier = "Rare", Weight = 100, Family = "Demonic", ObjectType = "Special", Vfx = "Shadow", Description = "Press it to your chest and step out of your own body." },
@@ -106,7 +106,7 @@ RelicConfig.Relics = {
 	{ Id = "FourStarDragunBall", Name = "Four-Star Dragon Ball", Tier = "Legendary", Weight = 88, Family = "Astral", ObjectType = "Crystal", Vfx = "Starlight", Description = "Gather all seven and the sky starts listening." },
 	{ Id = "GoraGoraFruit", Name = "Goro Goro Fruit", Tier = "Legendary", Weight = 84, Family = "Astral", ObjectType = "Crystal", Vfx = "Storm", Description = "Lightning sleeps inside it. Lightly." },
 	{ Id = "PekaPekaFruit", Name = "Pika Pika Fruit", Tier = "Legendary", Weight = 80, Family = "Spiritual", ObjectType = "Special", Vfx = "Holy", Description = "Bite it and you're gone at the speed of light." },
-	{ Id = "Enmah", Name = "Enma", Tier = "Legendary", Weight = 76, Family = "Arcane", ObjectType = "Weapon", Vfx = "Shadow", Description = "It pulls power out of whoever holds it. Only the strong keep up." },
+	{ Id = "Enmah", Name = "Zoro's Three Swords", Tier = "Legendary", Weight = 76, Family = "Arcane", ObjectType = "Weapon", Vfx = "Shadow", Description = "Wado, Kitetsu and Enma. One goes in the mouth." },
 	{ Id = "BashosanFan", Name = "Bashosen", Tier = "Legendary", Weight = 72, Family = "Astral", ObjectType = "Special", Vfx = "Storm", Description = "Each wave brings a different element." },
 	{ Id = "KohakoJar", Name = "Amber Purifying Jar", Tier = "Legendary", Weight = 68, Family = "Spiritual", ObjectType = "Mask", Vfx = "Spirit", Description = "Say your favorite word near it and you're inside." },
 	{ Id = "QuinsyMedallion", Name = "Quincy Medallion", Tier = "Legendary", Weight = 64, Family = "Arcane", ObjectType = "Crystal", Vfx = "Starlight", Description = "It steals the power you lean on most." },

@@ -7,7 +7,7 @@
 --   /mapstats          part count vs the budget, props per area, signal spots
 --   /modelcheck [all|clear]   gallery of imported relic models with warnings (all = include missing ones);
 --                      also lists which map props are imported, still primitives, or wrongly named
---   /modelreview [all|clear]   relic models that need a redo (ModelReview.Redo) on spinning stands in
+--   /modelreview [all|later|clear] relic models that need a redo (ModelReview.Redo) on spinning stands in
 --                      front of you, with the reason; all = every relic, redo ones in red
 --   /spawnsignal       spawn one of your signals right in front of you (ignores the cap)
 --   /regen             refill your signals to the maximum
@@ -972,8 +972,13 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			local shown = {}
 			for _, relic in RelicConfig.Relics do
 				local entry = ModelReview.ById[relic.Id]
-				if entry or mode == "all" then
-					table.insert(shown, { Relic = relic, Entry = entry })
+				local later = ModelReview.LaterById[relic.Id]
+				if mode == "later" then
+					if later then
+						table.insert(shown, { Relic = relic, Later = later })
+					end
+				elseif entry or mode == "all" then
+					table.insert(shown, { Relic = relic, Entry = entry, Later = later })
 				end
 			end
 
@@ -1006,7 +1011,10 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				stand.Size = Vector3.new(1, 4.5, 4.5)
 				stand.CFrame = CFrame.new(spot.Position) * CFrame.Angles(0, 0, math.rad(90))
 				stand.Material = Enum.Material.Slate
-				stand.Color = if item.Entry then Color3.fromRGB(90, 40, 40) else Color3.fromRGB(40, 70, 50)
+				stand.Color = if item.Entry
+					then Color3.fromRGB(90, 40, 40)
+					elseif item.Later then Color3.fromRGB(95, 75, 30)
+					else Color3.fromRGB(40, 70, 50)
 				stand.Parent = folder
 				local center = spot.Position + Vector3.new(0, 3.4, 0)
 				local model = RelicModels.build(item.Relic.Id, CFrame.new(center) * spot.Rotation * CFrame.Angles(0, math.pi, 0))
@@ -1034,9 +1042,17 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 				label.TextScaled = true
 				label.Font = Enum.Font.GothamBold
 				label.TextStrokeTransparency = 0.3
-				label.TextColor3 = if item.Entry then Color3.fromRGB(255, 120, 100) else Color3.fromRGB(120, 230, 140)
+				label.TextColor3 = if item.Entry
+					then Color3.fromRGB(255, 120, 100)
+					elseif item.Later then Color3.fromRGB(255, 200, 90)
+					else Color3.fromRGB(120, 230, 140)
 				label.Text = `{item.Relic.Name} ({item.Relic.Tier})\n`
-					.. (if item.Entry then `REDO: {item.Entry.Reason}` else "approved")
+					.. (
+						if item.Entry
+							then `REDO: {item.Entry.Reason}`
+							elseif item.Later then `LATER: {item.Later.Reason}`
+							else "approved"
+					)
 				label.Parent = billboard
 			end
 			folder.Parent = workspace
@@ -1060,7 +1076,12 @@ local function buildHandlers(map: Map): { [string]: (Player, { string }) -> () }
 			reply(
 				player,
 				`{#ModelReview.Redo} relic models flagged for a redo`
-					.. (if mode == "all" then `, showing all {#shown} relics (redo = red)` else `, all in front of you`)
+					.. (
+						if mode == "all"
+							then `, showing all {#shown} relics (redo = red, later = amber)`
+							elseif mode == "later" then `; showing the {#shown} kept for the final sweep`
+							else `, all in front of you`
+					)
 					.. ". Everything not flagged is approved. Walk along the rows to read each reason;"
 					.. " /modelreview clear removes them and takes you back."
 			)

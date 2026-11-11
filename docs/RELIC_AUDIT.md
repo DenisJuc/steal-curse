@@ -57,7 +57,7 @@ work/models/tripo/jobs_nov10b.txt, 720 credits).
 | Zangetzu | Zangetsu | |
 | PowaPole | Power Pole | |
 | ThunderNichirenBlade | Zenitsu's Nichirin Blade | |
-| SerratedTwinBlades | Tengen's Nichirin Cleavers | |
+| SerratedTwinBlades | Inosuke's Nichirin Blades | renamed Nov 10 to match the model |
 
 ## Rare (15)
 
@@ -107,7 +107,7 @@ work/models/tripo/jobs_nov10b.txt, 720 credits).
 | FourStarDragunBall | Four-Star Dragon Ball | |
 | GoraGoraFruit | Goro Goro Fruit | |
 | PekaPekaFruit | Pika Pika Fruit | |
-| Enmah | Enma | |
+| Enmah | Zoro's Three Swords | renamed Nov 10 to match the model |
 | BashosanFan | Bashosen | |
 | KohakoJar | Amber Purifying Jar | |
 | QuinsyMedallion | Quincy Medallion | |
