@@ -13,7 +13,7 @@ it counts as approved. In Studio, `/modelreview` puts the failing ones on spinni
 platform above you (walk up to a stand to read why it failed), `/modelreview later` shows the 6 kept for the
 final sweep, `/modelreview all` shows all 99 (redo red, later amber), `/modelreview clear` removes them and takes you back.
 
-## Redo: needs a new model (6, owner's Nov 11 review)
+## Redo: needs a new model (5, owner's Nov 11 review)
 
 | Relic | Why |
 |---|---|
