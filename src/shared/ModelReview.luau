@@ -12,11 +12,7 @@ export type Entry = { Id: string, Reason: string }
 ModelReview.Redo = {
 	-- Nov 11: all 24 remade from approved concepts (Tripo image-to-3D). Add ids back here if a model fails review.
 	-- Owner's Nov 11 review of the new models:
-	{ Id = "InsectNichirenBlade", Reason = "Shinobu's blade model is broken and looks very weird" },
-	{ Id = "Yorru", Reason = "blade came out far too small next to the cross guard" },
-	{ Id = "ScarlettEyes", Reason = "relic is now Tobi's Mask; still the old jar model" },
-	{ Id = "TengensCleavers", Reason = "new relic, no model yet" },
-	{ Id = "DeathPaintWomb", Reason = "solid tinted jar, the creature reads poorly" },
+	{ Id = "Yorru", Reason = "blade came out far too small next to the cross guard; owner will redesign the concept" },
 } :: { Entry }
 
 -- stylua: ignore

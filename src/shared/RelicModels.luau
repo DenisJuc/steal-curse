@@ -39,6 +39,7 @@ RelicModels.DisplayTurn = {
 	Benihima = SWORD_TILT,
 	DemonDwellingSword = SWORD_TILT,
 	FlameNichirenBlade = SWORD_TILT,
+	InsectNichirenBlade = SWORD_TILT, -- Shinobu's, matches the other Nichirin blades
 	Senbonsakura = SWORD_TILT,
 	AncientSunriseBlade = SWORD_TILT,
 } :: { [string]: { number } }

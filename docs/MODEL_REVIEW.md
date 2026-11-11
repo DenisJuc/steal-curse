@@ -13,15 +13,15 @@ it counts as approved. In Studio, `/modelreview` puts the failing ones on spinni
 platform above you (walk up to a stand to read why it failed), `/modelreview later` shows the 6 kept for the
 final sweep, `/modelreview all` shows all 99 (redo red, later amber), `/modelreview clear` removes them and takes you back.
 
-## Redo: needs a new model (5, owner's Nov 11 review)
+## Redo: needs a new model (1)
 
 | Relic | Why |
 |---|---|
-| Shinobu's Nichirin Blade | old model is broken; new concept approved |
-| Yoru | blade too small next to the guard; Tripo free retry on the existing job |
-| Death Painting Womb | solid jar read poorly; new no-jar concept approved |
-| Tobi's Mask (id ScarlettEyes) | swapped from Scarlet Eyes; needs its model |
-| Tengen's Nichirin Cleavers (new) | new relic, no model yet |
+| Yoru | blade too small next to the guard (first free retry didn't fix it; a 2nd one ran, not checked, 1 left on job 0d52c88a); owner will redesign the concept |
+
+Done Nov 11 (evening, 160 credits, contact shot `research_shots/models_nov11/contact_sheet_5.jpg`):
+Shinobu's Nichirin Blade (new model, 2nd free retry kept), Death Painting Womb (creature on a cushion),
+Tobi's Mask (id ScarlettEyes), Tengen's Nichirin Cleavers (new relic).
 
 Also fixed by display turn only (`RelicModels.DisplayTurn`): Nobara's hammer flipped, Three-Leaf Grimoire
 and DIO's Diary stood up, 10 swords/rods tilted onto a diagonal.
