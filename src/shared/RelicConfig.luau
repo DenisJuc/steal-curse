@@ -5,7 +5,7 @@
 -- DragonsBone = Inosuke's Boar Mask, GreedyIslandBook = Killua's Yo-yos, HolloBait = Substitute Soul
 -- Reaper Badge, BlackenedRope = Gojo's Blindfold, RiskieDice = Hisoka's Cards, OniSpineNaginata =
 -- Gaara's Gourd, StaffOfJudgement = Nezuko's Box.
--- Nov 11, same rule: HoyPoyCapsule = Ichiraku Ramen, SenzoBean = Den Den Mushi.
+-- Nov 11, same rule: HoyPoyCapsule = Ichiraku Ramen, SenzoBean = Den Den Mushi, ScarlettEyes = Tobi's Mask.
 -- Weight = relative chance inside its tier (every weight in a tier is different, so every relic
 -- has its own base odds); base odds are derived by RollMath, never typed by hand.
 -- ObjectType picks the shared capture animation family (Weapon, Book, Mask, Crystal, Special).
@@ -112,7 +112,7 @@ RelicConfig.Relics = {
 	{ Id = "KohakoJar", Name = "Amber Purifying Jar", Tier = "Legendary", Weight = 68, Family = "Spiritual", ObjectType = "Mask", Vfx = "Spirit", Description = "Say your favorite word near it and you're inside." },
 	{ Id = "QuinsyMedallion", Name = "Quincy Medallion", Tier = "Legendary", Weight = 64, Family = "Arcane", ObjectType = "Crystal", Vfx = "Starlight", Description = "It steals the power you lean on most." },
 	{ Id = "DemonDestroyingSword", Name = "Demon-Destroyer Sword", Tier = "Legendary", Weight = 60, Family = "Demonic", ObjectType = "Weapon", Vfx = "Blood", Description = "A demon is still screaming somewhere inside the steel." },
-	{ Id = "ScarlettEyes", Name = "Scarlet Eyes", Tier = "Legendary", Weight = 56, Family = "Demonic", ObjectType = "Mask", Vfx = "Blood", Description = "Two scarlet eyes float in the jar. They follow you." },
+	{ Id = "ScarlettEyes", Name = "Tobi's Mask", Tier = "Legendary", Weight = 56, Family = "Demonic", ObjectType = "Mask", Vfx = "Blood", Description = "One eye hole, one orange swirl. Nobody knows the face under it." },
 	{ Id = "HanafudaEarrings", Name = "Tanjiro's Hanafuda Earrings", Tier = "Legendary", Weight = 52, Family = "Spiritual", ObjectType = "Crystal", Vfx = "Ember", Description = "Passed down with a dance, and the dance hides a sun." },
 
 	-- Mythic (11)
@@ -127,6 +127,7 @@ RelicConfig.Relics = {
 	{ Id = "ToryToryPhoenixFruit", Name = "Tori Tori Fruit (Phoenix)", Tier = "Mythic", Weight = 68, Family = "Spiritual", ObjectType = "Special", Vfx = "Ember", Description = "It burns blue, and heals whatever it burns." },
 	{ Id = "BenihisagaGourd", Name = "Benihisago", Tier = "Mythic", Weight = 64, Family = "Arcane", ObjectType = "Mask", Vfx = "Spirit", Description = "Answer when it calls your name, and you're sealed inside." },
 	{ Id = "HokageHat", Name = "Hokage Hat", Tier = "Mythic", Weight = 60, Family = "Spiritual", ObjectType = "Mask", Vfx = "Ember", Description = "Heavy with every name that wore it before." },
+	{ Id = "TengensCleavers", Name = "Tengen's Nichirin Cleavers", Tier = "Mythic", Weight = 56, Family = "Astral", ObjectType = "Weapon", Vfx = "Storm", Description = "Two cleavers on one chain. Flashy, like their owner." },
 
 	-- Celestial (11)
 	{ Id = "Hogyuku", Name = "Hogyoku", Tier = "Celestial", Weight = 100, Family = "Astral", ObjectType = "Special", Vfx = "Starlight", Description = "It grants what its holder's heart truly wants." },

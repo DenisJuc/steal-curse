@@ -112,7 +112,7 @@ work/models/tripo/jobs_nov10b.txt, 720 credits).
 | KohakoJar | Amber Purifying Jar | |
 | QuinsyMedallion | Quincy Medallion | |
 | DemonDestroyingSword | Demon-Destroyer Sword | |
-| ScarlettEyes | Scarlet Eyes | |
+| ScarlettEyes | Tobi's Mask | SWAP Nov 11 (was Scarlet Eyes; the jar never read well) |
 | *(new)* | **Tanjiro's Hanafuda Earrings** | NEW |
 
 ## Mythic (11)
@@ -130,6 +130,7 @@ work/models/tripo/jobs_nov10b.txt, 720 credits).
 | ToryToryPhoenixFruit | Tori Tori Fruit (Phoenix) | |
 | BenihisagaGourd | Benihisago | |
 | *(new)* | **Hokage Hat** | NEW |
+| *(new, Nov 11)* `TengensCleavers` | **Tengen's Nichirin Cleavers** | NEW (Mythic; roster is now 100) |
 
 ## Celestial (11)
 
